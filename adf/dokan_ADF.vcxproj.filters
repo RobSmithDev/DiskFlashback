@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="ADF.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="ADF_operations.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ADF.h" />
+    <ClInclude Include="ADF_operations.h" />
+    <ClInclude Include="resource.h">
+      <Filter>res</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="res">
+      <UniqueIdentifier>{127bdd12-1cde-4d58-b94d-19c809bd6611}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource.rc">
+      <Filter>res</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="floppy.ico">
+      <Filter>res</Filter>
+    </Image>
+  </ItemGroup>
+</Project>

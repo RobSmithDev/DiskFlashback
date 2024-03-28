@@ -101,6 +101,8 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
             if (search != 0) 
                 return STATUS_OBJECT_NAME_COLLISION;
 
+            if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+
             size_t parentFolder = windowsPath.rfind(L'\\');
             SECTNUM rootFolder = v->rootBlock;
             std::string amigaName;
@@ -117,7 +119,8 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
 
             if (amigaName.length() > MAXNAMELEN) return STATUS_OBJECT_NAME_INVALID;
 
-            if (adfCountFreeBlocks(v) < 1) return STATUS_DISK_FULL;
+            if (adfCountFreeBlocks(v) < 1) 
+                return STATUS_DISK_FULL;
 
             if (adfCreateDir(v, rootFolder, amigaName.c_str()) != RC_OK) 
                 return STATUS_DATA_ERROR;
@@ -135,6 +138,9 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
         if (generic_desiredaccess & GENERIC_WRITE) access |= AdfFileMode::ADF_FILE_MODE_WRITE;
         if (generic_desiredaccess & GENERIC_ALL) access |= AdfFileMode::ADF_FILE_MODE_READ | AdfFileMode::ADF_FILE_MODE_WRITE;
 
+        if (access & AdfFileMode::ADF_FILE_MODE_WRITE)
+            if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+
         size_t parentFolder = windowsPath.rfind(L'\\');
         std::string amigaName;
 
@@ -143,7 +149,7 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
         if ((rc == RC_OK) && (parent.secType == ST_FILE)) {
             // Cannot delete a file with readonly attributes.
             if (file_attributes_and_flags & FILE_FLAG_DELETE_ON_CLOSE) 
-                if ((file_attributes_and_flags & FILE_ATTRIBUTE_READONLY) || (hasW(parent.access)))
+                if ((file_attributes_and_flags & FILE_ATTRIBUTE_READONLY) || (hasW(parent.access) || (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected())))
                     return STATUS_CANNOT_DELETE;
             
             // Cannot open a readonly file for writing.
@@ -185,7 +191,9 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
         if ((rc == RC_OK) && (parent.secType == ST_FILE)) {
             int32_t oldAccess = parent.access;
             if ((file_attributes_and_flags & FILE_FLAG_DELETE_ON_CLOSE) || (access)) oldAccess &= ~(ACCMASK_R | ACCMASK_D);
-            if (oldAccess != parent.access) adfSetEntryAccess(v, v->curDirPtr, amigaName.c_str(), oldAccess);
+            if (oldAccess != parent.access) 
+                if (!(reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()))
+                    adfSetEntryAccess(v, v->curDirPtr, amigaName.c_str(), oldAccess);
         }
 
         // Open fail?
@@ -199,7 +207,8 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
         switch (creation_disposition) {
             case CREATE_ALWAYS:          
                 if (search != ST_FILE) 
-                    if (adfCountFreeBlocks(v) < 1) return STATUS_DISK_FULL;
+                    if (adfCountFreeBlocks(v) < 1) 
+                        return STATUS_DISK_FULL;
 
                 // Its possible to create, with GENERIC_WRITE not specified! so this bypasses the problem
                 if (access != AdfFileMode::ADF_FILE_MODE_WRITE) {
@@ -218,7 +227,8 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
             case CREATE_NEW:
                 // Fail if it already exists
                 if (search == ST_FILE) return STATUS_OBJECT_NAME_COLLISION; 
-                if (adfCountFreeBlocks(v) < 1) return STATUS_DISK_FULL;
+                if (adfCountFreeBlocks(v) < 1) 
+                    return STATUS_DISK_FULL;
 
                 // Its possible to create, with GENERIC_WRITE not specified! so this bypasses the problem
                 if (access != AdfFileMode::ADF_FILE_MODE_WRITE) {
@@ -302,6 +312,8 @@ static NTSTATUS DOKAN_CALLBACK fs_readfile(LPCWSTR filename, LPVOID buffer, DWOR
 }
 
 static NTSTATUS DOKAN_CALLBACK fs_writefile(LPCWSTR filename, LPCVOID buffer, DWORD number_of_bytes_to_write, LPDWORD number_of_bytes_written, LONGLONG offset, PDOKAN_FILE_INFO dokanfileinfo) {
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+
     if (dokanfileinfo->Context) {
         AdfFile* fle = (AdfFile*)dokanfileinfo->Context;
 
@@ -336,10 +348,10 @@ static NTSTATUS DOKAN_CALLBACK fs_writefile(LPCWSTR filename, LPCVOID buffer, DW
             if (adfFileSeek(fle, offset) != RC_OK)
                 return STATUS_DATA_ERROR;
 
-        DWORD written = adfFileWrite(fle, number_of_bytes_to_write, (uint8_t*)buffer);
+        DWORD written = adfFileWrite(fle,number_of_bytes_to_write, (uint8_t*)buffer);
         if (number_of_bytes_written) *number_of_bytes_written = written;
 
-        if (written < number_of_bytes_to_write) return STATUS_DISK_FULL;
+        if (written < number_of_bytes_to_write)  return STATUS_DISK_FULL;
 
         // This shouldn't ever happen
         if (fle->curDataPtr == 0) return STATUS_DATA_ERROR;
@@ -350,6 +362,8 @@ static NTSTATUS DOKAN_CALLBACK fs_writefile(LPCWSTR filename, LPCVOID buffer, DW
 
 static NTSTATUS DOKAN_CALLBACK fs_flushfilebuffers(LPCWSTR filename, PDOKAN_FILE_INFO dokanfileinfo) {
     UNREFERENCED_PARAMETER(filename);
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+
     if (dokanfileinfo->Context) {
         AdfFile* fle = (AdfFile*)dokanfileinfo->Context;
         if (adfFileFlush(fle) == RC_OK) return STATUS_SUCCESS;
@@ -360,6 +374,8 @@ static NTSTATUS DOKAN_CALLBACK fs_flushfilebuffers(LPCWSTR filename, PDOKAN_FILE
 
 static NTSTATUS DOKAN_CALLBACK fs_setendoffile(LPCWSTR filename, LONGLONG ByteOffset, PDOKAN_FILE_INFO dokanfileinfo) {
     UNREFERENCED_PARAMETER(filename);
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+
     if (dokanfileinfo->Context) {
         AdfFile* fle = (AdfFile*)dokanfileinfo->Context;
         if (adfFileTruncate(fle, ByteOffset) == RC_OK) return STATUS_SUCCESS;
@@ -369,6 +385,8 @@ static NTSTATUS DOKAN_CALLBACK fs_setendoffile(LPCWSTR filename, LONGLONG ByteOf
 
 static NTSTATUS DOKAN_CALLBACK fs_setallocationsize(LPCWSTR filename, LONGLONG alloc_size, PDOKAN_FILE_INFO dokanfileinfo) {
     UNREFERENCED_PARAMETER(filename);
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+
     if (dokanfileinfo->Context) {
         AdfFile* fle = (AdfFile*)dokanfileinfo->Context;
         uint32_t siz = adfFileGetSize(fle);
@@ -384,7 +402,8 @@ static NTSTATUS DOKAN_CALLBACK fs_setallocationsize(LPCWSTR filename, LONGLONG a
                 uint32_t written = adfFileWriteFilled(fle, 0, toWrite);
                 adfFileSeek(fle, pos);
 
-                if (toWrite > written) return STATUS_DISK_FULL;
+                if (toWrite > written) 
+                    return STATUS_DISK_FULL;
                 return STATUS_SUCCESS;
             }
         }
@@ -408,7 +427,7 @@ static NTSTATUS DOKAN_CALLBACK fs_getfileInformation(LPCWSTR filename, LPBY_HAND
     if ((parent.secType != ST_FILE) && (parent.secType != ST_DIR) && (parent.secType != ST_ROOT)) return STATUS_OBJECT_NAME_NOT_FOUND;
 
     struct AdfEntry e;
-
+ 
     e.access = parent.access;
     e.type = parent.secType;
     buffer->dwFileAttributes =amigaToWindowsAttributes(parent.access, search);
@@ -483,6 +502,7 @@ static NTSTATUS DOKAN_CALLBACK fs_findfiles(LPCWSTR filename, PFillFindData fill
 
 static NTSTATUS DOKAN_CALLBACK fs_setfileattributes(LPCWSTR filename, DWORD fileattributes, PDOKAN_FILE_INFO dokanfileinfo) {
     struct AdfVolume* v = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->volume();
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
 
     std::wstring windowsPath = filename;
     if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
@@ -511,6 +531,7 @@ static NTSTATUS DOKAN_CALLBACK fs_setfileattributes(LPCWSTR filename, DWORD file
 
 static NTSTATUS DOKAN_CALLBACK fs_setfiletime(LPCWSTR filename, CONST FILETIME* creationtime, CONST FILETIME* lastaccesstime, CONST FILETIME* lastwritetime, PDOKAN_FILE_INFO dokanfileinfo) {
     struct AdfVolume* v = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->volume();
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
 
     std::wstring windowsPath = filename;
     if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
@@ -546,6 +567,7 @@ static NTSTATUS DOKAN_CALLBACK fs_setfiletime(LPCWSTR filename, CONST FILETIME* 
 
 static NTSTATUS DOKAN_CALLBACK fs_deletefile(LPCWSTR filename, PDOKAN_FILE_INFO dokanfileinfo) {
     struct AdfVolume* v = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->volume();
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
 
     std::wstring windowsPath = filename;
     if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
@@ -572,6 +594,7 @@ static NTSTATUS DOKAN_CALLBACK fs_deletefile(LPCWSTR filename, PDOKAN_FILE_INFO 
 
 static NTSTATUS DOKAN_CALLBACK fs_deletedirectory(LPCWSTR filename, PDOKAN_FILE_INFO dokanfileinfo) {
     struct AdfVolume* v = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->volume();
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
 
     std::wstring windowsPath = filename;
     if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
@@ -595,6 +618,7 @@ static NTSTATUS DOKAN_CALLBACK fs_deletedirectory(LPCWSTR filename, PDOKAN_FILE_
 
 static NTSTATUS DOKAN_CALLBACK fs_movefile(LPCWSTR filename, LPCWSTR new_filename, BOOL replace_if_existing, PDOKAN_FILE_INFO dokanfileinfo) {
     struct AdfVolume* v = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->volume();
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
 
     std::wstring windowsPath = filename;
     if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
@@ -650,7 +674,8 @@ static NTSTATUS DOKAN_CALLBACK fs_getdiskfreespace(PULONGLONG free_bytes_availab
     uint32_t numBlocks = (v->lastBlock - v->firstBlock) - 1;  
     uint32_t blocksFree = adfCountFreeBlocks(v);
     *total_number_of_bytes = numBlocks * v->datablockSize;
-    *total_number_of_free_bytes = *free_bytes_available = blocksFree * v->datablockSize;    
+    *total_number_of_free_bytes = blocksFree * v->datablockSize;    
+    *free_bytes_available = blocksFree * v->datablockSize;
     return STATUS_SUCCESS;
 }
 
@@ -662,10 +687,7 @@ static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation( LPWSTR volumename_buffer
     wcscpy_s(volumename_buffer, volumename_size, volName.c_str());
     *volume_serialnumber = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->volumeSerial(); // make one up
     *maximum_component_length = MAXNAMELEN;
-    *filesystem_flags = FILE_CASE_PRESERVED_NAMES;
-    *filesystem_flags = FILE_CASE_SENSITIVE_SEARCH | FILE_CASE_PRESERVED_NAMES |
-        FILE_SUPPORTS_REMOTE_STORAGE | FILE_UNICODE_ON_DISK |
-        FILE_NAMED_STREAMS;
+    *filesystem_flags = FILE_CASE_PRESERVED_NAMES | FILE_SUPPORTS_REMOTE_STORAGE;
 
     std::wstring volType = L"Amiga ";
 
@@ -680,6 +702,8 @@ static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation( LPWSTR volumename_buffer
     if (isINTL(v->dosType)) volType += L" Intl";
     if (isDIRCACHE(v->dosType)) volType += L" Dir Cache";
     wcscpy_s(filesystem_name_buffer, filesystem_name_size, volType.c_str());
+
+    if (reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext)->isWriteProtected()) *filesystem_flags |= FILE_READ_ONLY_VOLUME;
 
     return STATUS_SUCCESS;
 }

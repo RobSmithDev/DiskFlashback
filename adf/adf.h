@@ -18,11 +18,12 @@ class fs {
 		struct AdfDevice* m_adfDevice;
 		struct AdfVolume* m_adfVolume;
 		std::wstring m_drive;
+		bool m_readOnly;
 
 		// Reverse mapping for badly named files
 		std::map<std::string, std::wstring> m_safeFilenameMap;
 	public:
-		fs(struct AdfDevice* adfFile, struct AdfVolume* adfVolume, WCHAR driveLetter);
+		fs(struct AdfDevice* adfFile, struct AdfVolume* adfVolume, WCHAR driveLetter, bool readOnly);
 		void start();
 		void stop();
 		bool isRunning();
@@ -37,6 +38,9 @@ class fs {
 
 		// Return TRUE if file is in use
 		bool isFileInUse(SECTNUM fileRoot, const std::string& filename) { return false; };
+
+		// Returns TRUE if write protected
+		bool isWriteProtected();
 
 		struct AdfDevice* device() { return m_adfDevice; };
 		struct AdfVolume* volume() { return m_adfVolume; };

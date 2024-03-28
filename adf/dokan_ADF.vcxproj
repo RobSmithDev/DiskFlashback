@@ -342,13 +342,22 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ADF.cpp" />
+    <ClCompile Include="amiga_sectors.cpp" />
+    <ClCompile Include="floppybridge_lib.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ADF_operations.cpp" />
+    <ClCompile Include="readwrite_file.cpp" />
+    <ClCompile Include="readwrite_floppybridge.cpp" />
     <ClCompile Include="sectorCache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ADF.h" />
     <ClInclude Include="ADF_operations.h" />
+    <ClInclude Include="amiga_sectors.h" />
+    <ClInclude Include="floppybridge_abstract.h" />
+    <ClInclude Include="floppybridge_lib.h" />
+    <ClInclude Include="readwrite_file.h" />
+    <ClInclude Include="readwrite_floppybridge.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="sectorCache.h" />
   </ItemGroup>
@@ -358,6 +367,9 @@
     </ProjectReference>
     <ProjectReference Include="..\ADFlib\win32\src\adf.vcxproj">
       <Project>{70b5fad1-b4b3-3df0-a4ce-3f0ac4343ecd}</Project>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\Rob\OneDrive\Original Layout\Documents\Programming\Embedded\ReadFloppyDisk.sketch\bridge\FloppyDriveBridge\windows\FloppyBridge.vcxproj">
+      <Project>{ebf9eb12-0bf9-4299-a86f-c36236eaba45}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

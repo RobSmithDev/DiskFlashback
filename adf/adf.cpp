@@ -1,7 +1,8 @@
 #include "adf.h"
+#include "sectorCache.h"
 
 
-fs::fs(struct AdfDevice* adfDevice, struct AdfVolume* adfVolume, WCHAR driveLetter) : m_adfDevice(adfDevice), m_adfVolume(adfVolume) {
+fs::fs(struct AdfDevice* adfDevice, struct AdfVolume* adfVolume, WCHAR driveLetter, bool readOnly) : m_readOnly(readOnly), m_adfDevice(adfDevice), m_adfVolume(adfVolume) {
 	m_drive.resize(3);
 	m_drive[0] = driveLetter;
 	m_drive[1] = L':';
@@ -17,9 +18,12 @@ void fs::start() {
 	dokan_options.SingleThread = true;
 	dokan_options.Timeout = 0;
 	dokan_options.GlobalContext = reinterpret_cast<ULONG64>(this);
+	dokan_options.SectorSize = m_adfVolume->blockSize;
+	dokan_options.Timeout = 5 * 60 * 1000; // 5 minute timeout - disks are SLOW!
+
 	// DOKAN_OPTION_WRITE_PROTECT
 #ifdef _DEBUG
-	//dokan_options.Options |= DOKAN_OPTION_STDERR | DOKAN_OPTION_DEBUG;
+	dokan_options.Options |= DOKAN_OPTION_STDERR;
 		//dokan_options.Options |= DOKAN_OPTION_DISPATCH_DRIVER_LOGS;
 #endif
 	NTSTATUS status = DokanCreateFileSystem(&dokan_options, &fs_operations, &m_instance);
@@ -46,6 +50,10 @@ void fs::start() {
 	}
 }
 
+// Returns TRUE if write protected
+bool fs::isWriteProtected() {
+	return m_readOnly || ((m_adfDevice->nativeDev) && (((SectorCacheEngine*)m_adfDevice->nativeDev)->isDiskWriteProtected()));
+}
 
 bool fs::isRunning() {
 	return DokanIsFileSystemRunning(m_instance);	

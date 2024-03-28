@@ -8,6 +8,8 @@
 #include "adf_operations.h"
 #include <errno.h>
 #include "sectorCache.h"
+#include "readwrite_file.h"
+#include "readwrite_floppybridge.h"
 
 std::vector<fs*> dokan_fs;
 struct AdfDevice* adfFile = nullptr;
@@ -50,7 +52,10 @@ void Verbose(char* msg) {
 
 
 
-RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const BOOL ro) {
+RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const BOOL ro) {    
+    SectorRW_FloppyBridge* d = new SectorRW_FloppyBridge("");
+    /*
+
     HANDLE fle = CreateFileA(name, GENERIC_READ | (ro ? 0 : GENERIC_WRITE), 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, 0);
     if (fle == INVALID_HANDLE_VALUE) {
         int err = GetLastError();
@@ -62,15 +67,19 @@ RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const
     if (!d) {
         CloseHandle(fle);
         return RC_ERROR;
-    }
-    dev->size = GetFileSize(fle, NULL);
+    }*/
+
+    //dev->size = GetFileSize(fle, NULL);
+
+    dev->size = d->getDiskDataSize();
+
     dev->nativeDev = (void*)d;
 
     return RC_OK;
 }
 
 RETCODE adfReleaseDevice(struct AdfDevice* const dev) {
-    NativeDeviceCached* d = (NativeDeviceCached*)dev->nativeDev;
+    SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
     if (d) {
         delete d;
         dev->nativeDev = nullptr;
@@ -79,12 +88,12 @@ RETCODE adfReleaseDevice(struct AdfDevice* const dev) {
 }
 
 RETCODE adfNativeReadSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, uint8_t* const buf) {    
-    NativeDeviceCached* d = (NativeDeviceCached*)dev->nativeDev;
+    SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
     return d->readData(n, size, buf) ? RC_OK : RC_ERROR;
 }
 
 RETCODE adfNativeWriteSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, const uint8_t* const buf) {
-    NativeDeviceCached* d = (NativeDeviceCached*)dev->nativeDev;
+    SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
     return d->writeData(n, size, buf) ? RC_OK : RC_ERROR;
 }
 
@@ -117,8 +126,6 @@ int __cdecl wmain(ULONG argc, PWCHAR argv[]) {
         if ((letter < 'A') || (letter > 'Z')) return 3;
 
         if (std::wstring(argv[1]) == L"FILE") {
-
-
             std::string ansiFilename;
             wideToAnsi(argv[3], ansiFilename);
 
@@ -126,15 +133,33 @@ int __cdecl wmain(ULONG argc, PWCHAR argv[]) {
             
             if (!adfFile) return 4;
         }
-        else {
+        else 
+            if (std::wstring(argv[1]) == L"DRIVE") {
+                if (argc < 5) return 2;
 
-        }
+                std::string ansiConfig;
+                wideToAnsi(argv[3], ansiConfig);
+
+              
+                /* ARG 3 = Driver Type (DrawBridge, Greaseweazle, Supercard Pro)
+                bridge = FloppyBridgeAPI::createDriver(_wtoi(argv[3]));
+                if (!bridge) return 4;
+
+                int comPort = _wtoi(argv[4]);
+
+                bridge->setBridgeMode(FloppyBridge::BridgeMode::bmStalling);
+                bridge->setComPortAutoDetect(comPort == 0);
+                if (comPort) {
+                    std::wstring port = L"\\\\.\\COM" + std::to_wstring(comPort);
+                    bridge->setComPort((TCHAR*)port.c_str());
+                }*/
+            }
 
         // Attempt to mount all drives
         for (int volumeNumber = 0; volumeNumber < adfFile->nVol; volumeNumber++) {
             AdfVolume* vol = adfMount(adfFile, volumeNumber, readOnly);
             if (vol) {
-                dokan_fs.push_back(new fs(adfFile, vol, letter));
+                dokan_fs.push_back(new fs(adfFile, vol, letter, readOnly));
                 letter++;
             }
         }

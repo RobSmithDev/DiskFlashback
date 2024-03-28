@@ -3,7 +3,7 @@
 
 
 // Get oldest sector we've cached and remove it, but don't free it!
-NativeDeviceCached::SectorData* NativeDeviceCached::getAndReleaseOldestSector() {
+SectorCacheEngine::SectorData* SectorCacheEngine::getAndReleaseOldestSector() {
     SectorData* result = nullptr;
     uint32_t sectorNumber = 0;
 
@@ -20,13 +20,16 @@ NativeDeviceCached::SectorData* NativeDeviceCached::getAndReleaseOldestSector() 
 
 
 // Write data to the cache
-void NativeDeviceCached::writeCache(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) {
+void SectorCacheEngine::writeCache(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) {
+    if (!m_cacheMaxMem) return;
+
     auto f = m_cache.find(sectorNumber);
     SectorData* secData;
 
     if (f == m_cache.end()) {
         if (m_maxCacheEntries == 0) m_maxCacheEntries = m_cacheMaxMem / sectorSize;
 
+        // If cache size is ZERO it means cache everything
         if (m_cache.size() > m_maxCacheEntries) {
             secData = getAndReleaseOldestSector();
             if (!secData) return;
@@ -52,7 +55,9 @@ void NativeDeviceCached::writeCache(const uint32_t sectorNumber, const uint32_t 
 }
 
 // Read data from the cache
-bool NativeDeviceCached::readCache(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) {
+bool SectorCacheEngine::readCache(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) {
+    if (!m_cacheMaxMem) return false;
+
     auto f = m_cache.find(sectorNumber);
     if (f == m_cache.end()) return false;
     if (m_maxCacheEntries == 0) m_maxCacheEntries = m_cacheMaxMem / sectorSize;
@@ -62,45 +67,33 @@ bool NativeDeviceCached::readCache(const uint32_t sectorNumber, const uint32_t s
     return true;
 }
 
-NativeDeviceCached::NativeDeviceCached(const uint32_t maxCacheMem, HANDLE fle) : m_file(fle), m_maxCacheEntries(0), m_cacheMaxMem(maxCacheMem) {
+SectorCacheEngine::SectorCacheEngine(const uint32_t maxCacheMem) : m_maxCacheEntries(0), m_cacheMaxMem(maxCacheMem) {
 
 }
 
-NativeDeviceCached::~NativeDeviceCached() {
+SectorCacheEngine::~SectorCacheEngine() {
     for (auto it : m_cache) {
         free(it.second->data);
         delete it.second;
     }
-    CloseHandle(m_file);
 }
 
-bool NativeDeviceCached::readData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) {
+bool SectorCacheEngine::readData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) {
     if (readCache(sectorNumber, sectorSize, data)) return true;
 
-    if (SetFilePointer(m_file, sectorNumber * sectorSize, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-        return false;
+    if (internalReadData(sectorNumber, sectorSize, data)) {
+        writeCache(sectorNumber, sectorSize, data);
+        return true;
+    }
 
-    DWORD read = 0;
-    if (!ReadFile(m_file, data, sectorSize, &read, NULL))
-        return false;
-
-    if (read != sectorSize) return false;
-
-    writeCache(sectorNumber, sectorSize, data);
-    return true;
+    return false;
 }
 
-bool NativeDeviceCached::writeData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) {
-    if (SetFilePointer(m_file, sectorNumber * sectorSize, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-        return false;
-
-    DWORD write = 0;
-    if (!WriteFile(m_file, data, sectorSize, &write, NULL))
-        return false;
-
-    if (write != sectorSize) return false;
-
-    writeCache(sectorNumber, sectorSize, data);
-    return true;
+bool SectorCacheEngine::writeData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) {
+    if (internalWriteData(sectorNumber, sectorSize, data)) {
+        writeCache(sectorNumber, sectorSize, data);
+        return true;
+    } 
+    return false;
 }
 

@@ -1,18 +1,17 @@
 #pragma once
 
-// Handles reading and writing to a file, with sector cache for improved speed
+
 #include <Windows.h>
 #include <unordered_map>
 
 
-class NativeDeviceCached {
+class SectorCacheEngine {
 private:
     struct SectorData {
         void* data;
         ULONGLONG lastUse;
     };
 
-    HANDLE m_file;
     uint32_t m_maxCacheEntries;
     const uint32_t m_cacheMaxMem;
 
@@ -21,14 +20,30 @@ private:
 
     SectorData* getAndReleaseOldestSector();
     // Write data to the cache
-    void writeCache(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data);
+    virtual void writeCache(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data);
     // Read data from the cache
-    bool readCache(const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
+    virtual bool readCache(const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
+
+protected:
+
+
+    // Override.  
+    virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) = 0;
+    virtual bool internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) = 0;
 
 public:
-    NativeDeviceCached(const uint32_t maxCacheMem, HANDLE fle);
-    ~NativeDeviceCached();
+    // Create cache engine, setting maxCacheMem to zero disables the cache
+    SectorCacheEngine(const uint32_t maxCacheMem);
+    virtual ~SectorCacheEngine();
 
     bool readData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
     bool writeData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data);
+
+    virtual bool isDiskPresent() = 0;
+    virtual bool isDiskWriteProtected() = 0;
+
+    // Fetch the size of the disk file
+    virtual uint32_t getDiskDataSize() = 0;
+
+    virtual bool available() = 0;
 };

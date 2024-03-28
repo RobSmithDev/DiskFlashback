@@ -4,6 +4,21 @@
     <ClCompile Include="ADF.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ADF_operations.cpp" />
+    <ClCompile Include="readwrite_floppybridge.cpp">
+      <Filter>Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="readwrite_file.cpp">
+      <Filter>Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="sectorCache.cpp">
+      <Filter>Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="floppybridge_lib.cpp">
+      <Filter>Interfaces\floppybridge</Filter>
+    </ClCompile>
+    <ClCompile Include="amiga_sectors.cpp">
+      <Filter>Interfaces</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ADF.h" />
@@ -11,10 +26,34 @@
     <ClInclude Include="resource.h">
       <Filter>res</Filter>
     </ClInclude>
+    <ClInclude Include="readwrite_floppybridge.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="readwrite_file.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="sectorCache.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="floppybridge_lib.h">
+      <Filter>Interfaces\floppybridge</Filter>
+    </ClInclude>
+    <ClInclude Include="floppybridge_abstract.h">
+      <Filter>Interfaces\floppybridge</Filter>
+    </ClInclude>
+    <ClInclude Include="amiga_sectors.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">
       <UniqueIdentifier>{127bdd12-1cde-4d58-b94d-19c809bd6611}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interfaces">
+      <UniqueIdentifier>{5c738464-8c69-45d0-a89d-5735bcf50d27}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interfaces\floppybridge">
+      <UniqueIdentifier>{9b804ff8-f264-4b2b-89df-ac6181bf8c04}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

@@ -80,16 +80,21 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
     dokanfileinfo->Context = 0;
 
     fs* f = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext);
-    if (f->isLocked()) return STATUS_DEVICE_BUSY;
-    if (!f->isDiskInDrive()) return STATUS_NO_MEDIA_IN_DEVICE;
-    struct AdfVolume* v = f->volume();
     std::wstring windowsPath = filename;
     if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
     if (windowsPath.substr(0, 25) == L"System Volume Information" || windowsPath.substr(0, 12) == L"$RECYCLE.BIN") return STATUS_NO_SUCH_FILE;
-
+    if (!f->isDiskInDrive()) {
+        if (windowsPath.empty()) return STATUS_SUCCESS;
+        return STATUS_NO_MEDIA_IN_DEVICE;
+    }
+    struct AdfVolume* v = f->volume();
     if (!v) {
         if (windowsPath.empty()) return STATUS_SUCCESS;
         return STATUS_UNRECOGNIZED_MEDIA;
+    }
+    if (f->isLocked()) {
+        if (windowsPath.empty()) return STATUS_SUCCESS;
+        return STATUS_DEVICE_BUSY;
     }
 
     DokanMapKernelToUserCreateFileFlags( desiredaccess, fileattributes, createoptions, createdisposition, &generic_desiredaccess, &file_attributes_and_flags, &creation_disposition);
@@ -766,15 +771,14 @@ static NTSTATUS DOKAN_CALLBACK fs_movefile(LPCWSTR filename, LPCWSTR new_filenam
 
 static NTSTATUS DOKAN_CALLBACK fs_getdiskfreespace(PULONGLONG free_bytes_available, PULONGLONG total_number_of_bytes, PULONGLONG total_number_of_free_bytes, PDOKAN_FILE_INFO dokanfileinfo) {
     fs* f = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext);
+    *total_number_of_bytes = 0;
+    *total_number_of_free_bytes = 0;
+    *free_bytes_available = 0;
+
     if (f->isLocked()) return STATUS_DEVICE_BUSY;
     if (!f->isDiskInDrive()) return STATUS_NO_MEDIA_IN_DEVICE;
-    if (!f->volume()) {
-        *total_number_of_bytes = 0;
-        *total_number_of_free_bytes = 0;
-        *free_bytes_available = 0;
-        return STATUS_SUCCESS;
-    }
-
+    if (!f->volume()) return STATUS_SUCCESS;
+    
     struct AdfVolume* v = f->volume();
     uint32_t numBlocks = (v->lastBlock - v->firstBlock) - 1;  
     uint32_t blocksFree = adfCountFreeBlocks(v);
@@ -786,16 +790,29 @@ static NTSTATUS DOKAN_CALLBACK fs_getdiskfreespace(PULONGLONG free_bytes_availab
 
 static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation( LPWSTR volumename_buffer, DWORD volumename_size, LPDWORD volume_serialnumber, LPDWORD maximum_component_length, LPDWORD filesystem_flags, LPWSTR filesystem_name_buffer, DWORD filesystem_name_size, PDOKAN_FILE_INFO dokanfileinfo) {
     fs* f = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext);
-    if (f->isLocked()) return STATUS_DEVICE_BUSY;
-    if (!f->isDiskInDrive()) return STATUS_NO_MEDIA_IN_DEVICE;
+    if (f->isLocked()) {
+        wcscpy_s(volumename_buffer, volumename_size, f->getDriverName().c_str());
+        wcscpy_s(filesystem_name_buffer, filesystem_name_size, L"Busy");
+        *filesystem_flags = FILE_READ_ONLY_VOLUME;
+        return STATUS_SUCCESS;
+    }
+    if (!f->isDiskInDrive()) {
+        wcscpy_s(volumename_buffer, volumename_size, f->getDriverName().c_str());
+        wcscpy_s(filesystem_name_buffer, filesystem_name_size, L"No Disk");
+        *filesystem_flags = FILE_READ_ONLY_VOLUME;
+        return STATUS_SUCCESS;
+    }
 
     struct AdfVolume* v = f->volume();
     *volume_serialnumber = f->volumeSerial(); // make one up
     *maximum_component_length = MAXNAMELEN;
-    *filesystem_flags = FILE_CASE_PRESERVED_NAMES | FILE_SUPPORTS_REMOTE_STORAGE;
+    *filesystem_flags = FILE_CASE_PRESERVED_NAMES;
 
     if (v) {
-        std::wstring volName; if (v->volName) ansiToWide(v->volName, volName);
+        struct bRootBlock root;
+        char diskName[35] = { 0 };
+        std::wstring volName;
+        if (v->volName) ansiToWide(v->volName, volName);
         wcscpy_s(volumename_buffer, volumename_size, volName.c_str());
 
         std::wstring volType = L"Amiga ";

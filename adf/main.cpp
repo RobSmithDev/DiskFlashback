@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <ShlObj.h>
 
 #define REMOTECTRL_RELEASE          1
 #define REMOTECTRL_RESTORE          2
@@ -26,6 +27,12 @@
 
 // Active threads we're keeping track of
 std::vector<std::thread> m_threads;
+
+// Device open
+struct AdfDevice* adfFile = nullptr;
+
+// File systems currently open
+std::vector<fs*> dokan_fs;
 
 
 #define TIMERID_MONITOR_FILESYS 1000
@@ -89,13 +96,6 @@ HWND findPotentialExplorerParent() {
 }
 
 
-// Device open
-struct AdfDevice* adfFile = nullptr;
-
-// File systems currently open
-std::vector<fs*> dokan_fs;
-
-
 // ADFLib Warning
 void Warning(char* msg) {
 #ifdef _DEBUG
@@ -144,7 +144,11 @@ RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const
         break;
 
     case '2': // BRIDGE Mode
-        d = new SectorRW_FloppyBridge(&name[1]);
+        d = new SectorRW_FloppyBridge(&name[1], [](bool diskInserted) {
+            for (fs* fs : dokan_fs) {
+                if (diskInserted) fs->remountVolume(); else fs->unmountVolume();
+            }
+        });
         break;
 
     default:
@@ -328,48 +332,6 @@ void runMountedVolumes(HINSTANCE hInstance, const std::wstring mode, SectorCache
     }    
 }
 
-
-
-RETCODE adfMountFlopButDontFail(struct AdfDevice* const dev)
-{
-    struct AdfVolume* vol;
-    struct bRootBlock root;
-    char diskName[35];
-
-    dev->cylinders = 80;
-    dev->heads = 2;
-    if (dev->devType == DEVTYPE_FLOPDD)
-        dev->sectors = 11;
-    else
-        dev->sectors = 22;
-
-    vol = (struct AdfVolume*)malloc(sizeof(struct AdfVolume));
-    if (!vol) return RC_ERROR;
-
-    vol->mounted = TRUE;
-    vol->firstBlock = 0;
-    vol->lastBlock = (int32_t)(dev->cylinders * dev->heads * dev->sectors - 1);
-    vol->rootBlock = (vol->lastBlock + 1 - vol->firstBlock) / 2;
-    vol->blockSize = 512;
-    vol->dev = dev;
-
-    if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == RC_OK) {
-        memset(diskName, 0, 35);
-        memcpy_s(diskName, 35, root.diskName, root.nameLen);
-    }
-    else diskName[0] = '\0';
-    vol->volName = _strdup(diskName);
-
-    dev->volList = (struct AdfVolume**)malloc(sizeof(struct AdfVolume*));
-    if (!dev->volList) {
-        free(vol);
-        return RC_ERROR;
-    }
-    dev->volList[0] = vol;
-    dev->nVol = 1;
-
-    return RC_OK;
-}
 
 
 //int __cdecl _main(ULONG argc, PWCHAR argv[]) {    

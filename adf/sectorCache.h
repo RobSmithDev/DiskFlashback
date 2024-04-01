@@ -63,6 +63,9 @@ public:
     // Fetch the size of the disk file
     virtual uint32_t getDiskDataSize() = 0;
 
+    // Returns the name of the driver providing access
+    virtual std::wstring getDriverName() = 0;
+
     // Return TRUE if this is actually a physical "REAL" drive
     virtual bool isPhysicalDisk() { return false; };
 

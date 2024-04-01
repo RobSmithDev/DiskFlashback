@@ -15,6 +15,16 @@ uint32_t SectorRW_FloppyBridge::id() {
     else return 0xFFFF;
 }
 
+// Returns the name of the driver providing access
+std::wstring SectorRW_FloppyBridge::getDriverName() {
+    switch (m_bridge->getDriverTypeIndex()) {
+    case 0: return L"Drawbridge";
+    case 1: return L"Greaseweazle";
+    case 2: return L"Supercard Pro";
+    default: return L"Unknown";
+    }
+}
+
 // Reset the cache
 void SectorRW_FloppyBridge::resetCache() {
     SectorCacheEngine::resetCache();
@@ -30,8 +40,9 @@ bool SectorRW_FloppyBridge::flushWriteCache() {
     return flushPendingWrites();
 }
 
-
-SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile) : SectorCacheEngine(0), m_sectorsPerTrack(0), m_motorTurnOnTime(0), m_timer(0) {
+// Constructor
+SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile, std::function<void(bool diskInserted)> diskChangeCallback) : 
+    SectorCacheEngine(0), m_sectorsPerTrack(0), m_motorTurnOnTime(0), m_timer(0), m_diskChangeCallback(diskChangeCallback) {
     m_timerQueue = CreateTimerQueue();
 
     // Use profile eventually, for now we cheat
@@ -84,25 +95,37 @@ bool SectorRW_FloppyBridge::isDiskWriteProtected() {
 
 // The motor usage has timed out
 void SectorRW_FloppyBridge::motorMonitor() {
-    std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
-    if ((m_motorTurnOnTime) && (GetTickCount64() - m_motorTurnOnTime > MOTOR_IDLE_TIMEOUT)) {
-        flushPendingWrites();
-        m_bridge->setMotorStatus(false, false);
-        m_ignoreErrors = false;
-        m_blockWriting = false;
-        m_motorTurnOnTime = 0;
+    bool sendNotify = false;
+    {
+        std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
+        if ((m_motorTurnOnTime) && (GetTickCount64() - m_motorTurnOnTime > MOTOR_IDLE_TIMEOUT)) {
+            flushPendingWrites();
+            m_bridge->setMotorStatus(false, false);
+            m_ignoreErrors = false;
+            m_blockWriting = false;
+            m_motorTurnOnTime = 0;
+        }
+
+        if (m_bridge)
+            if (m_bridge->isDiskInDrive() != m_diskInDrive) {
+                m_diskInDrive = !m_diskInDrive;
+                if (!m_diskInDrive) {
+                    m_bridge->gotoCylinder(0, false);
+                    m_bridge->setMotorStatus(false, false);
+                    // cache really needs to be cleared!
+                    if (m_tracksToFlush.size() < 1) {
+                        for (uint32_t trk = 0; trk < MAX_TRACKS; trk++)
+                            m_trackCache[trk].sectors.clear();
+                    }
+                }
+                sendNotify = true;
+            }
     }
 
-    if ((m_bridge) && (!m_bridge->isDiskInDrive())) {
-        if (!m_diskChanged) {
-            m_bridge->gotoCylinder(0, false);
-            m_bridge->setMotorStatus(false, false);
-            // cache really needs to be cleared!
-            if (m_tracksToFlush.size() < 1) {
-                for (uint32_t trk = 0; trk < MAX_TRACKS; trk++)
-                    m_trackCache[trk].sectors.clear();
-            }
-            m_diskChanged = true;
+    if (sendNotify) {
+        if (m_diskChangeCallback) {
+            for (DecodedTrack& trk : m_trackCache) trk.sectors.clear();
+            m_diskChangeCallback(m_diskInDrive);
         }
     }
 }

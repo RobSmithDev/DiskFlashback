@@ -1,5 +1,8 @@
 #include "adf.h"
 #include "sectorCache.h"
+#include <Shlobj.h>
+
+#pragma comment(lib,"Shell32.lib")
 
 // These were borrowed from the WinUAE source code, HOWEVER, they're identical to what the Amiga OS writes with the INSTALL command
 static uint8_t bootblock_ofs[] = {
@@ -35,6 +38,56 @@ bool fs::driveInUse() {
 }
 
 
+
+RETCODE adfMountFlopButDontFail(struct AdfDevice* const dev)
+{
+	struct AdfVolume* vol;
+	struct bRootBlock root;
+	char diskName[35];
+
+	dev->cylinders = 80;
+	dev->heads = 2;
+	if (dev->devType == DEVTYPE_FLOPDD)
+		dev->sectors = 11;
+	else
+		dev->sectors = 22;
+
+	vol = (struct AdfVolume*)malloc(sizeof(struct AdfVolume));
+	if (!vol) return RC_ERROR;
+
+	vol->mounted = TRUE;
+	vol->firstBlock = 0;
+	vol->lastBlock = (int32_t)(dev->cylinders * dev->heads * dev->sectors - 1);
+	vol->rootBlock = (vol->lastBlock + 1 - vol->firstBlock) / 2;
+	vol->blockSize = 512;
+	vol->dev = dev;
+
+	if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == RC_OK) {
+		memset(diskName, 0, 35);
+		memcpy_s(diskName, 35, root.diskName, root.nameLen);
+	}
+	else diskName[0] = '\0';
+	vol->volName = _strdup(diskName);
+
+	if (dev->volList) {
+		for (size_t i = 0; i < dev->nVol; i++) {
+			free(dev->volList[i]->volName);
+			free(dev->volList[i]);
+		}
+		free(dev->volList);
+	}
+	dev->volList = (struct AdfVolume**)malloc(sizeof(struct AdfVolume*));
+	if (!dev->volList) {
+		free(vol);
+		return RC_ERROR;
+	}
+	dev->volList[0] = vol;
+	dev->nVol = 1;
+
+	return RC_OK;
+}
+
+
 fs::fs(struct AdfDevice* adfDevice, struct AdfVolume* adfVolume, int volumeNumber, WCHAR driveLetter, bool readOnly) : 
 	m_readOnly(readOnly), m_adfDevice(adfDevice), m_adfVolume(adfVolume), m_volumeNumber(volumeNumber)  {
 	m_drive.resize(3);
@@ -51,11 +104,28 @@ void fs::unmountVolume() {
 		adfUnMount(m_adfVolume);
 		m_adfVolume = nullptr;
 	}	
+	SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
+	//refreshDriveInformation();
 }
+
+// Make windows realise a change occured
+void fs::refreshDriveInformation() {
+	
+	
+	//SHChangeNotify(SHCNE_FREESPACE, SHCNF_PATH, m_drive.c_str(), NULL);
+}
+
 // special command to re-mount the unmounted volume
 void fs::remountVolume() {
-	if (!m_adfVolume)
+	if (!m_adfVolume) {
+		if (isPhysicalDevice()) adfMountFlopButDontFail(m_adfDevice);
 		m_adfVolume = adfMount(m_adfDevice, m_volumeNumber, m_readOnly);
+	}
+
+	//SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
+	SHChangeNotify(SHCNE_DRIVEREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
+	SHChangeNotify(SHCNE_DRIVEADD, SHCNF_PATH, m_drive.c_str(), NULL);
+	//SHChangeNotify(SHCNE_MEDIAINSERTED, SHCNF_PATH, m_drive.c_str(), NULL);
 }
 
 void fs::start() {
@@ -63,7 +133,9 @@ void fs::start() {
 	ZeroMemory(&dokan_options, sizeof(DOKAN_OPTIONS));
 	dokan_options.Version = DOKAN_VERSION;
 	dokan_options.Options = DOKAN_OPTION_CURRENT_SESSION;
-	dokan_options.MountPoint = m_drive.c_str();
+	std::wstring d = m_drive;
+	if (d.length() < 3) d += L":\\";
+	dokan_options.MountPoint = d.c_str();
 	dokan_options.SingleThread = true;
 	dokan_options.GlobalContext = reinterpret_cast<ULONG64>(this);
 	dokan_options.SectorSize = m_adfVolume ? m_adfVolume->blockSize : 512;
@@ -147,6 +219,18 @@ bool fs::isWriteProtected() {
 bool fs::isDiskInDrive() {
 	if (!m_adfDevice->nativeDev) return true;
 	return ((SectorCacheEngine*)m_adfDevice->nativeDev)->isDiskPresent();
+}
+
+// Returns TRUE if this is a real disk
+bool fs::isPhysicalDevice() {
+	if (!m_adfDevice->nativeDev) return true;
+	return ((SectorCacheEngine*)m_adfDevice->nativeDev)->isPhysicalDisk();
+}
+
+// Returns the name of the driver used for FloppyBridge
+std::wstring fs::getDriverName() {
+	if (!m_adfDevice->nativeDev) return L"Unknown";
+	return ((SectorCacheEngine*)m_adfDevice->nativeDev)->getDriverName();
 }
 
 // Install bootblock
@@ -270,8 +354,7 @@ void fs::wait(DWORD timeout) {
 
 void fs::stop() {
 	if (m_instance) {
-		DokanCloseHandle(m_instance);
-		DokanRemoveMountPoint(m_drive.c_str());
+		DokanCloseHandle(m_instance);		
 		m_instance = 0;
 		m_drive = L"";
 		if (m_adfVolume) adfUnMount(m_adfVolume);

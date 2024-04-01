@@ -20,6 +20,9 @@ public:
     virtual bool isDiskPresent() override;
     virtual bool isDiskWriteProtected() override;
 
+    // Returns the name of the driver providing access
+    virtual std::wstring getDriverName() override { return L"ADF File"; };
+
 
     // Fetch the size of the disk file
     virtual uint32_t getDiskDataSize() override;

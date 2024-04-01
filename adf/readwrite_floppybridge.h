@@ -29,10 +29,11 @@ private:
     HANDLE m_timerQueue;
     HANDLE m_timer                  = 0;
     bool m_blockWriting             = false;  // used if errors occur
-    bool m_diskChanged              = false;  // Monitor for disk change
+    bool m_diskInDrive              = false;  // Monitor for disk change
     PDOKAN_FILE_INFO m_dokanfileinfo = nullptr; // active file i/o
     std::mutex m_motorTimerProtect;
     bool m_writeOnly = false;
+    std::function<void(bool diskInserted)> m_diskChangeCallback;
 
     // Tracks that need committing to disk
     // NOTE: Using MAP not UNORDERED_MAP. This *should* make the disk head stepping fairly sequential and faster
@@ -64,7 +65,7 @@ protected:
     bool waitForMotor(bool upperSide);
 
 public:
-    SectorRW_FloppyBridge(const std::string& profile);
+    SectorRW_FloppyBridge(const std::string& profile, std::function<void(bool diskInserted)> diskChangeCallback);
     ~SectorRW_FloppyBridge();
 
     // Fetch the size of the disk file
@@ -91,6 +92,8 @@ public:
     // Return an ID to identify this with
     virtual uint32_t id() override;
 
+    // Returns the name of the driver providing access
+    virtual std::wstring getDriverName() override;
 
     void motorMonitor();
 };

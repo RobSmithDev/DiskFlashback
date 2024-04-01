@@ -32,6 +32,9 @@ public:
 	~ActiveFileIO();
 };
 
+
+extern RETCODE adfMountFlopButDontFail(struct AdfDevice* const dev);
+
 class fs {
 	friend class ActiveFileIO;
 
@@ -58,6 +61,10 @@ class fs {
 		// Sets a current file info block as active (or NULL for not) so DokanResetTimeout can be called if needed
 		void setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo);
 		void clearFileIO();
+
+		// Make windows realise a change occured
+		void refreshDriveInformation();
+
 
 	public:
 		fs(struct AdfDevice* adfFile, struct AdfVolume* adfVolume, int volumeNumber, WCHAR driveLetter, bool readOnly);
@@ -91,6 +98,11 @@ class fs {
 		bool isWriteProtected();
 		// Returns TRUE if theres a disk in the drive
 		bool isDiskInDrive();
+		// Returns the name of the driver used for FloppyBridge
+		std::wstring getDriverName();
+
+		// Returns TRUE if this is a real disk
+		bool isPhysicalDevice();
 
 		// Return true if the drive has files open
 		bool driveInUse();

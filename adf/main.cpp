@@ -3,6 +3,14 @@
 #include <string>
 #include <vector>
 
+#define REMOTECTRL_RELEASE          1
+#define REMOTECTRL_RESTORE          2
+#define REMOTECTRL_FORMAT           3
+#define REMOTECTRL_INSTALLBB        4
+#define REMOTECTRL_COPYTODISK       5
+#define REMOTECTRL_COPYTOADF        6
+#define REMOTECTRL_EJECT            7
+
 #include "adf.h"
 #include "adflib/src/adflib.h"
 #include "adf_operations.h"
@@ -10,33 +18,92 @@
 #include "sectorCache.h"
 #include "readwrite_file.h"
 #include "readwrite_floppybridge.h"
+#include "SignalWnd.h"
+#include "dlgFormat.h"
+#include "psapi.h"
 
-std::vector<fs*> dokan_fs;
-struct AdfDevice* adfFile = nullptr;
+//#pragma comment(lib, "")
+
+// Active threads we're keeping track of
+std::vector<std::thread> m_threads;
 
 
-BOOL WINAPI ctrl_handler(DWORD dw_ctrl_type) {
-    switch (dw_ctrl_type) {
-        case CTRL_C_EVENT:
-        case CTRL_BREAK_EVENT:
-        case CTRL_CLOSE_EVENT:
-        case CTRL_LOGOFF_EVENT:
-        case CTRL_SHUTDOWN_EVENT:
-            SetConsoleCtrlHandler(ctrl_handler, FALSE);
-            for (auto& fs : dokan_fs) fs->stop();
-            return TRUE;
-        default:
-            return FALSE;
+#define TIMERID_MONITOR_FILESYS 1000
+
+typedef struct  {
+    WCHAR letter[2];
+    HWND windowFound;
+} WindowSearch;
+
+// Search windows for one that uses the drive letter specified
+BOOL CALLBACK windowSearchCallback(_In_ HWND hwnd, _In_ LPARAM lParam) {
+    WCHAR tmpText[100];
+    GetClassName(hwnd, tmpText, 100);
+    if (wcscmp(tmpText, MESSAGEWINDOW_CLASS_NAME) == 0) {
+        GetWindowText(hwnd, tmpText, 100);
+        WCHAR* pos = wcsstr(tmpText, L"_");
+        if (pos) {
+            pos++;
+            WindowSearch* s = (WindowSearch*)lParam;
+            // See if the letter is in here
+            if (wcsstr(pos, s->letter)) {
+                s->windowFound = hwnd;
+                return FALSE;
+            }
+        }
     }
+    return TRUE;
+}
+
+// Search for the control window matching the drive letter supplied
+HWND findControlWindowForDrive(WCHAR driveLetter) {
+    WindowSearch search;
+    search.letter[0] = driveLetter;
+    search.letter[1] = '\0';
+    search.windowFound = 0;
+    EnumWindows(windowSearchCallback, (LPARAM)&search);
+    return search.windowFound;
+}
+
+// Looks to see if the active foreground window is explorer and if so use it as a parent
+HWND findPotentialExplorerParent() {
+    // See if the currently active window is explorer
+    HWND parent = GetForegroundWindow();
+    if (parent) {
+        DWORD pid;
+        if (GetWindowThreadProcessId(parent, &pid)) {
+            HANDLE proc = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+            if (proc) {
+                WCHAR exeName[MAX_PATH];
+                if (GetProcessImageFileName(proc, exeName, MAX_PATH)) {
+                    std::wstring name = exeName;
+                    for (WCHAR& c : name) c = towupper(c);
+                    if (wcsstr(name.c_str(), L"EXPLORER.EXE") == nullptr)
+                        return 0;
+                }
+                CloseHandle(proc);
+            }
+        }
+    }
+    return parent;
 }
 
 
+// Device open
+struct AdfDevice* adfFile = nullptr;
+
+// File systems currently open
+std::vector<fs*> dokan_fs;
+
+
+// ADFLib Warning
 void Warning(char* msg) {
 #ifdef _DEBUG
     fprintf(stderr,"Warning <%s>\n",msg);
 #endif
 }
 
+// ADFLib Errors
 void Error(char* msg) {
 #ifdef _DEBUG
     fprintf(stderr,"Error <%s>\n",msg);
@@ -44,40 +111,57 @@ void Error(char* msg) {
    // exit(1);
 }
 
+// ADFLib Verbose Logging
 void Verbose(char* msg) {
 #ifdef _DEBUG
     fprintf(stderr,"Verbose <%s>\n",msg);
 #endif
 }
 
-
-
+// ADFLib Native Functions
 RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const BOOL ro) {    
-    SectorRW_FloppyBridge* d = new SectorRW_FloppyBridge("");
-    /*
+    if (!name) return RC_ERROR;
+    if (strlen(name) < 2) return RC_ERROR;
 
-    HANDLE fle = CreateFileA(name, GENERIC_READ | (ro ? 0 : GENERIC_WRITE), 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, 0);
-    if (fle == INVALID_HANDLE_VALUE) {
-        int err = GetLastError();
+    SectorCacheEngine* d = nullptr;
+    HANDLE fle;
+
+    switch (name[0]) {
+    case '1': // FILE Mode
+        fle = CreateFileA(&name[1], GENERIC_READ | (ro ? 0 : GENERIC_WRITE), 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, 0);
+        if (fle == INVALID_HANDLE_VALUE) {
+            int err = GetLastError();
+            return RC_ERROR;
+        }
+
+        // Default the cache to allow a entire HD floppy disk to get into the cache. 
+        d = new SectorRW_File(512 * 84 * 2 * 2 * 11, fle);
+        if (!d) {
+            CloseHandle(fle);
+            return RC_ERROR;
+        }
+
+        break;
+
+    case '2': // BRIDGE Mode
+        d = new SectorRW_FloppyBridge(&name[1]);
+        break;
+
+    default:
+        // Unknown mode
         return RC_ERROR;
     }
 
-    // Default the cache to allow a entire HD floppy disk to get into the cache. 
-    NativeDeviceCached* d = new NativeDeviceCached(512*84*2*2*11, fle);
-    if (!d) {
-        CloseHandle(fle);
+    if (!d->available()) {
+        delete d;
         return RC_ERROR;
-    }*/
-
-    //dev->size = GetFileSize(fle, NULL);
+    }
 
     dev->size = d->getDiskDataSize();
-
     dev->nativeDev = (void*)d;
 
     return RC_OK;
 }
-
 RETCODE adfReleaseDevice(struct AdfDevice* const dev) {
     SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
     if (d) {
@@ -86,29 +170,23 @@ RETCODE adfReleaseDevice(struct AdfDevice* const dev) {
     }
     return RC_OK;
 }
-
 RETCODE adfNativeReadSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, uint8_t* const buf) {    
     SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
     return d->readData(n, size, buf) ? RC_OK : RC_ERROR;
 }
-
 RETCODE adfNativeWriteSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, const uint8_t* const buf) {
     SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
     return d->writeData(n, size, buf) ? RC_OK : RC_ERROR;
 }
-
 BOOL adfIsDevNative(const char* const devName) {
     // If disk starts with DOS then its not a native device
     return true;
 }
 
-
-int __cdecl wmain(ULONG argc, PWCHAR argv[]) {
+// Setup
+void prepADFLib() {
     adfEnvInitDefault();
-    mainEXE = argv[0];
-
     adfSetEnvFct((AdfLogFct)Error, (AdfLogFct)Warning, (AdfLogFct)Verbose, NULL);
-
     struct AdfNativeFunctions native;
     native.adfInitDevice = adfInitDevice;
     native.adfReleaseDevice = adfReleaseDevice;
@@ -116,73 +194,252 @@ int __cdecl wmain(ULONG argc, PWCHAR argv[]) {
     native.adfNativeWriteSector = adfNativeWriteSector;
     native.adfIsDevNative = adfIsDevNative;
     adfSetNative(&native);
+}
+
+// Request to mount all found volumes
+void mountVolumes(WCHAR firstLetter, bool forceReadOnly) {
+    if (!adfFile) return;
+
+    // Attempt to mount all drives
+    for (int volumeNumber = 0; volumeNumber < adfFile->nVol; volumeNumber++) {
+        AdfVolume* vol = adfMount(adfFile, volumeNumber, forceReadOnly);
+        dokan_fs.push_back(new fs(adfFile, vol, volumeNumber, firstLetter, forceReadOnly));
+        firstLetter++;
+    }
+}
+
+// clean up threads
+void cleanThreads() {
+    auto it = m_threads.begin();
+    while (it < m_threads.end()) {
+        if (it->joinable()) {
+            it->join();
+            it = m_threads.erase(it);
+        }
+        else it++;
+    }
+}
+
+// Main loop for the file system
+void runMountedVolumes(HINSTANCE hInstance, const std::wstring mode, SectorCacheEngine* io) {
+    std::wstring title = std::wstring(mode) + std::to_wstring(io->id()) + L"_";
+    for (auto& fs : dokan_fs) {
+        fs->start();
+        title += fs->driveLetter().substr(0, 1);
+    }
+
+    // For other processess to control this one
+    CMessageWindow wnd(hInstance, title);
+
+    // Handle TIMER events - for monitoring the filesystem for termination
+    wnd.setMessageHandler(WM_TIMER, [&wnd](WPARAM timerID, LPARAM lpUser) -> LRESULT {
+        if (timerID == TIMERID_MONITOR_FILESYS) {
+            // Clean up finished threads
+            cleanThreads();
+
+            // See if the process is done for
+            bool running = m_threads.size();
+            if (!running) for (auto& fs : dokan_fs) running |= fs->isRunning();
+            if (!running) {
+                KillTimer(wnd.hwnd(), TIMERID_MONITOR_FILESYS);
+                PostQuitMessage(0);
+            }
+            return 0;
+        }
+        return DefWindowProc(wnd.hwnd(), WM_TIMER, timerID, lpUser);
+    });
+
+
+
+    // Handle remote control messages
+    wnd.setMessageHandler(WM_USER, [&wnd, hInstance, io](WPARAM commandID, LPARAM param) -> LRESULT {
+        fs* fs = nullptr;
+        for (auto& fsSearch : dokan_fs)
+            if ((fsSearch) && (fsSearch->driveLetter()[0] == (WCHAR)param)) {
+                fs = fsSearch;
+                break;
+            }
+        if (!fs) return 0;
+        HWND potentialParent = findPotentialExplorerParent();
+
+        switch (commandID) {
+
+        case REMOTECTRL_RELEASE:
+            return 0;
+
+        case REMOTECTRL_RESTORE:
+            return 0;
+
+        case REMOTECTRL_FORMAT: 
+            m_threads.emplace_back(std::thread([hInstance, potentialParent, io, fs]() {
+                // This doesnt modify whats passed unless it returns TRUE
+                DialogFORMAT dlg(hInstance, potentialParent, io, fs);
+                return dlg.doModal();
+            }));
+            return 0;
+
+        case REMOTECTRL_INSTALLBB: 
+            m_threads.emplace_back(std::thread([hInstance, potentialParent, io, fs]() {
+                  std::wstring msg = L"Install bootblock on drive " + fs->driveLetter().substr(0, 2) + L"?";
+                  if (MessageBox(potentialParent, msg.c_str(), L"Install Bootblock?", MB_YESNO | MB_ICONQUESTION) == IDYES)
+                      if (!fs->installBootBlock())
+                          MessageBox(potentialParent, L"An error occured writing the boot block", L"Boot Block Error", MB_OK | MB_ICONEXCLAMATION);
+            }));
+            return 0;
+
+        case REMOTECTRL_COPYTODISK:
+            return 0;
+
+        case REMOTECTRL_COPYTOADF:
+            return 0;
+
+        case REMOTECTRL_EJECT: {
+            bool filesOpen = fs->driveInUse();
+            bool locked = fs->isLocked();
+            if (filesOpen || locked) {
+                m_threads.emplace_back(std::thread([hInstance, potentialParent, io, fs, filesOpen, locked]() {
+                    std::wstring msg = L"Cannot eject drive " + fs->driveLetter().substr(0, 2) + L" - " + (locked ? L"the drive is busy" : L"files are currently open");
+                    MessageBox(potentialParent, msg.c_str(), L"Eject", MB_OK | MB_ICONSTOP);
+                    }));
+            }
+            else fs->stop();
+            return 0;
+        }
+
+        default:
+            return 0;
+        }
+    });
+
+    SetTimer(wnd.hwnd(), TIMERID_MONITOR_FILESYS, 200, NULL);
+     
+    MSG msg;
+    BOOL bRet;
+    while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
+        if (bRet == -1) {
+            KillTimer(wnd.hwnd(), TIMERID_MONITOR_FILESYS);
+            for (auto& fs : dokan_fs) fs->stop();
+            break;
+        }
+        else {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }    
+}
+
+
+
+RETCODE adfMountFlopButDontFail(struct AdfDevice* const dev)
+{
+    struct AdfVolume* vol;
+    struct bRootBlock root;
+    char diskName[35];
+
+    dev->cylinders = 80;
+    dev->heads = 2;
+    if (dev->devType == DEVTYPE_FLOPDD)
+        dev->sectors = 11;
+    else
+        dev->sectors = 22;
+
+    vol = (struct AdfVolume*)malloc(sizeof(struct AdfVolume));
+    if (!vol) return RC_ERROR;
+
+    vol->mounted = TRUE;
+    vol->firstBlock = 0;
+    vol->lastBlock = (int32_t)(dev->cylinders * dev->heads * dev->sectors - 1);
+    vol->rootBlock = (vol->lastBlock + 1 - vol->firstBlock) / 2;
+    vol->blockSize = 512;
+    vol->dev = dev;
+
+    if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == RC_OK) {
+        memset(diskName, 0, 35);
+        memcpy_s(diskName, 35, root.diskName, root.nameLen);
+    }
+    else diskName[0] = '\0';
+    vol->volName = _strdup(diskName);
+
+    dev->volList = (struct AdfVolume**)malloc(sizeof(struct AdfVolume*));
+    if (!dev->volList) {
+        free(vol);
+        return RC_ERROR;
+    }
+    dev->volList[0] = vol;
+    dev->nVol = 1;
+
+    return RC_OK;
+}
+
+
+//int __cdecl _main(ULONG argc, PWCHAR argv[]) {    
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
+    int argc = 0;
+    WCHAR exeName[MAX_PATH];
+    GetModuleFileName(NULL, exeName, MAX_PATH);
+
+    LPWSTR* argv = CommandLineToArgvW(pCmdLine, &argc);
+    argv--; argc++;
+
+    mainEXE = exeName;
     
     try {
-        if (!SetConsoleCtrlHandler(ctrl_handler, TRUE)) return 1;
         if (argc < 3) return 2;
         BOOL readOnly = FALSE; // TODO
             // Bad letter
         WCHAR letter = argv[2][0];
         if ((letter < 'A') || (letter > 'Z')) return 3;
 
+        if (std::wstring(argv[1]) == L"CONTROL") {
+            HWND wnd = findControlWindowForDrive(letter);
+            std::wstring param = argv[3];
+            if (wnd) {
+                if (param == L"FORMAT") SendMessage(wnd, WM_USER, REMOTECTRL_FORMAT, (LPARAM)letter);
+                if (param == L"EJECT") SendMessage(wnd, WM_USER, REMOTECTRL_EJECT, (LPARAM)letter);
+                if (param == L"BB") SendMessage(wnd, WM_USER, REMOTECTRL_INSTALLBB, (LPARAM)letter);
+            }
+        } else
         if (std::wstring(argv[1]) == L"FILE") {
+            prepADFLib();
             std::string ansiFilename;
             wideToAnsi(argv[3], ansiFilename);
-
-            adfFile = adfMountDev(ansiFilename.c_str(), readOnly);
-            
+            ansiFilename = "1" + ansiFilename;
+            adfFile = adfMountDev(ansiFilename.c_str(), readOnly);            
             if (!adfFile) return 4;
         }
         else 
-            if (std::wstring(argv[1]) == L"DRIVE") {
-                if (argc < 5) return 2;
+        if (std::wstring(argv[1]) == L"BRIDGE") {
+            prepADFLib();
+            std::string ansiConfig;
+            wideToAnsi(argv[3], ansiConfig); 
+            ansiConfig = "2" + ansiConfig;
 
-                std::string ansiConfig;
-                wideToAnsi(argv[3], ansiConfig);
+            // This has to be forced in bridge mode
+            adfFile = adfOpenDev(ansiConfig.c_str(), readOnly);
+            if (!adfFile) return 4;
 
-              
-                /* ARG 3 = Driver Type (DrawBridge, Greaseweazle, Supercard Pro)
-                bridge = FloppyBridgeAPI::createDriver(_wtoi(argv[3]));
-                if (!bridge) return 4;
-
-                int comPort = _wtoi(argv[4]);
-
-                bridge->setBridgeMode(FloppyBridge::BridgeMode::bmStalling);
-                bridge->setComPortAutoDetect(comPort == 0);
-                if (comPort) {
-                    std::wstring port = L"\\\\.\\COM" + std::to_wstring(comPort);
-                    bridge->setComPort((TCHAR*)port.c_str());
-                }*/
-            }
-
-        // Attempt to mount all drives
-        for (int volumeNumber = 0; volumeNumber < adfFile->nVol; volumeNumber++) {
-            AdfVolume* vol = adfMount(adfFile, volumeNumber, readOnly);
-            if (vol) {
-                dokan_fs.push_back(new fs(adfFile, vol, letter, readOnly));
-                letter++;
-            }
+            if ((adfFile->devType == DEVTYPE_FLOPDD) || (adfFile->devType == DEVTYPE_FLOPHD)) {
+                if (adfMountFlopButDontFail(adfFile) != RC_OK) {
+                    return 4;
+                }
+            }             
         }
 
-        DokanInit();
+        if (adfFile) {
+            mountVolumes(letter, readOnly);
 
-        // Start them up!
-        for (auto& fs : dokan_fs) fs->start();
+            // See if anything mounted
+            SectorCacheEngine* d = (SectorCacheEngine*)adfFile->nativeDev;
+            if (!d) return 0;
 
-        // Start the memory filesystem
-        bool running;
-        do {
-            running = false;
-            for (auto& fs : dokan_fs) {
-                fs->wait(250);
-                running |= fs->isRunning();
-            }
-        } while (running);
-
-        DokanShutdown();
+            DokanInit();
+            runMountedVolumes(hInstance, argv[1], d);            
+            DokanShutdown();
+        }
     } catch (const std::exception& ex) {
         UNREFERENCED_PARAMETER(ex);
     }
+
     for (auto& fs : dokan_fs) fs->stop();
 
     if (adfFile) {
@@ -191,6 +448,7 @@ int __cdecl wmain(ULONG argc, PWCHAR argv[]) {
     }
 
     adfEnvCleanUp();
+    LocalFree(argv + 1);
 
     return 0;
 }

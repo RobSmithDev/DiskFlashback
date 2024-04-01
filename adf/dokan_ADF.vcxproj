@@ -181,7 +181,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
@@ -287,7 +287,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -343,23 +343,27 @@
   <ItemGroup>
     <ClCompile Include="ADF.cpp" />
     <ClCompile Include="amiga_sectors.cpp" />
+    <ClCompile Include="dlgFormat.cpp" />
     <ClCompile Include="floppybridge_lib.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ADF_operations.cpp" />
     <ClCompile Include="readwrite_file.cpp" />
     <ClCompile Include="readwrite_floppybridge.cpp" />
     <ClCompile Include="sectorCache.cpp" />
+    <ClCompile Include="SignalWnd.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ADF.h" />
     <ClInclude Include="ADF_operations.h" />
     <ClInclude Include="amiga_sectors.h" />
+    <ClInclude Include="dlgFormat.h" />
     <ClInclude Include="floppybridge_abstract.h" />
     <ClInclude Include="floppybridge_lib.h" />
     <ClInclude Include="readwrite_file.h" />
     <ClInclude Include="readwrite_floppybridge.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="sectorCache.h" />
+    <ClInclude Include="SignalWnd.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\dokan\dokan.vcxproj">

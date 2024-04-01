@@ -7,6 +7,30 @@ VOID CALLBACK MotorMonitor(_In_ PVOID   lpParameter, _In_ BOOLEAN TimerOrWaitFir
     callback->motorMonitor();
 }
 
+// Return an ID to identify this with
+uint32_t SectorRW_FloppyBridge::id() {
+    if (m_bridge) {
+        return m_bridge->getDriverTypeIndex();
+    }
+    else return 0xFFFF;
+}
+
+// Reset the cache
+void SectorRW_FloppyBridge::resetCache() {
+    SectorCacheEngine::resetCache();
+
+    std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
+    m_tracksToFlush.clear();
+    for (DecodedTrack& trk : m_trackCache) trk.sectors.clear();
+}
+
+// Flush changes to disk
+bool SectorRW_FloppyBridge::flushWriteCache() {
+    std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
+    return flushPendingWrites();
+}
+
+
 SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile) : SectorCacheEngine(0), m_sectorsPerTrack(0), m_motorTurnOnTime(0), m_timer(0) {
     m_timerQueue = CreateTimerQueue();
 
@@ -42,6 +66,12 @@ SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile) : Secto
     CreateTimerQueueTimer(&m_timer, m_timerQueue, MotorMonitor, this, 500, 200, WT_EXECUTEDEFAULT | WT_EXECUTELONGFUNCTION);
 }
 
+
+void SectorRW_FloppyBridge::setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo) {
+    std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
+    m_dokanfileinfo = dokanfileinfo;
+};
+
 bool SectorRW_FloppyBridge::isDiskPresent() {
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
     return m_bridge->isDiskInDrive();
@@ -63,7 +93,7 @@ void SectorRW_FloppyBridge::motorMonitor() {
         m_motorTurnOnTime = 0;
     }
 
-    if (!m_bridge->isDiskInDrive()) {
+    if ((m_bridge) && (!m_bridge->isDiskInDrive())) {
         if (!m_diskChanged) {
             m_bridge->gotoCylinder(0, false);
             m_bridge->setMotorStatus(false, false);
@@ -81,6 +111,8 @@ void SectorRW_FloppyBridge::motorMonitor() {
 void SectorRW_FloppyBridge::motorInUse(bool upperSide) {
     if (!m_motorTurnOnTime) m_bridge->setMotorStatus(upperSide, true);
     m_motorTurnOnTime = GetTickCount64();
+
+    if (m_dokanfileinfo) DokanResetTimeout(DOKAN_EXTRATIME, m_dokanfileinfo);
 }
 
 // Waits for the drive to be ready, and if it times out, returns false
@@ -90,6 +122,9 @@ bool SectorRW_FloppyBridge::waitForMotor(bool upperSide) {
         Sleep(100);
         if (GetTickCount64() - m_motorTurnOnTime > MOTOR_TIMEOUT_TIME) return false;
     }
+    
+    if (m_dokanfileinfo) DokanResetTimeout(DOKAN_EXTRATIME, m_dokanfileinfo);
+
     return true;
 }
 
@@ -160,6 +195,7 @@ bool SectorRW_FloppyBridge::internalReadData(const uint32_t sectorNumber, const 
             if (m_ignoreErrors) return false;
             retries = 0;
 
+            if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
             switch (MessageBox(GetDesktopWindow(), L"There have been some errors reading data from the disk.\nWhat would you like to do?", L"Disk Errors Detected", MB_SETFOREGROUND | MB_SYSTEMMODAL | MB_ICONQUESTION | MB_ABORTRETRYIGNORE)) {
             case IDRETRY:
             case IDTRYAGAIN: break;
@@ -234,10 +270,6 @@ bool SectorRW_FloppyBridge::internalWriteData(const uint32_t sectorNumber, const
     const bool upperSurface = track & 1;
     const int cylinder = track / 2;
 
-    char b[100];
-    sprintf_s(b, "WRITE SECTOR %i\n", sectorNumber);
-    OutputDebugStringA(b);
-
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
 
     motorInUse(upperSurface);
@@ -246,7 +278,6 @@ bool SectorRW_FloppyBridge::internalWriteData(const uint32_t sectorNumber, const
     auto it = m_trackCache[track].sectors.find(trackBlock);
     if (it != m_trackCache[track].sectors.end()) {
         if (memcmp(it->second.data, data, sectorSize) == 0) {
-            OutputDebugStringA("SECTOR WRITE SKIPPED\n");
             it->second.numErrors = 0;
             return true;
         }
@@ -289,24 +320,20 @@ void SectorRW_FloppyBridge::removeFailedWritesFromCache() {
 }
 
 // Flush any writing thats still pending - lock must already be obtained
-void SectorRW_FloppyBridge::flushPendingWrites() {
-    if (m_blockWriting) return;
+bool SectorRW_FloppyBridge::flushPendingWrites() {
+    if (m_blockWriting) return false;
     
     for (auto& trk : m_tracksToFlush) {
         const uint32_t track = trk.first;
         const bool upperSurface = track & 1;
         const uint32_t cylinder = track / 2;
 
-        char b[100];
-        sprintf_s(b, "Writing to track %i\n", track);
-        OutputDebugStringA(b);
-
         // Motor shouldn't stop here
         motorInUse(upperSurface);
         m_bridge->gotoCylinder(cylinder, upperSurface);
         if (!waitForMotor(upperSurface)) {
             m_tracksToFlush.clear();
-            return;
+            return false;
         }
 
         // Assemble and commit an entire track.  First see if any data is missing
@@ -322,8 +349,22 @@ void SectorRW_FloppyBridge::flushPendingWrites() {
         if (fillData) {
             // 1. Take a copy
             const std::unordered_map<int, DecodedSector> backup = m_trackCache[track].sectors;
-            // 2. *try* to read the track (but dont care if it fails)
-            doTrackReading(track, upperSurface);
+            if (m_writeOnly) {
+                for (uint32_t sec = 0; sec < m_sectorsPerTrack; sec++) {
+                    auto it = m_trackCache[track].sectors.find(sec);
+                    // Does a sector with this number exist?
+                    if (it == m_trackCache[track].sectors.end()) {
+                        DecodedSector tmp;
+                        memset(&tmp, 0, sizeof(tmp));
+                        tmp.numErrors = 0;
+                        m_trackCache[track].sectors.insert(std::make_pair(sec, tmp));
+                    }
+                }
+            }
+            else {
+                // 2. *try* to read the track (but dont care if it fails)
+                doTrackReading(track, upperSurface);
+            }
             // 3. Replace any tracks now read with any we have in our backup that have errors = 0
             for (const auto& sec : backup) {
                 if (sec.second.numErrors == 0) {
@@ -339,8 +380,7 @@ void SectorRW_FloppyBridge::flushPendingWrites() {
         if (numBytes < 0) {
             // this *should* never happen
             removeFailedWritesFromCache();
-            OutputDebugStringA("encodeSectorsIntoMFM Error\n");
-            return;
+            return false;
         }
 
         // Write retries
@@ -358,40 +398,39 @@ void SectorRW_FloppyBridge::flushPendingWrites() {
                 // Wait for the seek, or it will get removed! 
                 Sleep(300);
                 m_bridge->gotoCylinder(cylinder, upperSurface);
-                OutputDebugStringA("WRITE Re-Seek\n");
             }
 
             // Commit to disk
             motorInUse(upperSurface);
-            OutputDebugStringA("...writing\n");
+
             if (m_bridge->writeMFMTrackToBuffer(upperSurface, cylinder, false, numBytes, m_mfmBuffer)) {
                 // Now wait until it completes - approx 400-500ms as this will also read it back to verify it
                 ULONGLONG start = GetTickCount64();
                 while (!m_bridge->isWriteComplete()) {
                     if (GetTickCount64() - start > DISK_WRITE_TIMEOUT) {
+                        if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
                         switch (MessageBox(GetDesktopWindow(), L"Disk writing is taking too long.\nWhat would you like to do?", L"Disk Writing Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION)) {
                         case IDABORT:
                             m_blockWriting = true;
                             removeFailedWritesFromCache();
-                            return;
+                            return false;
                         case IDRETRY:
                             start = GetTickCount64();
                             break;
                         default:
                             removeFailedWritesFromCache();
-                            return;
+                            return false;
                         }
                     }
                 }
-                OutputDebugStringA("...verifying\n");
-
                 // Writing succeeded. Now to do a verify!
                 const std::unordered_map<int, DecodedSector> backup = m_trackCache[track].sectors;
                 for (;;) {
                     if (!doTrackReading(track, upperSurface)) {
+                        if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
                         if (MessageBox(GetDesktopWindow(), L"Disk verifying is taking too long.\nWhat would you like to do?", L"Disk Verifying Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION) != IDRETRY) {
                             removeFailedWritesFromCache();
-                            return;
+                            return false;
                         }
                         // Wait and try again
                         Sleep(100);
@@ -406,12 +445,18 @@ void SectorRW_FloppyBridge::flushPendingWrites() {
                     // Sector no longer exists.  ERROR!
                     if (search == m_trackCache[track].sectors.end()) {
                         errors = true;
+#ifdef _DEBUG       
+                        OutputDebugStringA("Verify Fail Sector Missing\n");
+#endif
                         break;
                     }
                     else {
                         // Did it reac back with errors!?
                         if (search->second.numErrors) {
                             errors = true;
+#ifdef _DEBUG       
+                            OutputDebugStringA("Verify Fail Error Count\n");
+#endif
                             break;
                         }
                         else {
@@ -419,23 +464,21 @@ void SectorRW_FloppyBridge::flushPendingWrites() {
                             if (memcmp(search->second.data, sec.second.data, sizeof(RawDecodedSector)) != 0) {
                                 // BAD read back even though there were no errors
                                 errors = true;
+#ifdef _DEBUG       
+                                OutputDebugStringA("Verify Fail Data\n");
+#endif
                                 break;
                             }
                         }
                     }
                 }
 
-                if (errors) {
-                    OutputDebugStringA("...VERIFY FAILED\n");
-                }
-                else
-                    break;
+                if (!errors) break;
             }
             else {
                 // this shouldnt ever happen
                 removeFailedWritesFromCache();
-                OutputDebugStringA("...shouldnt happen\n");
-                return;
+                return false;
             }
 
             retries++;
@@ -446,4 +489,5 @@ void SectorRW_FloppyBridge::flushPendingWrites() {
     }
 
     removeFailedWritesFromCache();
+    return true;
 }

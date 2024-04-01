@@ -766,6 +766,10 @@ const FloppyDiskBridge::BridgeDriver* FloppyBridgeAPI::getDriverInfo() {
 	if (BRIDGE_GetDriverInfo(m_driverIndex, &m_driverInfo)) return m_driverInfo;
 	return nullptr;
 }
+const unsigned int FloppyBridgeAPI::getDriverTypeIndex() const {
+	return m_driverIndex;
+}
+	
 bool FloppyBridgeAPI::resetDrive(int trackNumber) {
 	return DRIVER_resetDrive(m_handle, trackNumber);
 }

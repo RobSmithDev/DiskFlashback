@@ -67,6 +67,12 @@ bool SectorCacheEngine::readCache(const uint32_t sectorNumber, const uint32_t se
     return true;
 }
 
+// Reset the cache
+void SectorCacheEngine::resetCache() {
+    m_cache.clear();
+}
+
+
 SectorCacheEngine::SectorCacheEngine(const uint32_t maxCacheMem) : m_maxCacheEntries(0), m_cacheMaxMem(maxCacheMem) {
 
 }

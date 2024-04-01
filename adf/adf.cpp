@@ -1,53 +1,141 @@
 #include "adf.h"
 #include "sectorCache.h"
 
+// These were borrowed from the WinUAE source code, HOWEVER, they're identical to what the Amiga OS writes with the INSTALL command
+static uint8_t bootblock_ofs[] = {
+	0x44,0x4f,0x53,0x00,0xc0,0x20,0x0f,0x19,0x00,0x00,0x03,0x70,0x43,0xfa,0x00,0x18,
+	0x4e,0xae,0xff,0xa0,0x4a,0x80,0x67,0x0a,0x20,0x40,0x20,0x68,0x00,0x16,0x70,0x00,
+	0x4e,0x75,0x70,0xff,0x60,0xfa,0x64,0x6f,0x73,0x2e,0x6c,0x69,0x62,0x72,0x61,0x72,
+	0x79
+};
+static uint8_t bootblock_ffs[] = {
+	0x44, 0x4F, 0x53, 0x01, 0xE3, 0x3D, 0x0E, 0x72, 0x00, 0x00, 0x03, 0x70, 0x43, 0xFA, 0x00, 0x3E,
+	0x70, 0x25, 0x4E, 0xAE, 0xFD, 0xD8, 0x4A, 0x80, 0x67, 0x0C, 0x22, 0x40, 0x08, 0xE9, 0x00, 0x06,
+	0x00, 0x22, 0x4E, 0xAE, 0xFE, 0x62, 0x43, 0xFA, 0x00, 0x18, 0x4E, 0xAE, 0xFF, 0xA0, 0x4A, 0x80,
+	0x67, 0x0A, 0x20, 0x40, 0x20, 0x68, 0x00, 0x16, 0x70, 0x00, 0x4E, 0x75, 0x70, 0xFF, 0x4E, 0x75,
+	0x64, 0x6F, 0x73, 0x2E, 0x6C, 0x69, 0x62, 0x72, 0x61, 0x72, 0x79, 0x00, 0x65, 0x78, 0x70, 0x61,
+	0x6E, 0x73, 0x69, 0x6F, 0x6E, 0x2E, 0x6C, 0x69, 0x62, 0x72, 0x61, 0x72, 0x79, 0x00, 0x00, 0x00,
+};
 
-fs::fs(struct AdfDevice* adfDevice, struct AdfVolume* adfVolume, WCHAR driveLetter, bool readOnly) : m_readOnly(readOnly), m_adfDevice(adfDevice), m_adfVolume(adfVolume) {
+
+
+ActiveFileIO::ActiveFileIO(fs* owner) : m_owner(owner) {};
+// Add Move constructor
+ActiveFileIO::ActiveFileIO(ActiveFileIO&& source) noexcept {
+	this->m_owner = source.m_owner;
+	source.m_owner = nullptr;
+}
+ActiveFileIO::~ActiveFileIO() {
+	if (m_owner) m_owner->clearFileIO();
+}
+
+// Return true if the drive has files open
+bool fs::driveInUse() {
+	return m_inUse.size();
+}
+
+
+fs::fs(struct AdfDevice* adfDevice, struct AdfVolume* adfVolume, int volumeNumber, WCHAR driveLetter, bool readOnly) : 
+	m_readOnly(readOnly), m_adfDevice(adfDevice), m_adfVolume(adfVolume), m_volumeNumber(volumeNumber)  {
 	m_drive.resize(3);
 	m_drive[0] = driveLetter;
 	m_drive[1] = L':';
 	m_drive[2] = L'\\';
 }
 
+
+
+// Special command to unmount the volume
+void fs::unmountVolume() {
+	if (m_adfVolume) {		
+		adfUnMount(m_adfVolume);
+		m_adfVolume = nullptr;
+	}	
+}
+// special command to re-mount the unmounted volume
+void fs::remountVolume() {
+	if (!m_adfVolume)
+		m_adfVolume = adfMount(m_adfDevice, m_volumeNumber, m_readOnly);
+}
+
 void fs::start() {
 	DOKAN_OPTIONS dokan_options;
 	ZeroMemory(&dokan_options, sizeof(DOKAN_OPTIONS));
 	dokan_options.Version = DOKAN_VERSION;
-	dokan_options.Options = DOKAN_OPTION_REMOVABLE | DOKAN_OPTION_CURRENT_SESSION;
+	dokan_options.Options = DOKAN_OPTION_CURRENT_SESSION;
 	dokan_options.MountPoint = m_drive.c_str();
 	dokan_options.SingleThread = true;
-	dokan_options.Timeout = 0;
 	dokan_options.GlobalContext = reinterpret_cast<ULONG64>(this);
-	dokan_options.SectorSize = m_adfVolume->blockSize;
-	dokan_options.Timeout = 5 * 60 * 1000; // 5 minute timeout - disks are SLOW!
+	dokan_options.SectorSize = m_adfVolume ? m_adfVolume->blockSize : 512;
+	dokan_options.AllocationUnitSize = m_adfVolume ? m_adfVolume->blockSize : 512;
+	dokan_options.Timeout = 5 * 60000; // 5 minutes
 
 	// DOKAN_OPTION_WRITE_PROTECT
 #ifdef _DEBUG
-	dokan_options.Options |= DOKAN_OPTION_STDERR;
-		//dokan_options.Options |= DOKAN_OPTION_DISPATCH_DRIVER_LOGS;
+	//dokan_options.Options |= DOKAN_OPTION_STDERR;
 #endif
 	NTSTATUS status = DokanCreateFileSystem(&dokan_options, &fs_operations, &m_instance);
 
 	switch (status) {
-		case DOKAN_SUCCESS:
-			break;
-		case DOKAN_ERROR:
-			throw std::runtime_error("Error");
-		case DOKAN_DRIVE_LETTER_ERROR:
-			throw std::runtime_error("Bad Drive letter");
-		case DOKAN_DRIVER_INSTALL_ERROR:
-			throw std::runtime_error("Can't install driver");
-		case DOKAN_START_ERROR:
-			throw std::runtime_error("Driver something wrong");
-		case DOKAN_MOUNT_ERROR:
-			throw std::runtime_error("Can't assign a drive letter");
-		case DOKAN_MOUNT_POINT_ERROR:
-			throw std::runtime_error("Mount point error");
-		case DOKAN_VERSION_ERROR:
-			throw std::runtime_error("Version error");
-		default:
-			throw std::runtime_error("Unknown error"); 
+	case DOKAN_SUCCESS:
+		break;
+	case DOKAN_ERROR:
+		throw std::runtime_error("Error");
+	case DOKAN_DRIVE_LETTER_ERROR:
+		throw std::runtime_error("Bad Drive letter");
+	case DOKAN_DRIVER_INSTALL_ERROR:
+		throw std::runtime_error("Can't install driver");
+	case DOKAN_START_ERROR:
+		throw std::runtime_error("Driver something wrong");
+	case DOKAN_MOUNT_ERROR:
+		throw std::runtime_error("Can't assign a drive letter");
+	case DOKAN_MOUNT_POINT_ERROR:
+		throw std::runtime_error("Mount point error");
+	case DOKAN_VERSION_ERROR:
+		throw std::runtime_error("Version error");
+	default:
+		throw std::runtime_error("Unknown error");
 	}
+}
+
+// Return TRUE if file is in use
+bool fs::isFileInUse(const char* const name, const AdfFileMode mode) {
+	if (!m_adfVolume) return false;
+
+	// Horrible way to do this 
+	AdfFile* fle = adfFileOpen(m_adfVolume, name, AdfFileMode::ADF_FILE_MODE_READ);
+	if (!fle) return false;
+	SECTNUM fleKey = fle->fileHdr->headerKey;
+	adfFileClose(fle);
+
+	for (const auto& openFle : m_inUse) 
+		if (openFle.first->fileHdr->headerKey == fleKey) {
+			// Match - if its read only and we're read only thats ok
+			if ((mode & AdfFileMode::ADF_FILE_MODE_WRITE) || (openFle.first->modeWrite)) return true;
+		}
+
+	return false;
+}
+void fs::addTrackFileInUse(AdfFile* handle) {
+	m_inUse.insert(std::make_pair(handle, 1));
+}
+void fs::releaseFileInUse(AdfFile* handle) {
+	auto f = m_inUse.find(handle);
+	if (f != m_inUse.end()) m_inUse.erase(f);
+}
+
+
+// Returns if disk is locked and cannot be read
+bool fs::isLocked() {
+	return (m_adfDevice->nativeDev) && (((SectorCacheEngine*)m_adfDevice->nativeDev)->isAccessLocked());
+}
+
+// Returns FALSE if files are open
+bool fs::setLocked(bool enableLock) {
+	if (m_inUse.size()) return false;
+	if (!m_adfDevice->nativeDev) return false;
+	((SectorCacheEngine*)m_adfDevice->nativeDev)->setLocked(enableLock);
+	return true;
 }
 
 // Returns TRUE if write protected
@@ -55,21 +143,138 @@ bool fs::isWriteProtected() {
 	return m_readOnly || ((m_adfDevice->nativeDev) && (((SectorCacheEngine*)m_adfDevice->nativeDev)->isDiskWriteProtected()));
 }
 
+// Returns TRUE if theres a disk in the drive
+bool fs::isDiskInDrive() {
+	if (!m_adfDevice->nativeDev) return true;
+	return ((SectorCacheEngine*)m_adfDevice->nativeDev)->isDiskPresent();
+}
+
+// Install bootblock
+bool fs::installBootBlock() {
+	if (!m_adfVolume) return false;
+	const std::string appName = "Installed with " APPLICATION_NAME;
+
+	// 1024 bytes is required
+	uint8_t* mem = (uint8_t*)malloc(1024);
+	if (!mem) return false;
+	memset(mem, 0, 1024);
+
+	memset(mem, 0, 1024);
+	if (isFFS(m_adfVolume->dosType)) {
+		size_t size = sizeof(bootblock_ofs) / sizeof(*bootblock_ofs);
+		memcpy_s(mem, 1024, bootblock_ofs, size);
+		strcpy_s((char*)(mem + size + 8), 1024 - (size + 8), appName.c_str());
+	}
+	else {
+		size_t size = sizeof(bootblock_ffs) / sizeof(*bootblock_ffs);
+		memcpy_s(mem, 1024, bootblock_ffs, size);
+		strcpy_s((char*)(mem + size + 8), 1024 - (size + 8), appName.c_str());
+	}
+	
+	if (isWriteProtected()) return false;
+	// Nothing writes to where thr boot block is so it's safe to do this
+	bool ok = adfInstallBootBlock(m_adfVolume, mem) == RC_OK;
+
+	free(mem);
+
+	return ok;
+}
+
+
+// Add some hacks to the registery to make the drive context menu work
+void fs::applyRegistryAction(const std::wstring registeryKeyName, const std::wstring menuLabel, const int iconIndex, const std::wstring& commandParams) {
+	WCHAR path[256];
+	swprintf_s(path, L"Software\\Classes\\Drive\\shell\\%s_%c", registeryKeyName.c_str(), m_drive[0]);
+	RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, menuLabel.c_str(), menuLabel.length() * 2);
+	RegSetKeyValue(HKEY_CURRENT_USER, path, L"AppliesTo", REG_SZ, m_drive.c_str(), m_drive.length() * 2);
+	RegSetKeyValue(HKEY_CURRENT_USER, path, L"MultiSelectModel", REG_SZ, L"Single", 6 * 2);
+	const std::wstring iconNumber = L"\"" + mainEXE + L"\", " + std::to_wstring(iconIndex);
+	RegSetKeyValue(HKEY_CURRENT_USER, path, L"Icon", REG_SZ, iconNumber.c_str(), iconNumber.length() * 2);
+	std::wstring cmd = L"\"" + mainEXE + L"\" CONTROL "+ m_drive.substr(0,1)+L" "+commandParams;
+	wcscat_s(path, L"\\command");
+	RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, cmd.c_str(), cmd.length() * 2);
+}
+
+// Remove those hacks
+void fs::removeRegisteryAction(const std::wstring registeryKeyName) {
+	WCHAR path[256], path2[256];
+	swprintf_s(path, L"Software\\Classes\\Drive\\shell\\%s_%c", registeryKeyName.c_str(), m_drive[0]);
+	wcscpy_s(path2, path);
+	wcscat_s(path2, L"\\command");
+	RegDeleteKey(HKEY_CURRENT_USER, path2);
+	RegDeleteKey(HKEY_CURRENT_USER, path);
+}
+
+void fs::mounted(const std::wstring& mountPoint, bool wasMounted) {
+	if (wasMounted) m_drive = mountPoint;
+	if (m_drive.empty()) return;
+	m_drive[0] = towupper(m_drive[0]);
+
+	WCHAR path[128];
+	swprintf_s(path, L"Software\\Classes\\Applications\\Explorer.exe\\Drives\\%s\\DefaultIcon", m_drive.substr(0, 1).c_str());
+
+	// Clear anything previously there
+	removeRegisteryAction(L"ADFMounterSystemBB");
+	removeRegisteryAction(L"ADFMounterSystemFormat");
+	removeRegisteryAction(L"ADFMounterSystemEject");
+	RegDeleteKeyValue(HKEY_CURRENT_USER, path, NULL);
+	RegDeleteKey(HKEY_CURRENT_USER, path);
+	path[wcslen(path) - 12] = L'\0';
+	RegDeleteKey(HKEY_CURRENT_USER, path);
+
+	swprintf_s(path, L"Software\\Classes\\Applications\\Explorer.exe\\Drives\\%s\\DefaultIcon", m_drive.substr(0, 1).c_str());
+
+	if (wasMounted) {
+		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, mainEXE.c_str(), mainEXE.length() * 2);
+		applyRegistryAction(L"ADFMounterSystemFormat", L"Form&at...", 0,L"FORMAT");
+		bool physicalDisk = (m_adfDevice && m_adfDevice->nativeDev && ((SectorCacheEngine*)m_adfDevice->nativeDev)->isPhysicalDisk());
+
+		if (physicalDisk) {
+
+		}
+		else {
+			applyRegistryAction(L"ADFMounterSystemEject", L"&Eject", 0, L"EJECT");
+		}
+
+		if (m_adfVolume) {
+			if (m_adfVolume->dev->devType == DEVTYPE_FLOPDD || m_adfVolume->dev->devType == DEVTYPE_FLOPHD) {
+				applyRegistryAction(L"ADFMounterSystemBB", L"&Install Bootblock...", 0, L"BB");
+			}
+		}
+	}
+}
+
+// Sets a current file info block as active (or NULL for not) so DokanResetTimeout can be called if needed
+void fs::setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo) {
+	if (!m_adfDevice->nativeDev) return;
+	((SectorCacheEngine*)m_adfDevice->nativeDev)->setActiveFileIO(dokanfileinfo);
+}
+
+// Let the system know I/O is currently happenning.  ActiveFileIO must be kepyt in scope until io is complete
+ActiveFileIO fs::notifyIOInUse(PDOKAN_FILE_INFO dokanfileinfo) {
+	setActiveFileIO(dokanfileinfo);
+	return ActiveFileIO(this);
+}
+
+void fs::clearFileIO() {
+	setActiveFileIO(nullptr);
+}
+
 bool fs::isRunning() {
-	return DokanIsFileSystemRunning(m_instance);	
+	return DokanIsFileSystemRunning(m_instance);
 }
 
 void fs::wait(DWORD timeout) {
 	DokanWaitForFileSystemClosed(m_instance, timeout);
 }
 
-void fs::stop() { 
+void fs::stop() {
 	if (m_instance) {
 		DokanCloseHandle(m_instance);
 		DokanRemoveMountPoint(m_drive.c_str());
 		m_instance = 0;
 		m_drive = L"";
-		adfUnMount(m_adfVolume);
+		if (m_adfVolume) adfUnMount(m_adfVolume);
 		m_adfVolume = nullptr;
 	}
 }
@@ -116,7 +321,7 @@ void fs::amigaFilenameToWindowsFilename(const std::string& amigaFilename, std::w
 void fs::windowsFilenameToAmigaFilename(const std::wstring& windowsFilename, std::string& amigaFilename) {
 	auto it = std::find_if(std::begin(m_safeFilenameMap), std::end(m_safeFilenameMap),
 		[&windowsFilename](auto&& p) { return p.second == windowsFilename; });
-	if (it != m_safeFilenameMap.end()) 
+	if (it != m_safeFilenameMap.end())
 		amigaFilename = it->first;
 	else {
 		wideToAnsi(windowsFilename, amigaFilename);

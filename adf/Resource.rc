@@ -54,6 +54,61 @@ END
 // remains consistent on all systems.
 IDI_ICON1               ICON                    "floppy.ico"
 
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_FORMAT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 150
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 186
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_FORMAT DIALOGEX 0, 0, 157, 193
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "&Start",ID_START,45,172,50,14
+    PUSHBUTTON      "&Close",ID_CLOSE,100,172,50,14
+    LTEXT           "File system",IDC_STATIC,7,7,36,8
+    COMBOBOX        IDC_FILESYSTEM,7,18,143,58,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Volume label",IDC_STATIC,7,36,40,8
+    GROUPBOX        "Format options",IDC_STATIC,7,66,143,77
+    CONTROL         "&Quick Format",IDC_QUICK,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,79,58,10
+    CONTROL         "&Directory Cache",IDC_CACHE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,94,67,10
+    CONTROL         "&International Mode",IDC_INT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,109,77,10
+    CONTROL         "&Install Boot Block",IDC_BB,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,124,70,10
+    CONTROL         "",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_BORDER,7,148,143,8
+    EDITTEXT        IDC_LABEL,7,47,143,14,ES_AUTOHSCROLL
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_FORMAT AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
 #endif    // English (United Kingdom) resources
 /////////////////////////////////////////////////////////////////////////////
 

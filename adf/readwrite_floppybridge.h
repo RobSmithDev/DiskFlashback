@@ -8,6 +8,7 @@
 #include "amiga_sectors.h"
 #include <mutex>
 
+
 #define MFM_BUFFER_MAX_TRACK_LENGTH			(0x3A00 * 2)    // 29,696 bytes
 #define MAX_TRACKS                          164
 #define MOTOR_TIMEOUT_TIME                  2500    // Timeout to wait for the motor to spin up
@@ -16,6 +17,7 @@
 #define MOTOR_IDLE_TIMEOUT                  2000    // How long after access to switch off the motor and flush changes to disk
 #define DISK_WRITE_TIMEOUT                  5000    // Allow 5 seconds to write the data
 #define FORCE_FLUSH_AT_TRACKS               10      // How many tracks to have pending write before its forced (5 cylinders, both sides)
+#define DOKAN_EXTRATIME                     10000   // How much extra time to add to the timeout for dokan file operations
 
 class SectorRW_FloppyBridge : public SectorCacheEngine {
 private:
@@ -28,8 +30,9 @@ private:
     HANDLE m_timer                  = 0;
     bool m_blockWriting             = false;  // used if errors occur
     bool m_diskChanged              = false;  // Monitor for disk change
-
+    PDOKAN_FILE_INFO m_dokanfileinfo = nullptr; // active file i/o
     std::mutex m_motorTimerProtect;
+    bool m_writeOnly = false;
 
     // Tracks that need committing to disk
     // NOTE: Using MAP not UNORDERED_MAP. This *should* make the disk head stepping fairly sequential and faster
@@ -39,7 +42,7 @@ private:
     DecodedTrack m_trackCache[MAX_TRACKS];
 
     // Flush any writing thats still pending
-    void flushPendingWrites();
+    bool flushPendingWrites();
 
     // Checks for pending writes, if theres too many then flush them
     void checkFlushPendingWrites();
@@ -70,6 +73,24 @@ public:
 
     virtual bool isDiskPresent() override;
     virtual bool isDiskWriteProtected() override;
+
+    virtual void setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo) override;
+
+    // Return TRUE if this is actually a physical "REAL" drive
+    virtual bool isPhysicalDisk() override { return true; };
+
+    // Flush changes to disk
+    virtual bool flushWriteCache() override;
+
+    // Reset the cache
+    virtual void resetCache() override;
+
+    // Force writing only, so no read-by back first
+    virtual void setWritingOnlyMode(bool only) override { m_writeOnly = only; };
+
+    // Return an ID to identify this with
+    virtual uint32_t id() override;
+
 
     void motorMonitor();
 };

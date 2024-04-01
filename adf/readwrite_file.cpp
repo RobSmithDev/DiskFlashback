@@ -42,6 +42,10 @@ bool SectorRW_File::internalWriteData(const uint32_t sectorNumber, const uint32_
     if (SetFilePointer(m_file, sectorNumber * sectorSize, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
         return false;
 
+    char tmp[100];
+    sprintf_s(tmp, "WRITE BLOCK %i\n", sectorNumber);
+    OutputDebugStringA(tmp);
+
     DWORD write = 0;
     if (!WriteFile(m_file, data, sectorSize, &write, NULL))
         return false;

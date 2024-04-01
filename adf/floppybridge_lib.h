@@ -254,7 +254,7 @@ public:
 	virtual ~FloppyBridgeAPI();
 	virtual bool initialise() override;
 	virtual void shutdown() override;
-	virtual const BridgeDriver* getDriverInfo() override;
+	virtual const BridgeDriver* getDriverInfo() override;	
 	virtual unsigned char getBitSpeed() override;
 	virtual DriveTypeID getDriveTypeID() override;
 	virtual const char* getLastErrorMessage() override;
@@ -286,6 +286,7 @@ public:
 	virtual bool isWriteComplete() override;
 	virtual bool canTurboWrite() override;
 	virtual bool isReadyToWrite() override;
+	const unsigned int getDriverTypeIndex() const;
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

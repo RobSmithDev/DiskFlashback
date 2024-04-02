@@ -96,6 +96,10 @@ bool DialogFORMAT::shouldClose() {
 
 // Actually do the format
 bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, bool doFFS, const std::string& volumeLabel) {
+	if (!m_io->isDiskPresent()) {
+		MessageBox(m_hParent, L"No disk in drive. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
+		return false;
+	}
 	if (m_io->isDiskWriteProtected()) {
 		MessageBox(m_hParent, L"Disk in drive is write protected. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 		return false;

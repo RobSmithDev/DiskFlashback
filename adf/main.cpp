@@ -365,10 +365,7 @@ void runMountedVolumes(HINSTANCE hInstance, const std::wstring mode, SectorCache
         }
     }    
 }
-
-
-
-   
+  
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     int argc = 0;
     WCHAR exeName[MAX_PATH];
@@ -399,7 +396,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                     std::wstring msg = letter + std::wstring(argv[4]);
                     COPYDATASTRUCT tmp;
                     tmp.lpData = (void*)msg.c_str();
-                    tmp.cbData = msg.length() * 2;  // unicode
+                    tmp.cbData = (DWORD)(msg.length() * 2);  // unicode
                     tmp.dwData = REMOTECTRL_COPYTODISK;
                     CMessageWindow wnd2(hInstance, L"CopyDataTemp");
                     SendMessage(wnd, WM_COPYDATA, (WPARAM)wnd2.hwnd(), (LPARAM)&tmp);
@@ -437,7 +434,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             }             
         }
 
-        if (adfFile) {
+        if (adfFile) {            
             mountVolumes(letter, readOnly);
 
             // See if anything mounted

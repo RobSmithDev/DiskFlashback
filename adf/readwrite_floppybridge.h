@@ -33,6 +33,7 @@ private:
     PDOKAN_FILE_INFO m_dokanfileinfo = nullptr; // active file i/o
     std::mutex m_motorTimerProtect;
     bool m_writeOnly = false;
+    bool m_lockedOut = false;
     std::function<void(bool diskInserted)> m_diskChangeCallback;
 
     // Tracks that need committing to disk
@@ -95,6 +96,10 @@ public:
 
     // Return an ID to identify this with
     virtual uint32_t id() override;
+
+    // Restore and release for remote usage
+    virtual void releaseDrive() override;
+    virtual bool restoreDrive() override;
 
     // Return the current number of sectors per track
     virtual uint32_t numSectorsPerTrack() { return m_sectorsPerTrack; }

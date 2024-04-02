@@ -66,6 +66,10 @@ public:
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() = 0;
 
+    // Restore and release for remote usage
+    virtual void releaseDrive() {};
+    virtual bool restoreDrive() { return true; };
+
     // Return TRUE if this is actually a physical "REAL" drive
     virtual bool isPhysicalDisk() { return false; };
 

@@ -7,6 +7,33 @@ VOID CALLBACK MotorMonitor(_In_ PVOID   lpParameter, _In_ BOOLEAN TimerOrWaitFir
     callback->motorMonitor();
 }
 
+void SectorRW_FloppyBridge::releaseDrive() {
+    m_bridge->shutdown();
+    m_lockedOut = true;
+}
+bool SectorRW_FloppyBridge::restoreDrive() {
+    std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
+    m_motorTurnOnTime = 0;
+
+    if (!m_lockedOut) return true;
+
+    if (!m_bridge->initialise()) {
+        delete m_bridge;
+        m_bridge = nullptr;
+        return false;
+    }
+
+    if (!m_bridge->resetDrive(0)) {
+        delete m_bridge;
+        m_bridge = nullptr;
+        return false;
+    }
+
+    m_lockedOut = false;
+    return true;
+}
+
+
 // Return an ID to identify this with
 uint32_t SectorRW_FloppyBridge::id() {
     if (m_bridge) {
@@ -36,6 +63,7 @@ void SectorRW_FloppyBridge::resetCache() {
 
 // Flush changes to disk
 bool SectorRW_FloppyBridge::flushWriteCache() {
+    if (m_lockedOut) return false;
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
     return flushPendingWrites();
 }
@@ -51,18 +79,9 @@ SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile, std::fu
     m_bridge->setBridgeMode(FloppyBridge::BridgeMode::bmStalling);
     m_bridge->setComPortAutoDetect(true);
 
-    if (!m_bridge->initialise()) {
-        delete m_bridge;
-        m_bridge = nullptr;
-        return;
-    }
-
-    if (!m_bridge->resetDrive(0)) {
-        delete m_bridge;
-        m_bridge = nullptr;
-        return;
-    }
-
+    m_lockedOut = true;
+    if (!restoreDrive()) return;
+   
     m_mfmBuffer = malloc(MFM_BUFFER_MAX_TRACK_LENGTH);
     if (!m_mfmBuffer) {
         delete m_bridge;
@@ -111,6 +130,8 @@ bool SectorRW_FloppyBridge::diskRemovedWarning() {
 
 // The motor usage has timed out
 void SectorRW_FloppyBridge::motorMonitor() {
+    if (m_lockedOut) return;
+
     bool sendNotify = false;
     {
         std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
@@ -221,6 +242,7 @@ bool SectorRW_FloppyBridge::setForceDensityMode(FloppyBridge::BridgeDensityMode 
 // Do reading
 bool SectorRW_FloppyBridge::internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) {
     if (sectorSize != SECTOR_BYTES) return false;
+    if (m_lockedOut) return false;
 
     const int track = sectorNumber / m_sectorsPerTrack;
     const int trackBlock = sectorNumber % m_sectorsPerTrack;
@@ -319,6 +341,7 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, const bool uppe
 bool SectorRW_FloppyBridge::internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) {
     if (sectorSize != SECTOR_BYTES) return false;
     if (m_blockWriting) return false;
+    if (m_lockedOut) return false;
 
     const int track = sectorNumber / m_sectorsPerTrack;
     if (track >= MAX_TRACKS) return false;

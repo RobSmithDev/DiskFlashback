@@ -46,6 +46,7 @@ class fs {
 		int m_volumeNumber;
 		std::wstring m_drive;
 		bool m_readOnly;
+		bool m_remoteLockout = false;
 
 		// Files in use
 		std::unordered_map<struct AdfFile*, int> m_inUse;
@@ -120,7 +121,11 @@ class fs {
 		// Notify and setup things when the drive becomes mounted
 		void mounted(const std::wstring& mountPoint, bool wasMounted);
 
-		
+		// Release the drive so it can be used by other apps
+		void releaseDrive();
+
+		// Restore the drive after it was released
+		void restoreDrive();
 
 		// Special command to unmount the volume
 		void unmountVolume();

@@ -100,6 +100,37 @@ fs::fs(struct AdfDevice* adfDevice, struct AdfVolume* adfVolume, int volumeNumbe
 }
 
 
+// Release the drive so it can be used by other apps
+void fs::releaseDrive() {
+	if (m_remoteLockout) return;
+	if (!m_adfDevice->nativeDev) return;
+	SectorCacheEngine* io = (SectorCacheEngine*)m_adfDevice->nativeDev;
+	if (!io) return;
+	if (!io->isPhysicalDisk()) return;
+	if (!setLocked(true)) {
+		std::wstring t = L"Unable to release the " + getDriverName() + L" floppy drive.\nThere are files currently open";
+		MessageBox(GetDesktopWindow(), t.c_str(), L"Drive in use", MB_OK | MB_ICONSTOP);
+		return;
+	}
+	unmountVolume();
+	m_remoteLockout = true;
+	io->releaseDrive();
+}
+
+// Restore the drive after it was released
+void fs::restoreDrive() {
+	if (!m_remoteLockout) return;
+	if (!m_adfDevice->nativeDev) return;
+	SectorCacheEngine* io = (SectorCacheEngine*)m_adfDevice->nativeDev;
+	if (!io) return;
+	if (!io->isPhysicalDisk()) return;
+	io->resetCache();
+	io->restoreDrive();
+	setLocked(false);
+	remountVolume();
+	m_remoteLockout = false;
+}
+
 
 // Special command to unmount the volume
 void fs::unmountVolume() {
@@ -209,6 +240,7 @@ bool fs::isLocked() {
 bool fs::setLocked(bool enableLock) {
 	if (m_inUse.size()) return false;
 	if (!m_adfDevice->nativeDev) return false;
+	((SectorCacheEngine*)m_adfDevice->nativeDev)->flushWriteCache();
 	((SectorCacheEngine*)m_adfDevice->nativeDev)->setLocked(enableLock);
 	return true;
 }
@@ -238,6 +270,7 @@ std::wstring fs::getDriverName() {
 
 // Install bootblock
 bool fs::installBootBlock() {
+	if (m_remoteLockout) return false;
 	if (!m_adfVolume) return false;
 	const std::string appName = "Installed with " APPLICATION_NAME;
 
@@ -266,7 +299,6 @@ bool fs::installBootBlock() {
 
 	return ok;
 }
-
 
 // Add some hacks to the registery to make the drive context menu work
 void fs::applyRegistryAction(const std::wstring registeryKeyName, const std::wstring menuLabel, const int iconIndex, const std::wstring& commandParams) {

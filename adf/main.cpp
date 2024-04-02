@@ -282,7 +282,7 @@ void runMountedVolumes(HINSTANCE hInstance, const std::wstring mode, SectorCache
                 return dlg.doModal();
             }));
         }
-
+        return 0;
      });
 
 
@@ -300,9 +300,11 @@ void runMountedVolumes(HINSTANCE hInstance, const std::wstring mode, SectorCache
         switch (commandID) {
 
         case REMOTECTRL_RELEASE:
+            fs->releaseDrive();
             return 0;
 
         case REMOTECTRL_RESTORE:
+            fs->restoreDrive();
             return 0;
 
         case REMOTECTRL_FORMAT: 

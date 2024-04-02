@@ -106,8 +106,7 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
     if ((search == ST_ROOT) || (search == ST_DIR)) dokanfileinfo->IsDirectory = true;
 
     if (dokanfileinfo->IsDirectory) {
-        if (search == ST_FILE) 
-            return STATUS_NOT_A_DIRECTORY;
+        if (search == ST_FILE)  return STATUS_NOT_A_DIRECTORY;
 
         if (creation_disposition == CREATE_NEW || creation_disposition == OPEN_ALWAYS) {
             if (search != 0) 
@@ -336,8 +335,8 @@ static NTSTATUS DOKAN_CALLBACK fs_readfile(LPCWSTR filename, LPVOID buffer, DWOR
 
         ActiveFileIO io = f->notifyIOInUse(dokanfileinfo);
 
-        if (adfFileGetPos(fle) != offset)
-            if (adfFileSeek(fle, offset) != RC_OK) 
+        if (adfFileGetPos(fle) != (uint32_t)offset)
+            if (adfFileSeek(fle, (uint32_t)offset) != RC_OK) 
                 return STATUS_DATA_ERROR;
 
         DWORD lenRead = adfFileRead(fle, bufferlength, (uint8_t*)buffer);
@@ -389,8 +388,8 @@ static NTSTATUS DOKAN_CALLBACK fs_writefile(LPCWSTR filename, LPCVOID buffer, DW
         }
 
         //, offset
-        if (adfFileGetPos(fle) != offset)
-            if (adfFileSeek(fle, offset) != RC_OK) 
+        if (adfFileGetPos(fle) != (uint32_t)offset)
+            if (adfFileSeek(fle, (uint32_t)offset) != RC_OK)
                 return STATUS_DATA_ERROR;
         
         DWORD written = adfFileWrite(fle,number_of_bytes_to_write, (uint8_t*)buffer);
@@ -440,7 +439,7 @@ static NTSTATUS DOKAN_CALLBACK fs_setendoffile(LPCWSTR filename, LONGLONG ByteOf
     if (dokanfileinfo->Context) {
         AdfFile* fle = (AdfFile*)dokanfileinfo->Context;
         ActiveFileIO io = f->notifyIOInUse(dokanfileinfo);
-        if (adfFileTruncate(fle, ByteOffset) == RC_OK) return STATUS_SUCCESS;
+        if (adfFileTruncate(fle, (uint32_t)ByteOffset) == RC_OK) return STATUS_SUCCESS;
     } else return STATUS_OBJECT_NAME_NOT_FOUND;
     return STATUS_ACCESS_DENIED;
 }
@@ -463,12 +462,12 @@ static NTSTATUS DOKAN_CALLBACK fs_setallocationsize(LPCWSTR filename, LONGLONG a
         }
 
         if (alloc_size < siz) {
-            if (adfFileTruncate(fle, alloc_size) == RC_OK) return STATUS_SUCCESS;
+            if (adfFileTruncate(fle, (uint32_t)alloc_size) == RC_OK) return STATUS_SUCCESS;
         }
         else {
             uint32_t pos = adfFileGetPos(fle);
             if (adfFileSeekEOF(fle) == RC_OK) {
-                uint32_t toWrite = alloc_size - siz;
+                uint32_t toWrite = (uint32_t)alloc_size - siz;
 
                 uint32_t written = adfFileWriteFilled(fle, 0, toWrite);
                 adfFileSeek(fle, pos);
@@ -500,7 +499,7 @@ static NTSTATUS DOKAN_CALLBACK fs_getfileInformation(LPCWSTR filename, LPBY_HAND
         return STATUS_OBJECT_NAME_NOT_FOUND;
     if ((parent.secType != ST_FILE) && (parent.secType != ST_DIR) && (parent.secType != ST_ROOT)) return STATUS_OBJECT_NAME_NOT_FOUND;
 
-    struct AdfEntry e;
+    struct AdfEntry e = { 0 };
  
     e.access = parent.access;
     e.type = parent.secType;
@@ -587,11 +586,8 @@ static NTSTATUS DOKAN_CALLBACK fs_setfileattributes(LPCWSTR filename, DWORD file
     if (f->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
     struct AdfVolume* v = f->volume();
 
-    std::wstring windowsPath = filename;
-    if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
-
     std::string amigafilename;
-    int32_t search = locatePath(windowsPath, dokanfileinfo, amigafilename);
+    int32_t search = locatePath(filename, dokanfileinfo, amigafilename);
     if (search != ST_FILE) return STATUS_OBJECT_NAME_NOT_FOUND;
 
     struct bEntryBlock parent;
@@ -620,10 +616,7 @@ static NTSTATUS DOKAN_CALLBACK fs_setfiletime(LPCWSTR filename, CONST FILETIME* 
     if (!f->volume()) return STATUS_UNRECOGNIZED_MEDIA;
     struct AdfVolume* v = f->volume();
 
-    std::wstring windowsPath = filename;
-    if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
-
-    int32_t search = locatePath(windowsPath, dokanfileinfo);
+    int32_t search = locatePath(filename, dokanfileinfo);
     if (search != ST_FILE) return STATUS_OBJECT_NAME_NOT_FOUND;
 
     // We only support last write time
@@ -660,11 +653,8 @@ static NTSTATUS DOKAN_CALLBACK fs_deletefile(LPCWSTR filename, PDOKAN_FILE_INFO 
     if (!f->volume()) return STATUS_UNRECOGNIZED_MEDIA;
     struct AdfVolume* v = f->volume();
 
-    std::wstring windowsPath = filename;
-    if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
-
     std::string amigaName;
-    int32_t search = locatePath(windowsPath, dokanfileinfo, amigaName);
+    int32_t search = locatePath(filename, dokanfileinfo, amigaName);
     if (search == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
     if (search != ST_FILE) return STATUS_ACCESS_DENIED;
 
@@ -691,11 +681,8 @@ static NTSTATUS DOKAN_CALLBACK fs_deletedirectory(LPCWSTR filename, PDOKAN_FILE_
     if (!f->volume()) return STATUS_UNRECOGNIZED_MEDIA;
     struct AdfVolume* v = f->volume();
 
-    std::wstring windowsPath = filename;
-    if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
-
     std::string amigaName;
-    int32_t search = locatePath(windowsPath, dokanfileinfo, amigaName);
+    int32_t search = locatePath(filename, dokanfileinfo, amigaName);
     if (search == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
     if (search != ST_DIR) 
         return STATUS_ACCESS_DENIED;
@@ -719,18 +706,13 @@ static NTSTATUS DOKAN_CALLBACK fs_movefile(LPCWSTR filename, LPCWSTR new_filenam
     if (!f->volume()) return STATUS_UNRECOGNIZED_MEDIA;
     struct AdfVolume* v = f->volume();
 
-
-    std::wstring windowsPath = filename;
-    if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
-
     std::string amigaName;
-    int32_t srcFileFolder = locatePath(windowsPath, dokanfileinfo, amigaName);
+    int32_t srcFileFolder = locatePath(filename, dokanfileinfo, amigaName);
     if (srcFileFolder == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
 
     adfParentDir(v);
     SECTNUM srcSector = v->curDirPtr;
     SECTNUM dstSector = srcSector;
-
 
     std::wstring newName = new_filename;
     if (newName.length() && (newName[0] == '\\')) newName.erase(newName.begin());
@@ -809,7 +791,6 @@ static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation( LPWSTR volumename_buffer
     *filesystem_flags = FILE_CASE_PRESERVED_NAMES;
 
     if (v) {
-        struct bRootBlock root;
         char diskName[35] = { 0 };
         std::wstring volName;
         if (v->volName) ansiToWide(v->volName, volName);

@@ -93,6 +93,22 @@ bool SectorRW_FloppyBridge::isDiskWriteProtected() {
     return m_bridge->isWriteProtected();
 }
 
+// Show disk removed warning - returns TRUE if disk was re-inserted
+bool SectorRW_FloppyBridge::diskRemovedWarning() {
+    if (m_bridge->isDiskInDrive()) return true;
+    
+    ULONGLONG t = GetTickCount64() - 1000;
+    while (!m_bridge->isDiskInDrive()) {
+        if (GetTickCount64() - t > 1000) {
+            if (MessageBox(GetDesktopWindow(), L"WARNING: Not all data has been written to disk!\nYou MUST re-insert the disk into drive and press retry.", L"FLOPPY DISK REMOVED", MB_ICONSTOP | MB_RETRYCANCEL) != IDRETRY)
+                return false;
+            t = GetTickCount64();
+        }
+        else Sleep(100);
+    } 
+    return true;
+}
+
 // The motor usage has timed out
 void SectorRW_FloppyBridge::motorMonitor() {
     bool sendNotify = false;
@@ -112,6 +128,17 @@ void SectorRW_FloppyBridge::motorMonitor() {
                 if (!m_diskInDrive) {
                     m_bridge->gotoCylinder(0, false);
                     m_bridge->setMotorStatus(false, false);
+
+                    if (m_tracksToFlush.size()) {
+                        if (diskRemovedWarning()) {
+                            // Trigger re-writing
+                            m_motorTurnOnTime = GetTickCount64() - (MOTOR_IDLE_TIMEOUT+1);
+                            m_diskInDrive = m_bridge->isDiskInDrive();
+                            return;
+                        }
+                        else m_tracksToFlush.clear();                        
+                    }
+
                     // cache really needs to be cleared!
                     if (m_tracksToFlush.size() < 1) {
                         for (uint32_t trk = 0; trk < MAX_TRACKS; trk++)
@@ -183,6 +210,12 @@ uint32_t SectorRW_FloppyBridge::getDiskDataSize() {
         default: m_sectorsPerTrack = 0;
     }
     return SECTOR_BYTES * m_sectorsPerTrack * 2 * 80;
+}
+
+// Change the denity more of the bridge
+bool SectorRW_FloppyBridge::setForceDensityMode(FloppyBridge::BridgeDensityMode mode) {
+    if (!m_bridge) return false;
+    return m_bridge->setBridgeDensityMode(mode);
 }
 
 // Do reading
@@ -426,19 +459,42 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
             // Commit to disk
             motorInUse(upperSurface);
 
+            if (!m_bridge->isDiskInDrive()) {
+                if (!diskRemovedWarning()) {
+                    removeFailedWritesFromCache();
+                    return false;
+                }
+            }
+
             if (m_bridge->writeMFMTrackToBuffer(upperSurface, cylinder, false, numBytes, m_mfmBuffer)) {
                 // Now wait until it completes - approx 400-500ms as this will also read it back to verify it
                 ULONGLONG start = GetTickCount64();
+                bool doRetry = false;
                 while (!m_bridge->isWriteComplete()) {
                     if (GetTickCount64() - start > DISK_WRITE_TIMEOUT) {
                         if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
+                        m_bridge->resetDrive(cylinder);
+                        m_motorTurnOnTime = 0;
+                        Sleep(200);
+                        if (!m_bridge->isDiskInDrive()) {
+                            if (diskRemovedWarning()) {
+                                doRetry = true;
+                                break;
+                            } 
+                            else {
+                                m_blockWriting = true;
+                                removeFailedWritesFromCache();
+                                return false;
+                            }
+                        }
+                        else
                         switch (MessageBox(GetDesktopWindow(), L"Disk writing is taking too long.\nWhat would you like to do?", L"Disk Writing Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION)) {
                         case IDABORT:
                             m_blockWriting = true;
                             removeFailedWritesFromCache();
                             return false;
-                        case IDRETRY:
-                            start = GetTickCount64();
+                        case IDRETRY: 
+                            doRetry = true;
                             break;
                         default:
                             removeFailedWritesFromCache();
@@ -446,57 +502,69 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
                         }
                     }
                 }
-                // Writing succeeded. Now to do a verify!
-                const std::unordered_map<int, DecodedSector> backup = m_trackCache[track].sectors;
-                for (;;) {
-                    if (!doTrackReading(track, upperSurface)) {
-                        if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
-                        if (MessageBox(GetDesktopWindow(), L"Disk verifying is taking too long.\nWhat would you like to do?", L"Disk Verifying Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION) != IDRETRY) {
-                            removeFailedWritesFromCache();
-                            return false;
+                if (doRetry) {
+                    retries=0;
+                } else {
+                    // Writing succeeded. Now to do a verify!
+                    const std::unordered_map<int, DecodedSector> backup = m_trackCache[track].sectors;
+                    for (;;) {
+                        if (!doTrackReading(track, upperSurface)) {
+                            if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
+                            m_motorTurnOnTime = 0;
+                            if (!m_bridge->isDiskInDrive()) {
+                                if (!diskRemovedWarning()) {
+                                    removeFailedWritesFromCache();
+                                    return false;
+                                }
+                            }
+                            else
+                                if (MessageBox(GetDesktopWindow(), L"Disk verifying is taking too long.\nWhat would you like to do?", L"Disk Verifying Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION) != IDRETRY) {
+                                    removeFailedWritesFromCache();
+                                    return false;
+                                }
+                            // Wait and try again
+                            Sleep(100);
                         }
-                        // Wait and try again
-                        Sleep(100);
+                        else break;
                     }
-                    else break;
-                }
 
-                // Check what was read back matches what we wrote
-                bool errors = false;
-                for (const auto& sec : backup) {
-                    auto search = m_trackCache[track].sectors.find(sec.first);
-                    // Sector no longer exists.  ERROR!
-                    if (search == m_trackCache[track].sectors.end()) {
-                        errors = true;
-#ifdef _DEBUG       
-                        OutputDebugStringA("Verify Fail Sector Missing\n");
-#endif
-                        break;
-                    }
-                    else {
-                        // Did it reac back with errors!?
-                        if (search->second.numErrors) {
+                    // Check what was read back matches what we wrote
+                    bool errors = false;
+                    for (const auto& sec : backup) {
+                        auto search = m_trackCache[track].sectors.find(sec.first);
+                        // Sector no longer exists.  ERROR!
+                        if (search == m_trackCache[track].sectors.end()) {
                             errors = true;
 #ifdef _DEBUG       
-                            OutputDebugStringA("Verify Fail Error Count\n");
+                            OutputDebugStringA("Verify Fail Sector Missing\n");
 #endif
                             break;
                         }
                         else {
-                            // Finally, compare the data and see if its identical
-                            if (memcmp(search->second.data, sec.second.data, sizeof(RawDecodedSector)) != 0) {
-                                // BAD read back even though there were no errors
+                            // Did it reac back with errors!?
+                            if (search->second.numErrors) {
                                 errors = true;
 #ifdef _DEBUG       
-                                OutputDebugStringA("Verify Fail Data\n");
+                                OutputDebugStringA("Verify Fail Error Count\n");
 #endif
                                 break;
                             }
+                            else {
+                                // Finally, compare the data and see if its identical
+                                if (memcmp(search->second.data, sec.second.data, sizeof(RawDecodedSector)) != 0) {
+                                    // BAD read back even though there were no errors
+                                    errors = true;
+#ifdef _DEBUG       
+                                    OutputDebugStringA("Verify Fail Data\n");
+#endif
+                                    break;
+                                }
+                            }
                         }
                     }
-                }
 
-                if (!errors) break;
+                    if (!errors) break;
+                }
             }
             else {
                 // this shouldnt ever happen

@@ -15,7 +15,7 @@
 #define TRACK_READ_TIMEOUT                  1000    // Should be enough to read it 5 times!
 #define MAX_RETRIES                         6       // Attempts to re-read a sector to get a better one
 #define MOTOR_IDLE_TIMEOUT                  2000    // How long after access to switch off the motor and flush changes to disk
-#define DISK_WRITE_TIMEOUT                  5000    // Allow 5 seconds to write the data
+#define DISK_WRITE_TIMEOUT                  1000    // Allow 1.5 second to write and read-back the data
 #define FORCE_FLUSH_AT_TRACKS               10      // How many tracks to have pending write before its forced (5 cylinders, both sides)
 #define DOKAN_EXTRATIME                     10000   // How much extra time to add to the timeout for dokan file operations
 
@@ -54,7 +54,8 @@ private:
     // Removes anything that failed from the cache so it has to be re-read from the disk
     void removeFailedWritesFromCache();
 
-
+    // Show disk removed warning - returns TRUE if disk was re-inserted
+    bool diskRemovedWarning();
 protected:
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
     virtual bool internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) override;
@@ -89,8 +90,14 @@ public:
     // Force writing only, so no read-by back first
     virtual void setWritingOnlyMode(bool only) override { m_writeOnly = only; };
 
+    // Change the denity more of the bridge
+    bool setForceDensityMode(FloppyBridge::BridgeDensityMode mode);
+
     // Return an ID to identify this with
     virtual uint32_t id() override;
+
+    // Return the current number of sectors per track
+    virtual uint32_t numSectorsPerTrack() { return m_sectorsPerTrack; }
 
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() override;

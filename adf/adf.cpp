@@ -65,14 +65,17 @@ RETCODE adfMountFlopButDontFail(struct AdfDevice* const dev)
 	if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == RC_OK) {
 		memset(diskName, 0, 35);
 		memcpy_s(diskName, 35, root.diskName, root.nameLen);
+		diskName[34] = '\0';  // make sure its null terminted
 	}
 	else diskName[0] = '\0';
 	vol->volName = _strdup(diskName);
 
 	if (dev->volList) {
 		for (size_t i = 0; i < dev->nVol; i++) {
-			free(dev->volList[i]->volName);
-			free(dev->volList[i]);
+			if (dev->volList[i]) {
+				if (dev->volList[i]->volName) free(dev->volList[i]->volName);
+				free(dev->volList[i]);
+			}
 		}
 		free(dev->volList);
 	}
@@ -269,24 +272,51 @@ bool fs::installBootBlock() {
 void fs::applyRegistryAction(const std::wstring registeryKeyName, const std::wstring menuLabel, const int iconIndex, const std::wstring& commandParams) {
 	WCHAR path[256];
 	swprintf_s(path, L"Software\\Classes\\Drive\\shell\\%s_%c", registeryKeyName.c_str(), m_drive[0]);
-	RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, menuLabel.c_str(), menuLabel.length() * 2);
-	RegSetKeyValue(HKEY_CURRENT_USER, path, L"AppliesTo", REG_SZ, m_drive.c_str(), m_drive.length() * 2);
+	RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, menuLabel.c_str(), (DWORD)(menuLabel.length() * 2));
+	RegSetKeyValue(HKEY_CURRENT_USER, path, L"AppliesTo", REG_SZ, m_drive.c_str(), (DWORD)(m_drive.length() * 2));
 	RegSetKeyValue(HKEY_CURRENT_USER, path, L"MultiSelectModel", REG_SZ, L"Single", 6 * 2);
 	const std::wstring iconNumber = L"\"" + mainEXE + L"\", " + std::to_wstring(iconIndex);
-	RegSetKeyValue(HKEY_CURRENT_USER, path, L"Icon", REG_SZ, iconNumber.c_str(), iconNumber.length() * 2);
+	RegSetKeyValue(HKEY_CURRENT_USER, path, L"Icon", REG_SZ, iconNumber.c_str(), (DWORD)(iconNumber.length() * 2));
 	std::wstring cmd = L"\"" + mainEXE + L"\" CONTROL "+ m_drive.substr(0,1)+L" "+commandParams;
 	wcscat_s(path, L"\\command");
-	RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, cmd.c_str(), cmd.length() * 2);
+	RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, cmd.c_str(), (DWORD)(cmd.length() * 2));
 }
 
 // Remove those hacks
 void fs::removeRegisteryAction(const std::wstring registeryKeyName) {
-	WCHAR path[256], path2[256];
+	WCHAR path[256];
 	swprintf_s(path, L"Software\\Classes\\Drive\\shell\\%s_%c", registeryKeyName.c_str(), m_drive[0]);
-	wcscpy_s(path2, path);
-	wcscat_s(path2, L"\\command");
-	RegDeleteKey(HKEY_CURRENT_USER, path2);
+	std::wstring path2 = std::wstring(path) + L"\\command";
+	RegDeleteKey(HKEY_CURRENT_USER, path2.c_str());
 	RegDeleteKey(HKEY_CURRENT_USER, path);
+}
+
+// Add data to the context menu for ADF
+void fs::controlADFMenu(bool add) {
+	WCHAR path[128];	
+
+	// Add a entry to the ADF context menu
+	LONG len = 128;
+	if (FAILED(RegQueryValue(HKEY_CURRENT_USER, L"Software\\Classes\\.adf", path, &len))) {
+		wcscpy_s(path, L"amiga.adf.file");
+		RegSetValue(HKEY_CURRENT_USER, L"Software\\Classes\\.adf", REG_SZ, path, wcslen(path) * 2);
+	}
+
+	std::wstring clsRoot = L"Software\\Classes\\" + std::wstring(path) + L"\\shell";
+	if (add) {
+		std::wstring cmd = L"\"" + mainEXE + L"\" CONTROL " + m_drive.substr(0, 1) + L" 2DISK \"%1\"";
+		clsRoot += L"\\Copy to Disk...";
+		const std::wstring iconNumber = L"\"" + mainEXE + L"\", " + std::to_wstring(0);
+		RegSetKeyValue(HKEY_CURRENT_USER, clsRoot.c_str(), L"Icon", REG_SZ, iconNumber.c_str(), iconNumber.length() * 2);
+		clsRoot += L"\\command";
+		RegSetValue(HKEY_CURRENT_USER, clsRoot.c_str(), REG_SZ, cmd.c_str(), cmd.length() * 2);
+
+		//"Icon" = "C:\\Program Files\\ConsoleZ\\Console.exe"
+	}
+	else {
+
+	}
+
 }
 
 void fs::mounted(const std::wstring& mountPoint, bool wasMounted) {
@@ -305,16 +335,18 @@ void fs::mounted(const std::wstring& mountPoint, bool wasMounted) {
 	RegDeleteKey(HKEY_CURRENT_USER, path);
 	path[wcslen(path) - 12] = L'\0';
 	RegDeleteKey(HKEY_CURRENT_USER, path);
+	const bool physicalDisk = (m_adfDevice && m_adfDevice->nativeDev && ((SectorCacheEngine*)m_adfDevice->nativeDev)->isPhysicalDisk());
+	if (physicalDisk) controlADFMenu(false);
 
 	swprintf_s(path, L"Software\\Classes\\Applications\\Explorer.exe\\Drives\\%s\\DefaultIcon", m_drive.substr(0, 1).c_str());
 
 	if (wasMounted) {
-		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, mainEXE.c_str(), mainEXE.length() * 2);
+		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, mainEXE.c_str(), (DWORD)(mainEXE.length() * 2));
 		applyRegistryAction(L"ADFMounterSystemFormat", L"Form&at...", 0,L"FORMAT");
-		bool physicalDisk = (m_adfDevice && m_adfDevice->nativeDev && ((SectorCacheEngine*)m_adfDevice->nativeDev)->isPhysicalDisk());
 
 		if (physicalDisk) {
-
+			applyRegistryAction(L"ADFMounterSystemCopy", L"&Copy to ADF...", 0, L"BACKUP");
+			controlADFMenu(true);
 		}
 		else {
 			applyRegistryAction(L"ADFMounterSystemEject", L"&Eject", 0, L"EJECT");

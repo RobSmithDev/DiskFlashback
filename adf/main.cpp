@@ -1,5 +1,5 @@
 
-
+#include <Windows.h>
 #include <string>
 #include <vector>
 #include <ShlObj.h>
@@ -22,6 +22,7 @@
 #include "SignalWnd.h"
 #include "dlgFormat.h"
 #include "psapi.h"
+#include "dlgCopy.h"
 
 //#pragma comment(lib, "")
 
@@ -253,6 +254,36 @@ void runMountedVolumes(HINSTANCE hInstance, const std::wstring mode, SectorCache
         return DefWindowProc(wnd.hwnd(), WM_TIMER, timerID, lpUser);
     });
 
+    wnd.setMessageHandler(WM_COPYDATA, [&wnd, hInstance, io](WPARAM window, LPARAM param) -> LRESULT {
+        COPYDATASTRUCT* cp = (COPYDATASTRUCT*)param;
+        if (!cp) return 0;
+        if (cp->dwData == REMOTECTRL_COPYTODISK) {
+            if (cp->cbData < 6) return 0;
+            if (cp->cbData > (MAX_PATH+2)*2) return 0;
+            HWND potentialParent = findPotentialExplorerParent();
+
+            // Extract the letter and string
+            const WCHAR* string = (WCHAR*)cp->lpData;
+            std::wstring filename;
+            WCHAR letter = *string; string++;
+            filename.resize((cp->cbData / 2) - 1);
+            memcpy_s(&filename[0], filename.length() * 2, string, cp->cbData - 2);    
+
+            fs* fs = nullptr;
+            for (auto& fsSearch : dokan_fs)
+                if ((fsSearch) && (fsSearch->driveLetter()[0] == letter)) {
+                    fs = fsSearch;
+                    break;
+                }
+            if (!fs) return 0;
+
+            m_threads.emplace_back(std::thread([hInstance, potentialParent, io, fs, filename]() {
+                DialogCOPY dlg(hInstance, potentialParent, io, fs, filename);
+                return dlg.doModal();
+            }));
+        }
+
+     });
 
 
     // Handle remote control messages
@@ -291,10 +322,11 @@ void runMountedVolumes(HINSTANCE hInstance, const std::wstring mode, SectorCache
             }));
             return 0;
 
-        case REMOTECTRL_COPYTODISK:
-            return 0;
-
         case REMOTECTRL_COPYTOADF:
+            m_threads.emplace_back(std::thread([hInstance, potentialParent, io, fs]() {
+                DialogCOPY dlg(hInstance, potentialParent, io, fs);
+                return dlg.doModal();
+            }));
             return 0;
 
         case REMOTECTRL_EJECT: {
@@ -334,7 +366,7 @@ void runMountedVolumes(HINSTANCE hInstance, const std::wstring mode, SectorCache
 
 
 
-//int __cdecl _main(ULONG argc, PWCHAR argv[]) {    
+   
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     int argc = 0;
     WCHAR exeName[MAX_PATH];
@@ -359,6 +391,22 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                 if (param == L"FORMAT") SendMessage(wnd, WM_USER, REMOTECTRL_FORMAT, (LPARAM)letter);
                 if (param == L"EJECT") SendMessage(wnd, WM_USER, REMOTECTRL_EJECT, (LPARAM)letter);
                 if (param == L"BB") SendMessage(wnd, WM_USER, REMOTECTRL_INSTALLBB, (LPARAM)letter);
+                if (param == L"2DISK") {
+                    // filename shoud be on the command line too
+                    if (argc < 4) return 4;
+                    std::wstring msg = letter + std::wstring(argv[4]);
+                    COPYDATASTRUCT tmp;
+                    tmp.lpData = (void*)msg.c_str();
+                    tmp.cbData = msg.length() * 2;  // unicode
+                    tmp.dwData = REMOTECTRL_COPYTODISK;
+                    CMessageWindow wnd2(hInstance, L"CopyDataTemp");
+                    SendMessage(wnd, WM_COPYDATA, (WPARAM)wnd2.hwnd(), (LPARAM)&tmp);
+                }
+                if (param == L"BACKUP") SendMessage(wnd, WM_USER, REMOTECTRL_COPYTOADF, (LPARAM)letter);
+            }
+            else {
+                // Shouldnt ever happen
+                MessageBox(GetDesktopWindow(), L"Could not locate drive", L"Drive not found", MB_OK | MB_ICONEXCLAMATION);
             }
         } else
         if (std::wstring(argv[1]) == L"FILE") {

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <windows.h>
+
 #include <dokan/dokan.h>
 #include <dokan/fileinfo.h>
 
@@ -8,7 +10,6 @@
 #include "adflib/src/adflib.h"
 #include "adf_operations.h"
 
-#include <WinBase.h>
 #include <iostream>
 #include <map>
 #include <unordered_map>
@@ -65,8 +66,18 @@ class fs {
 		// Make windows realise a change occured
 		void refreshDriveInformation();
 
+		// Add data to the context menu for ADF
+		void controlADFMenu(bool add);
+
 
 	public:
+		struct AdfDevice* device() { return m_adfDevice; };
+		struct AdfVolume* volume() { return m_adfVolume; };
+		const std::wstring driveLetter() const { return m_drive; };
+		// Returns a serial number for this volume   - thats actually "Amig"
+		DWORD volumeSerial() { return 0x416D6967; };
+
+
 		fs(struct AdfDevice* adfFile, struct AdfVolume* adfVolume, int volumeNumber, WCHAR driveLetter, bool readOnly);
 		void start();
 		void stop();
@@ -80,16 +91,12 @@ class fs {
 		void amigaFilenameToWindowsFilename(const std::string& amigaFilename, std::wstring& windowsFilename);
 		void windowsFilenameToAmigaFilename(const std::wstring& windowsFilename, std::string& amigaFilename);
 
-		// Returns a serial number for this volume   - thats actually Amig
-		DWORD volumeSerial() { return 0x416D6967; };
-
-		// Returns if disk is locked and cannot be read
+		// Returns if disk is locked and cannot be accessed
 		bool isLocked();
 		// Returns FALSE if files are open
 		bool setLocked(bool enableLock);
 
-
-		// Return TRUE if file is in use
+		// Return TRUE if file is in use for the new requested mode
 		bool isFileInUse(const char* const name, const AdfFileMode mode);
 		void addTrackFileInUse(struct AdfFile* handle);
 		void releaseFileInUse(struct AdfFile* handle);
@@ -110,12 +117,10 @@ class fs {
 		// Let the system know I/O is currently happenning.  ActiveFileIO must be kepyt in scope until io is complete
 		ActiveFileIO notifyIOInUse(PDOKAN_FILE_INFO dokanfileinfo);
 
-		struct AdfDevice* device() { return m_adfDevice; };
-		struct AdfVolume* volume() { return m_adfVolume; };
-
+		// Notify and setup things when the drive becomes mounted
 		void mounted(const std::wstring& mountPoint, bool wasMounted);
 
-		const std::wstring driveLetter() const { return m_drive; };
+		
 
 		// Special command to unmount the volume
 		void unmountVolume();

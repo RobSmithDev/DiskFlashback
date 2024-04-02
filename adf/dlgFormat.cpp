@@ -67,6 +67,7 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	SetWindowLong(ctrl, GWL_STYLE, GetWindowLong(ctrl, GWL_STYLE) | PBS_SMOOTH);
 	SendMessage(ctrl, PBM_SETSTEP, 1, 0);
 
+	BringWindowToTop(hwnd);
 	SetForegroundWindow(hwnd);
 } 
 	
@@ -85,20 +86,20 @@ void DialogFORMAT::enableControls(bool enable) {
 
 // Returns TRUE if its OK to close
 bool DialogFORMAT::shouldClose() {
-	if (m_formatThread) {
+	if (m_formatThread && (!m_abortFormat)) {
 		m_abortFormat = true;
-		HCURSOR lastCursor = SetCursor(LoadCursor(0, IDC_WAIT));
-		if (m_formatThread->joinable()) m_formatThread->join();
-		delete m_formatThread;
-		SetCursor(lastCursor);
-		m_formatThread = nullptr;
-		enableControls(true);
+		m_lastCursor = SetCursor(LoadCursor(0, IDC_WAIT));
+		return false;
 	}
 	return true;
 }
 
 // Actually do the format
 bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, bool doFFS, const std::string& volumeLabel) {
+	if (m_io->isDiskWriteProtected()) {
+		MessageBox(m_hParent, L"Disk in drive is write protected. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
+		return false;
+	}
 	m_fs->unmountVolume();
 
 	uint8_t mode = doFFS ? FSMASK_FFS : 0;
@@ -138,6 +139,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	if (installBB) {
 		if (m_abortFormat) return false;
 		m_io->setWritingOnlyMode(false);
+		m_fs->setLocked(false);
 		m_fs->remountVolume();
 		if (!m_fs->installBootBlock()) return false;
 		if (!m_io->flushWriteCache()) return false;
@@ -169,16 +171,19 @@ void DialogFORMAT::doFormat() {
 			m_io->setWritingOnlyMode(true);
 			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, doFFS, volumeLabel);
 			m_io->setWritingOnlyMode(false);
-			m_fs->remountVolume();
 			m_fs->setLocked(false);
+			m_fs->remountVolume();
 			enableControls(true);
 			if (ret) {
 				MessageBox(m_dialogBox, L"Format complete.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 			}
-			else {
+			else 
+			if (!m_abortFormat) {
 				MessageBox(m_dialogBox, L"Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 			}
 			SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
+			// Signal thread is complete
+			PostMessage(m_dialogBox, WM_USER, 0, 0);
 		});
 	}
 	else {
@@ -192,6 +197,28 @@ INT_PTR DialogFORMAT::handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 	case WM_INITDIALOG:
 		handleInitDialog(hwnd);
 		return TRUE;
+
+	case WM_DESTROY:
+		if (m_formatThread) {
+			m_abortFormat = true;
+			if (m_formatThread->joinable()) m_formatThread->join();
+			delete m_formatThread;
+			m_formatThread = nullptr;
+		}
+		break;
+
+	case WM_USER:
+		if (m_formatThread) {			
+			if (m_formatThread->joinable()) m_formatThread->join();
+			delete m_formatThread;
+			if (m_lastCursor) SetCursor(m_lastCursor);
+			m_lastCursor = 0;
+			m_formatThread = nullptr;
+			enableControls(true);
+		}
+		if (m_abortFormat) EndDialog(hwnd, FALSE);
+		break;
+
 
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {

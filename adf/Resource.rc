@@ -70,6 +70,14 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 186
     END
+
+    IDD_COPY, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 320
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 74
+    END
 END
 #endif    // APSTUDIO_INVOKED
 
@@ -98,6 +106,17 @@ BEGIN
     EDITTEXT        IDC_LABEL,7,47,143,14,ES_AUTOHSCROLL
 END
 
+IDD_COPY DIALOGEX 0, 0, 327, 81
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    PUSHBUTTON      "&Cancel",ID_CLOSE,270,60,50,14
+    CONTROL         "",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_BORDER,7,38,313,11
+    LTEXT           "File system",IDC_CAPTION,7,7,313,19,SS_NOPREFIX
+    LTEXT           "Progress:",IDC_STATIC,7,27,32,8
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -105,6 +124,11 @@ END
 //
 
 IDD_FORMAT AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+IDD_COPY AFX_DIALOG_LAYOUT
 BEGIN
     0
 END

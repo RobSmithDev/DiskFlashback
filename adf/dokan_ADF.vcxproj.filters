@@ -4,23 +4,28 @@
     <ClCompile Include="ADF.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ADF_operations.cpp" />
-    <ClCompile Include="readwrite_floppybridge.cpp">
-      <Filter>Interfaces</Filter>
-    </ClCompile>
-    <ClCompile Include="readwrite_file.cpp">
-      <Filter>Interfaces</Filter>
-    </ClCompile>
-    <ClCompile Include="sectorCache.cpp">
-      <Filter>Interfaces</Filter>
-    </ClCompile>
     <ClCompile Include="floppybridge_lib.cpp">
       <Filter>Interfaces\floppybridge</Filter>
     </ClCompile>
-    <ClCompile Include="amiga_sectors.cpp">
-      <Filter>Interfaces</Filter>
-    </ClCompile>
-    <ClCompile Include="SignalWnd.cpp" />
     <ClCompile Include="dlgFormat.cpp">
+      <Filter>Dialogs</Filter>
+    </ClCompile>
+    <ClCompile Include="amiga_sectors.cpp">
+      <Filter>Interfaces\amiga</Filter>
+    </ClCompile>
+    <ClCompile Include="readwrite_file.cpp">
+      <Filter>Interfaces\amiga</Filter>
+    </ClCompile>
+    <ClCompile Include="readwrite_floppybridge.cpp">
+      <Filter>Interfaces\amiga</Filter>
+    </ClCompile>
+    <ClCompile Include="sectorCache.cpp">
+      <Filter>Interfaces\amiga</Filter>
+    </ClCompile>
+    <ClCompile Include="SignalWnd.cpp">
+      <Filter>General</Filter>
+    </ClCompile>
+    <ClCompile Include="dlgCopy.cpp">
       <Filter>Dialogs</Filter>
     </ClCompile>
   </ItemGroup>
@@ -30,26 +35,31 @@
     <ClInclude Include="resource.h">
       <Filter>res</Filter>
     </ClInclude>
-    <ClInclude Include="readwrite_floppybridge.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="readwrite_file.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="sectorCache.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="floppybridge_lib.h">
       <Filter>Interfaces\floppybridge</Filter>
     </ClInclude>
     <ClInclude Include="floppybridge_abstract.h">
       <Filter>Interfaces\floppybridge</Filter>
     </ClInclude>
-    <ClInclude Include="amiga_sectors.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
-    <ClInclude Include="SignalWnd.h" />
     <ClInclude Include="dlgFormat.h">
+      <Filter>Dialogs</Filter>
+    </ClInclude>
+    <ClInclude Include="amiga_sectors.h">
+      <Filter>Interfaces\amiga</Filter>
+    </ClInclude>
+    <ClInclude Include="readwrite_file.h">
+      <Filter>Interfaces\amiga</Filter>
+    </ClInclude>
+    <ClInclude Include="readwrite_floppybridge.h">
+      <Filter>Interfaces\amiga</Filter>
+    </ClInclude>
+    <ClInclude Include="sectorCache.h">
+      <Filter>Interfaces\amiga</Filter>
+    </ClInclude>
+    <ClInclude Include="SignalWnd.h">
+      <Filter>General</Filter>
+    </ClInclude>
+    <ClInclude Include="dlgCopy.h">
       <Filter>Dialogs</Filter>
     </ClInclude>
   </ItemGroup>
@@ -65,6 +75,12 @@
     </Filter>
     <Filter Include="Dialogs">
       <UniqueIdentifier>{978bb8fb-2646-4e0f-92f7-939f6bfc3e23}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interfaces\amiga">
+      <UniqueIdentifier>{642e1b7e-8045-4c03-a6f0-ab2d54e6fa97}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="General">
+      <UniqueIdentifier>{4375ca01-14f1-4af1-9fe1-e88bcc3b3c31}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

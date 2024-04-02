@@ -343,6 +343,7 @@
   <ItemGroup>
     <ClCompile Include="ADF.cpp" />
     <ClCompile Include="amiga_sectors.cpp" />
+    <ClCompile Include="dlgCopy.cpp" />
     <ClCompile Include="dlgFormat.cpp" />
     <ClCompile Include="floppybridge_lib.cpp" />
     <ClCompile Include="main.cpp" />
@@ -356,6 +357,7 @@
     <ClInclude Include="ADF.h" />
     <ClInclude Include="ADF_operations.h" />
     <ClInclude Include="amiga_sectors.h" />
+    <ClInclude Include="dlgCopy.h" />
     <ClInclude Include="dlgFormat.h" />
     <ClInclude Include="floppybridge_abstract.h" />
     <ClInclude Include="floppybridge_lib.h" />

@@ -1,0 +1,84 @@
+.TH XDMS 1 "2006-08-17"
+.SH NAME
+xdms \- decompressing Amiga DMS files
+.SH SYNOPSIS
+.B xdms
+[-d destdir] [-p passwd] [-q] [-v] dmsfile [outputfile]
+.TP
+.B xdms
+[-d destdir] [-p passwd] [-q] [-v] <command> dmsfile [outputfile]
+.TP
+Commands:
+.TP
+.B xdms u
+or
+.B xdms
+Unpack file
+.TP
+.B xdms b
+Show attached banner
+.TP
+.B xdms d
+Show attached FILEID.DIZ
+.TP
+.B xdms f
+View full image information
+.TP
+.B xdms t
+Test archive
+.TP
+.B xdms v
+View DMS archive information
+.TP
+.B xdms x
+Extract files inside DMS archives using readdisk
+.TP
+.B xdms z
+Unpack to disk image and compress with gzip
+.br
+.SH DESCRIPTION
+\fBxdms\fP is a tool for decompressing Amiga DMS files to Amiga Disk Files
+(ADF images). DMS files are often used with Amiga emulators.
+.SH OPTIONS
+.TP
+.B \-d destdir
+Unpack to a separate destination directory.
+.TP
+.B \-f
+Override errors. Useful for desperate data salvaging.
+.TP
+.B \-p passwd
+Decrypt with a password.
+.TP
+.B \-q
+Be quiet.
+.TP
+.B \-v
+Be verbose.
+.SH EXAMPLES
+To unpack a DMS file, do:
+.TP
+.B xdms foo.dms
+.TP
+which is also equivalent to:
+.TP
+.B xdms u foo.dms
+.SH BUGS
+Yes.
+.br
+.SH SEE ALSO
+.BR amigadepacker (1),
+.BR lha (1),
+.BR ppcrack (1),
+.BR uae (1).
+.BR unadf (1),
+.BR unlzx (1),
+.BR xPK (1)
+.br
+.SH AUTHOR
+xdms was written by Andre' Rodrigues de la Rocha, but now hosted
+and maintained by Heikki Orsila <heikki.orsila@iki.fi>.
+.PP
+This manual page was written by
+G\[:u]rkan Seng\[:u]n <gurkan@linuks.mine.nu> for the Debian project and
+later modified by Heikki Orsila <heikki.orsila@iki.fi>.

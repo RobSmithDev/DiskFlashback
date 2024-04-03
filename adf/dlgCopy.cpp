@@ -34,10 +34,10 @@ INT_PTR DialogCOPY::doModal() {
 		memset(&dlg, 0, sizeof(dlg));
 		dlg.lStructSize = sizeof(dlg);
 		dlg.hwndOwner = m_hParent;
-		dlg.lpstrFilter = L"Amiga Disk Files (*.adf)|*.adf|All Files (*.*)|*.*||";
+		dlg.lpstrFilter = L"Amiga Disk Files (*.adf)\0*.adf\0All Files (*.*)\0*.*\0\0";
 		dlg.lpstrTitle = L"Save Disk to ADF...";
 		dlg.Flags = OFN_CREATEPROMPT | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT | OFN_HIDEREADONLY | OFN_NOREADONLYRETURN | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
-		dlg.lpstrDefExt = L".adf";
+		dlg.lpstrDefExt = L"adf";
 		dlg.lpstrFile = filename;
 		dlg.nMaxFile = MAX_PATH;
 		if (!GetSaveFileName(&dlg)) {
@@ -113,9 +113,6 @@ bool DialogCOPY::shouldClose() {
 bool DialogCOPY::runCopyCommand(HANDLE fle) {
 	m_fs->unmountVolume();
 
-	SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
-	if (!bridge) return false; // *shouldnt* happen
-
 	uint8_t sector[512];
 	uint32_t sectorNumber = 0;
 
@@ -127,13 +124,16 @@ bool DialogCOPY::runCopyCommand(HANDLE fle) {
 		
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < m_fs->device()->sectors; sec++) {
-				if (!m_io->readData(sectorNumber, 512, sector)) return false;
-				if (m_abortCopy) return false;
+				if (!m_io->readData(sectorNumber, 512, sector)) 
+					return false;
+				if (m_abortCopy) 
+					return false;
 				if (!WriteFile(fle, sector, 512, &written, NULL)) {
 					MessageBox(m_hParent, L"Error writing to ADF file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
 					return false;
 				}
-				if (m_abortCopy) return false;
+				if (m_abortCopy) 
+					return false;
 				sectorNumber++;
 			}
 			SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, track + 1, 0);
@@ -141,6 +141,9 @@ bool DialogCOPY::runCopyCommand(HANDLE fle) {
 		return true;
 	}
 	else {
+		SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
+		if (!bridge) return false; // *shouldnt* happen
+
 		// Find out whats in the supplied file
 		uint32_t totalSectors = GetFileSize(fle, NULL) / 512;
 		uint32_t numCyl = totalSectors / (2 * 11);
@@ -164,7 +167,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle) {
 		}
 		
 		// Is the actual disk HD?
-		if (bridge->numSectorsPerTrack() == 22) {
+		if (m_io->numSectorsPerTrack() == 22) {
 			if (!isHD) {
 				if (MessageBox(m_hParent, L"Inserted disk was detected as High Density.\nThis ADF is Double Density.\nAttempt to force writing as Double Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
 				bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmDDOnly);
@@ -186,7 +189,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle) {
 
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < secPerTrack; sec++) {
-				if (!ReadFile(fle, sector, 512, &written, NULL)) {
+				if ((!ReadFile(fle, sector, 512, &written, NULL)) || (written != 512)) {
 					MessageBox(m_hParent, L"Error reading from ADF file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
 					bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
 					return false;

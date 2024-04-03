@@ -50,7 +50,7 @@ private:
     void checkFlushPendingWrites();
 
     // Actually read the track
-    bool doTrackReading(const uint32_t track, const bool upperSurface);
+    bool doTrackReading(const uint32_t track, bool retryMode);
 
     // Removes anything that failed from the cache so it has to be re-read from the disk
     void removeFailedWritesFromCache();
@@ -101,8 +101,11 @@ public:
     virtual void releaseDrive() override;
     virtual bool restoreDrive() override;
 
+    // Return TRUE if yu can export this to an ADF
+    virtual bool allowCopyToADF() override { return true; };
+
     // Return the current number of sectors per track
-    virtual uint32_t numSectorsPerTrack() { return m_sectorsPerTrack; }
+    virtual uint32_t numSectorsPerTrack() override { return m_sectorsPerTrack; }
 
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() override;

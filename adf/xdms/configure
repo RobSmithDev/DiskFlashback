@@ -1,0 +1,81 @@
+#!/bin/sh
+
+VERSION="1.3.3"
+
+if test -z "$CC"; then
+    CC="gcc"
+fi
+
+if test -z "$CFLAGS"; then
+    CFLAGS="-O2"
+fi
+
+prefix=/usr/local
+
+for opt in "$@" ; do
+	case $opt in
+	--prefix=*)
+		prefix=`echo $opt | sed -n 's/--prefix=\(.*\)/\1/p'`
+		;;
+	--package-prefix=*)
+		packageprefix=`echo $opt | sed -n 's/--package-prefix=\(.*\)/\1/p'`
+		;;
+	*)
+		echo "configure parameter error"
+		echo ""
+		echo "Options:"
+		echo " --prefix=dir           install program to prefix 'dir'"
+ 		echo " --package-prefix=dest  pretend to install to the prefix,"
+		echo "                       but copy files to 'dest/prefix' on make install"
+		echo ""
+		echo "Influential environment variables:"
+		echo "  CC                    C compiler command"
+		echo "  CFLAGS                C compiler flags"
+		echo "  LDFLAGS               Linker flags"
+		echo "Setting environment variables CFLAGS and LDFLAGS lets you add"
+		echo "compile time options for your architecture. CC variable choose the"
+		echo "compiler."
+		exit
+		;;
+	esac
+done
+
+mingw=$(uname |grep -i mingw32)
+if test -z "$mingw" ; then
+    mingw=$($CC --version |grep -i mingw)
+    if test -n "$mingw" ; then
+	mingw="yes"
+    else
+	mingw=""
+    fi
+else
+    mingw="yes"
+fi
+
+cat > src/xdmsconfig.h <<EOF
+#ifndef XDMS_CONFIG_H_
+#define XDMS_CONFIG_H_
+
+#define VERSION "$VERSION"
+
+EOF
+if test -n "$mingw" ; then
+    echo "#define NO_MKSTEMP" >> src/xdmsconfig.h
+    LDFLAGS="$LDFLAGS -liberty"
+fi
+
+echo "#endif" >> src/xdmsconfig.h
+
+if test -n "$packageprefix" ; then
+    prefix="$packageprefix/$prefix"
+fi
+
+sed -e "s|{PREFIX}|$prefix|g" -e "s|{VERSION}|$VERSION|g" \
+    < Makefile.in > Makefile
+
+sed -e "s|{CC}|$CC|" -e "s|{CFLAGS}|$CFLAGS|" -e "s|{LDFLAGS}|$LDFLAGS|" \
+    < src/Makefile.in > src/Makefile
+
+echo "Would install xdms binary to directory $prefix/bin."
+echo ""
+echo "Configure succesful."

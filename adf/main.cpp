@@ -18,6 +18,7 @@
 #include <errno.h>
 #include "sectorCache.h"
 #include "readwrite_file.h"
+#include "readwrite_dms.h"
 #include "readwrite_floppybridge.h"
 #include "SignalWnd.h"
 #include "dlgFormat.h"
@@ -135,8 +136,21 @@ RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const
             return RC_ERROR;
         }
 
-        // Default the cache to allow a entire HD floppy disk to get into the cache. 
-        d = new SectorRW_File(512 * 84 * 2 * 2 * 11, fle);
+        {
+            char buffer[4] = { 0 };
+            DWORD read = 0;
+            if (!ReadFile(fle, buffer, 4, &read, NULL)) return RC_ERROR;
+            if (read != 4) return RC_ERROR;
+
+            if ((buffer[0] = 'D') && (buffer[1] = 'M') && (buffer[2] = 'S') && (buffer[3] = '!')) {
+                SetFilePointer(fle, 0, NULL, FILE_BEGIN);
+                d = new SectorRW_DMS(fle);
+            }
+            else {
+                // Default the cache to allow a entire HD floppy disk to get into the cache. 
+                d = new SectorRW_File(512 * 84 * 2 * 2 * 11, fle);
+            }
+        }
         if (!d) {
             CloseHandle(fle);
             return RC_ERROR;

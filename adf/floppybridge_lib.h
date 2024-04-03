@@ -278,7 +278,8 @@ public:
 	virtual void setSurface(bool side) override;
 	virtual int maxMFMBitPosition() override;
 	virtual void writeShortToBuffer(bool side, unsigned int track, unsigned short mfmData, int mfmPosition)  override;
-	virtual int getMFMTrack(const int bufferSizeInBytes, void* output) override;
+	virtual int getMFMTrack(bool side, unsigned int track, bool resyncRotation, const int bufferSizeInBytes, void* output) override;
+	virtual bool setDirectMode(bool directModeEnable) override;
 	virtual bool writeMFMTrackToBuffer(bool side, unsigned int track, bool writeFromIndex, int sizeInBytes, void* mfmData) override;
 	virtual bool isWriteProtected() override;
 	virtual unsigned int commitWriteBuffer(bool side, unsigned int track)  override;

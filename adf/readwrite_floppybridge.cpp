@@ -29,6 +29,9 @@ bool SectorRW_FloppyBridge::restoreDrive() {
         return false;
     }
 
+    // Its much faster, but of no use to *UAE!
+    m_bridge->setDirectMode(true);
+
     m_lockedOut = false;
     return true;
 }
@@ -241,14 +244,17 @@ bool SectorRW_FloppyBridge::setForceDensityMode(FloppyBridge::BridgeDensityMode 
 
 // Do reading
 bool SectorRW_FloppyBridge::internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) {
-    if (sectorSize != SECTOR_BYTES) return false;
-    if (m_lockedOut) return false;
+    if (sectorSize != SECTOR_BYTES) 
+        return false;
+    if (m_lockedOut) 
+        return false;
 
     const int track = sectorNumber / m_sectorsPerTrack;
     const int trackBlock = sectorNumber % m_sectorsPerTrack;
     const bool upperSurface = track & 1;
     const int cylinder = track / 2;
-    if (track >= MAX_TRACKS) return false;
+    if (track >= MAX_TRACKS) 
+        return false;
 
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
 
@@ -303,10 +309,11 @@ bool SectorRW_FloppyBridge::internalReadData(const uint32_t sectorNumber, const 
         m_bridge->gotoCylinder(cylinder, upperSurface);
 
         // Wait for the motor to spin up properly
-        if (!waitForMotor(upperSurface)) return false;
+        if (!waitForMotor(upperSurface)) 
+            return false;
 
         // Actually do the read
-        if (!doTrackReading(track, upperSurface)) return false;
+        doTrackReading(track, retries > 1);
 
         retries++;
     }
@@ -315,13 +322,13 @@ bool SectorRW_FloppyBridge::internalReadData(const uint32_t sectorNumber, const 
 }
 
 // Internal single attempt to read a track
-bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, const bool upperSurface) {
+bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode) {
     // Read some track data, with some delay for a retry
     ULONGLONG start = GetTickCount64();
     uint32_t bitsReceived;
     do {
-        motorInUse(upperSurface);
-        bitsReceived = m_bridge->getMFMTrack(MFM_BUFFER_MAX_TRACK_LENGTH, m_mfmBuffer);
+        motorInUse(track & 1);
+        bitsReceived = m_bridge->getMFMTrack(track&1, track/2, retryMode,MFM_BUFFER_MAX_TRACK_LENGTH, m_mfmBuffer);
 
         if (!bitsReceived) {
             if (GetTickCount64() - start > TRACK_READ_TIMEOUT) return false;
@@ -333,7 +340,7 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, const bool uppe
     findSectors((const unsigned char*)m_mfmBuffer, bitsReceived, m_sectorsPerTrack == NUM_SECTORS_PER_TRACK_HD, track, m_trackCache[track]);
 
     // Switch the buffer so next time we get a different one, maybe with less errors
-    m_bridge->mfmSwitchBuffer(upperSurface);
+    m_bridge->mfmSwitchBuffer(track & 1);
     return true;
 }
 
@@ -442,7 +449,7 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
             }
             else {
                 // 2. *try* to read the track (but dont care if it fails)
-                doTrackReading(track, upperSurface);
+                doTrackReading(track, false);
             }
             // 3. Replace any tracks now read with any we have in our backup that have errors = 0
             for (const auto& sec : backup) {
@@ -477,6 +484,7 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
                 // Wait for the seek, or it will get removed! 
                 Sleep(300);
                 m_bridge->gotoCylinder(cylinder, upperSurface);
+                retries = 0;
             }
 
             // Commit to disk
@@ -531,7 +539,7 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
                     // Writing succeeded. Now to do a verify!
                     const std::unordered_map<int, DecodedSector> backup = m_trackCache[track].sectors;
                     for (;;) {
-                        if (!doTrackReading(track, upperSurface)) {
+                        if (!doTrackReading(track, retries>1)) {
                             if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
                             m_motorTurnOnTime = 0;
                             if (!m_bridge->isDiskInDrive()) {

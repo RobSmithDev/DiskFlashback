@@ -22,12 +22,12 @@ private:
     std::unordered_map<uint32_t, SectorData*> m_cache;
 
     SectorData* getAndReleaseOldestSector();
-    // Write data to the cache
-    virtual void writeCache(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data);
-    // Read data from the cache
-    virtual bool readCache(const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
 
 protected:
+    // Write data to the cache
+    void writeCache(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data);
+    // Read data from the cache
+    bool readCache(const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
 
 
     // Override.  
@@ -72,6 +72,12 @@ public:
 
     // Return TRUE if this is actually a physical "REAL" drive
     virtual bool isPhysicalDisk() { return false; };
+
+    // Return TRUE if yu can export this to an ADF
+    virtual bool allowCopyToADF() { return false; };
+
+    // Return the current number of sectors per track
+    virtual uint32_t numSectorsPerTrack() = 0;
 
     // Return an ID to identify this with
     virtual uint32_t id() { return 0xFFFF; };

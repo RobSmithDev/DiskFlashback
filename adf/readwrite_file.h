@@ -8,6 +8,7 @@
 class SectorRW_File : public SectorCacheEngine {
 private:
     HANDLE m_file;
+    uint32_t m_sectorsPerTrack;
 
 protected:
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
@@ -23,6 +24,8 @@ public:
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() override { return L"ADF File"; };
 
+    // Return the current number of sectors per track
+    virtual uint32_t numSectorsPerTrack() override { return m_sectorsPerTrack; };
 
     // Fetch the size of the disk file
     virtual uint32_t getDiskDataSize() override;

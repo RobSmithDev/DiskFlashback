@@ -28,6 +28,39 @@
     <ClCompile Include="dlgCopy.cpp">
       <Filter>Dialogs</Filter>
     </ClCompile>
+    <ClCompile Include="xdms\src\crc_csum.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="readwrite_dms.cpp">
+      <Filter>Interfaces\amiga</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\getbits.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\maketbl.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\tables.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\u_deep.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\u_heavy.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\u_init.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\u_medium.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\u_quick.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
+    <ClCompile Include="xdms\src\u_rle.c">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ADF.h" />
@@ -62,6 +95,42 @@
     <ClInclude Include="dlgCopy.h">
       <Filter>Dialogs</Filter>
     </ClInclude>
+    <ClInclude Include="xdms\src\cdata.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\crc_csum.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="readwrite_dms.h">
+      <Filter>Interfaces\amiga</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\getbits.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\maketbl.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\tables.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\u_deep.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\u_heavy.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\u_init.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\u_medium.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\u_quick.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
+    <ClInclude Include="xdms\src\u_rle.h">
+      <Filter>Interfaces\amiga\xDMS</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">
@@ -81,6 +150,9 @@
     </Filter>
     <Filter Include="General">
       <UniqueIdentifier>{4375ca01-14f1-4af1-9fe1-e88bcc3b3c31}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interfaces\amiga\xDMS">
+      <UniqueIdentifier>{d82c00ec-ee11-4c69-901c-29d12bbe279d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

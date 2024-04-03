@@ -123,8 +123,9 @@ typedef bool 			 (CALLING_CONVENSION* _DRIVER_isWritePending)(BridgeDriverHandle
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_isWriteComplete)(BridgeDriverHandle bridgeDriverHandle);
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_canTurboWrite)(BridgeDriverHandle bridgeDriverHandle);
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_isReadyToWrite)(BridgeDriverHandle bridgeDriverHandle);
-typedef int 			 (CALLING_CONVENSION* _DRIVER_getTrack)(BridgeDriverHandle bridgeDriverHandle, int bufferSizeInBytes, void* data);
+typedef int 			 (CALLING_CONVENSION* _DRIVER_getTrack)(BridgeDriverHandle bridgeDriverHandle, bool side, unsigned int track, bool resyncRotation, int bufferSizeInBytes, void* data);
 typedef int 			 (CALLING_CONVENSION* _DRIVER_putTrack)(BridgeDriverHandle bridgeDriverHandle, bool side, unsigned int track, bool writeFromIndex, int bufferSizeInBytes, void* data);
+typedef int 			 (CALLING_CONVENSION* _DRIVER_setDirectMode)(BridgeDriverHandle bridgeDriverHandle, bool directMode);
 
 
 // Library function pointers
@@ -198,6 +199,7 @@ _DRIVER_canTurboWrite	DRIVER_canTurboWrite = nullptr;
 _DRIVER_isReadyToWrite	DRIVER_isReadyToWrite = nullptr;
 _DRIVER_getTrack DRIVER_getTrack = nullptr;
 _DRIVER_putTrack DRIVER_putTrack = nullptr;
+_DRIVER_setDirectMode DRIVER_setDirectMode = nullptr;
 
 
 // Sets up the bridge.  We assume it will persist while the application is open.
@@ -291,6 +293,7 @@ void prepareBridge() {
 	DRIVER_isReadyToWrite = (_DRIVER_isReadyToWrite)GETFUNC(hBridgeDLLHandle, "DRIVER_isReadyToWrite");
 	DRIVER_getTrack = (_DRIVER_getTrack)GETFUNC(hBridgeDLLHandle, "DRIVER_getTrack");
 	DRIVER_putTrack = (_DRIVER_putTrack)GETFUNC(hBridgeDLLHandle, "DRIVER_putTrack");
+	DRIVER_setDirectMode = (_DRIVER_setDirectMode)GETFUNC(hBridgeDLLHandle, "DRIVER_setDirectMode");
 
 	// Test a few
 	if ((!BRIDGE_About) || (!BRIDGE_NumDrivers) || (!BRIDGE_DeleteProfile)) {
@@ -830,8 +833,11 @@ int FloppyBridgeAPI::maxMFMBitPosition() {
 void FloppyBridgeAPI::writeShortToBuffer(bool side, unsigned int track, unsigned short mfmData, int mfmPosition) {
 	DRIVER_writeShortToBuffer(m_handle, side, track, mfmData, mfmPosition);
 }
-int FloppyBridgeAPI::getMFMTrack(const int bufferSizeInBytes, void* output) {
-	return DRIVER_getTrack(m_handle, bufferSizeInBytes, output);
+int FloppyBridgeAPI::getMFMTrack(bool side, unsigned int track, bool resyncRotation, const int bufferSizeInBytes, void* output) {
+	return DRIVER_getTrack(m_handle, side, track, resyncRotation, bufferSizeInBytes, output);
+}
+bool FloppyBridgeAPI::setDirectMode(bool directModeEnable) {
+	return DRIVER_setDirectMode(m_handle, directModeEnable);
 }
 bool FloppyBridgeAPI::writeMFMTrackToBuffer(bool side, unsigned int track, bool writeFromIndex, int sizeInBytes, void* mfmData) {
 	return DRIVER_putTrack(m_handle, side, track, writeFromIndex, sizeInBytes, mfmData);

@@ -174,7 +174,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_ENABLE_ATOMIC_ALIGNMENT_FIX;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
+      <PreprocessorDefinitions>UNDER_DOS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_ENABLE_ATOMIC_ALIGNMENT_FIX;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../../;../../sys;spdlog/include;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -280,7 +280,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_ENABLE_ATOMIC_ALIGNMENT_FIX;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
+      <PreprocessorDefinitions>UNDER_DOS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_ENABLE_ATOMIC_ALIGNMENT_FIX;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../../;../../sys;spdlog/include;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -348,10 +348,21 @@
     <ClCompile Include="floppybridge_lib.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ADF_operations.cpp" />
+    <ClCompile Include="readwrite_dms.cpp" />
     <ClCompile Include="readwrite_file.cpp" />
     <ClCompile Include="readwrite_floppybridge.cpp" />
     <ClCompile Include="sectorCache.cpp" />
     <ClCompile Include="SignalWnd.cpp" />
+    <ClCompile Include="xdms\src\crc_csum.c" />
+    <ClCompile Include="xdms\src\getbits.c" />
+    <ClCompile Include="xdms\src\maketbl.c" />
+    <ClCompile Include="xdms\src\tables.c" />
+    <ClCompile Include="xdms\src\u_deep.c" />
+    <ClCompile Include="xdms\src\u_heavy.c" />
+    <ClCompile Include="xdms\src\u_init.c" />
+    <ClCompile Include="xdms\src\u_medium.c" />
+    <ClCompile Include="xdms\src\u_quick.c" />
+    <ClCompile Include="xdms\src\u_rle.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ADF.h" />
@@ -361,11 +372,23 @@
     <ClInclude Include="dlgFormat.h" />
     <ClInclude Include="floppybridge_abstract.h" />
     <ClInclude Include="floppybridge_lib.h" />
+    <ClInclude Include="readwrite_dms.h" />
     <ClInclude Include="readwrite_file.h" />
     <ClInclude Include="readwrite_floppybridge.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="sectorCache.h" />
     <ClInclude Include="SignalWnd.h" />
+    <ClInclude Include="xdms\src\cdata.h" />
+    <ClInclude Include="xdms\src\crc_csum.h" />
+    <ClInclude Include="xdms\src\getbits.h" />
+    <ClInclude Include="xdms\src\maketbl.h" />
+    <ClInclude Include="xdms\src\tables.h" />
+    <ClInclude Include="xdms\src\u_deep.h" />
+    <ClInclude Include="xdms\src\u_heavy.h" />
+    <ClInclude Include="xdms\src\u_init.h" />
+    <ClInclude Include="xdms\src\u_medium.h" />
+    <ClInclude Include="xdms\src\u_quick.h" />
+    <ClInclude Include="xdms\src\u_rle.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\dokan\dokan.vcxproj">

@@ -5,7 +5,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>BRIDGE L config  FILE L f:\testing.adf  FILE L f:\testdisk.adf  FILE L f:\rom\XTHardDiskBackup.hdf  FILE L f:\testdisk.adf  </LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>FILE L "D:\Virtual Floppy Drive\dokany-master\xdms\xdms\x64\Debug\moo\amos3d.dms" FILE L "E:\Youtube Backup\PlipBox\amiga\BestWB.1.3.1\DOpus.dms" BRIDGE L config  FILE L f:\testing.adf  FILE L f:\testdisk.adf  FILE L f:\rom\XTHardDiskBackup.hdf  FILE L f:\testdisk.adf  </LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

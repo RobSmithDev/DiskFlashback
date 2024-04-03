@@ -363,28 +363,32 @@ void fs::mounted(const std::wstring& mountPoint, bool wasMounted) {
 	removeRegisteryAction(L"ADFMounterSystemBB");
 	removeRegisteryAction(L"ADFMounterSystemFormat");
 	removeRegisteryAction(L"ADFMounterSystemEject");
+	removeRegisteryAction(L"ADFMounterSystemCopy");
+
+
 	RegDeleteKeyValue(HKEY_CURRENT_USER, path, NULL);
 	RegDeleteKey(HKEY_CURRENT_USER, path);
 	path[wcslen(path) - 12] = L'\0';
 	RegDeleteKey(HKEY_CURRENT_USER, path);
-	const bool physicalDisk = (m_adfDevice && m_adfDevice->nativeDev && ((SectorCacheEngine*)m_adfDevice->nativeDev)->isPhysicalDisk());
+	SectorCacheEngine* cache = (SectorCacheEngine*)m_adfDevice->nativeDev;
+	const bool physicalDisk = m_adfDevice && m_adfDevice->nativeDev && (cache->isPhysicalDisk());
+	const bool copyToADF = m_adfDevice && m_adfDevice->nativeDev && (cache->allowCopyToADF());
 	if (physicalDisk) controlADFMenu(false);
 
 	swprintf_s(path, L"Software\\Classes\\Applications\\Explorer.exe\\Drives\\%s\\DefaultIcon", m_drive.substr(0, 1).c_str());
 
 	if (wasMounted) {
 		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, mainEXE.c_str(), (DWORD)(mainEXE.length() * 2));
-		applyRegistryAction(L"ADFMounterSystemFormat", L"Form&at...", 0,L"FORMAT");
+		if (cache && !cache->isDiskWriteProtected() && physicalDisk)
+			applyRegistryAction(L"ADFMounterSystemFormat", L"Form&at...", 0,L"FORMAT");
 
-		if (physicalDisk) {
+		if (copyToADF) {
 			applyRegistryAction(L"ADFMounterSystemCopy", L"&Copy to ADF...", 0, L"BACKUP");
 			controlADFMenu(true);
 		}
-		else {
-			applyRegistryAction(L"ADFMounterSystemEject", L"&Eject", 0, L"EJECT");
-		}
+		if (!physicalDisk) applyRegistryAction(L"ADFMounterSystemEject", L"&Eject", 0, L"EJECT");
 
-		if (m_adfVolume) {
+		if (m_adfVolume && cache && !cache->isDiskWriteProtected()) {
 			if (m_adfVolume->dev->devType == DEVTYPE_FLOPDD || m_adfVolume->dev->devType == DEVTYPE_FLOPHD) {
 				applyRegistryAction(L"ADFMounterSystemBB", L"&Install Bootblock...", 0, L"BB");
 			}

@@ -13,7 +13,7 @@
 #define MAX_TRACKS                          164
 #define MOTOR_TIMEOUT_TIME                  2500    // Timeout to wait for the motor to spin up
 #define TRACK_READ_TIMEOUT                  1000    // Should be enough to read it 5 times!
-#define MAX_RETRIES                         6       // Attempts to re-read a sector to get a better one
+#define MAX_RETRIES                         10      // Attempts to re-read a sector to get a better one
 #define MOTOR_IDLE_TIMEOUT                  2000    // How long after access to switch off the motor and flush changes to disk
 #define DISK_WRITE_TIMEOUT                  1000    // Allow 1.5 second to write and read-back the data
 #define FORCE_FLUSH_AT_TRACKS               10      // How many tracks to have pending write before its forced (5 cylinders, both sides)

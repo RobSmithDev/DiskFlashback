@@ -69,7 +69,8 @@ class fs {
 
 		// Add data to the context menu for ADF
 		void controlADFMenu(bool add);
-
+		// Add data to the context menu for DMS
+		void controlDMSMenu(bool add);
 
 	public:
 		struct AdfDevice* device() { return m_adfDevice; };

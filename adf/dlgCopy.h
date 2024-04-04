@@ -33,7 +33,7 @@ private:
 	void doCopy();
 
 	// Actually do the copy
-	bool runCopyCommand(HANDLE fle);
+	bool runCopyCommand(HANDLE fle, SectorCacheEngine* source);
 
 public:
 	DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, fs* fs);

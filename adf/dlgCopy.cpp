@@ -6,6 +6,8 @@
 #include "adf.h"
 #include <CommCtrl.h>
 #include "readwrite_floppybridge.h"
+#include "readwrite_file.h"
+#include "readwrite_dms.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -48,7 +50,7 @@ INT_PTR DialogCOPY::doModal() {
 	}
 	else {
 		std::wstring msg = L"All data on disk in drive "+m_fs->driveLetter().substr(0,2) + L" will be overwritten.\nAre you sure you want to continue?";
-		if (MessageBox(m_hParent, msg.c_str(), L"Copy ADF to Disk", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return 0;
+		if (MessageBox(m_hParent, msg.c_str(), L"Copy file to Disk", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return 0;
 	}
 
 	if (!m_io->isDiskPresent()) {
@@ -78,7 +80,7 @@ void DialogCOPY::handleInitDialog(HWND hwnd) {
 		SetWindowText(ctrl, (L"Copying disk to " + fname).c_str());
 	}
 	else {
-		m_windowCaption = L"Copy ADF to Disk " + m_fs->driveLetter().substr(0, 2);
+		m_windowCaption = L"Copy file to Disk " + m_fs->driveLetter().substr(0, 2);
 		SetWindowText(ctrl, (L"Copying " + fname+ L" to disk").c_str());
 	}
 	SetWindowText(hwnd, m_windowCaption.c_str());
@@ -110,13 +112,13 @@ bool DialogCOPY::shouldClose() {
 }
 
 // Actually do the format
-bool DialogCOPY::runCopyCommand(HANDLE fle) {
+bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 	m_fs->unmountVolume();
 
 	uint8_t sector[512];
 	uint32_t sectorNumber = 0;
 
-	if (m_backup) {
+	if (m_backup) {		
 		uint32_t totalTracks = m_fs->device()->cylinders * m_fs->device()->heads;
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
@@ -141,16 +143,17 @@ bool DialogCOPY::runCopyCommand(HANDLE fle) {
 		return true;
 	}
 	else {
+		if (!source) return false;
 		SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
 		if (!bridge) return false; // *shouldnt* happen
 
 		// Find out whats in the supplied file
-		uint32_t totalSectors = GetFileSize(fle, NULL) / 512;
+		uint32_t totalSectors = source->getDiskDataSize() / 512;
 		uint32_t numCyl = totalSectors / (2 * 11);
 
 		// Double density?
 		bool isHD = false;
-		uint32_t secPerTrack;
+		uint32_t secPerTrack = 0;
 		if (numCyl < 84) {
 			secPerTrack = 11;
 		}
@@ -161,7 +164,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle) {
 				isHD = true;
 			}
 			else {
-				MessageBox(m_hParent, L"Unrecognised ADF file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
+				MessageBox(m_hParent, L"Unrecognised input file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
 				return false;
 			}
 		}
@@ -169,17 +172,16 @@ bool DialogCOPY::runCopyCommand(HANDLE fle) {
 		// Is the actual disk HD?
 		if (m_io->numSectorsPerTrack() == 22) {
 			if (!isHD) {
-				if (MessageBox(m_hParent, L"Inserted disk was detected as High Density.\nThis ADF is Double Density.\nAttempt to force writing as Double Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
+				if (MessageBox(m_hParent, L"Inserted disk was detected as High Density.\nSelected file is Double Density.\nAttempt to force writing as Double Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
 				bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmDDOnly);
 			}
 		}
 		else {
 			if (isHD) {
-				if (MessageBox(m_hParent, L"Inserted disk was detected as Double Density.\nThis ADF is High Density.\nAttempt to force writing as High Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
+				if (MessageBox(m_hParent, L"Inserted disk was detected as Double Density.\nSelected file is High Density.\nAttempt to force writing as High Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
 				bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmHDOnly);
 			}
 		}		
-
 		m_io->resetCache();
 
 		uint32_t totalTracks = numCyl * 2;
@@ -187,10 +189,11 @@ bool DialogCOPY::runCopyCommand(HANDLE fle) {
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 		DWORD written;
 
+		uint32_t i = 0;
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < secPerTrack; sec++) {
-				if ((!ReadFile(fle, sector, 512, &written, NULL)) || (written != 512)) {
-					MessageBox(m_hParent, L"Error reading from ADF file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
+				if (!source->readData(i++, 512, sector)) {
+					MessageBox(m_hParent, L"Error reading from input file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
 					bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
 					return false;
 				}
@@ -225,19 +228,30 @@ void DialogCOPY::doCopy() {
 
 		m_copyThread = new std::thread([this]() {
 			HANDLE fle;
+			bool isDMS = false;
+			SectorCacheEngine* source = nullptr;
 			if (m_backup) {
 				fle = CreateFile(m_filename.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
 				if (fle == INVALID_HANDLE_VALUE) MessageBox(m_hParent, L"Unable to write to file. Disk copy aborted.", m_windowCaption.c_str(), MB_ICONSTOP | MB_OK);
 			}
 			else {
 				fle = CreateFile(m_filename.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-				if (fle == INVALID_HANDLE_VALUE) MessageBox(m_hParent, L"Unable to open ADF file. Disk copy aborted.", m_windowCaption.c_str(), MB_ICONSTOP | MB_OK);
+				if (fle == INVALID_HANDLE_VALUE) MessageBox(m_hParent, L"Unable to open input file. Disk copy aborted.", m_windowCaption.c_str(), MB_ICONSTOP | MB_OK); else {
+					char buf[5] = { 0 };
+					DWORD read;
+					if (!ReadFile(fle, buf, 4, &read, NULL)) read = 0;
+					SetFilePointer(fle, 0, NULL, FILE_BEGIN);
+					if (strcmp(buf, "DMS!") == 0) {
+						source = new SectorRW_DMS(fle);
+					}
+					else source = new SectorRW_File(512 * 44, fle);
+				}
 			}
 			bool ret = false;
 			if (fle != INVALID_HANDLE_VALUE) {
 				m_io->setWritingOnlyMode(!m_backup);
-				ret = runCopyCommand(fle);				
-				CloseHandle(fle);
+				ret = runCopyCommand(fle, source);
+				if (!source) CloseHandle(fle);
 				if (!m_backup) m_io->resetCache();
 				if ((!ret) && (m_backup)) DeleteFile(m_filename.c_str());
 			}
@@ -246,6 +260,7 @@ void DialogCOPY::doCopy() {
 			m_io->setWritingOnlyMode(false);
 			m_fs->setLocked(false);
 			m_fs->remountVolume();
+			if (source) delete source;
 			if (ret) {
 				MessageBox(m_dialogBox, L"Copy completed.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 			}

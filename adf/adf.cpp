@@ -346,9 +346,42 @@ void fs::controlADFMenu(bool add) {
 		//"Icon" = "C:\\Program Files\\ConsoleZ\\Console.exe"
 	}
 	else {
+		std::wstring clsRoot2 = clsRoot + L"\\Copy to Disk...";
+		std::wstring clsRoot3 = clsRoot2 + L"\\command";
+		RegDeleteKey(HKEY_CURRENT_USER, clsRoot3.c_str());
+		RegDeleteKey(HKEY_CURRENT_USER, clsRoot2.c_str());
+	}
+}
 
+
+// Add data to the context menu for DMS
+void fs::controlDMSMenu(bool add) {
+	WCHAR path[128];
+
+	// Add a entry to the ADF context menu
+	LONG len = 128;
+	if (FAILED(RegQueryValue(HKEY_CURRENT_USER, L"Software\\Classes\\.dms", path, &len))) {
+		wcscpy_s(path, L"amiga.dms.file");
+		RegSetValue(HKEY_CURRENT_USER, L"Software\\Classes\\.dms", REG_SZ, path, wcslen(path) * 2);
 	}
 
+	std::wstring clsRoot = L"Software\\Classes\\" + std::wstring(path) + L"\\shell";
+	if (add) {
+		std::wstring cmd = L"\"" + mainEXE + L"\" CONTROL " + m_drive.substr(0, 1) + L" 2DISK \"%1\"";
+		clsRoot += L"\\Copy to Disk...";
+		const std::wstring iconNumber = L"\"" + mainEXE + L"\", " + std::to_wstring(0);
+		RegSetKeyValue(HKEY_CURRENT_USER, clsRoot.c_str(), L"Icon", REG_SZ, iconNumber.c_str(), iconNumber.length() * 2);
+		clsRoot += L"\\command";
+		RegSetValue(HKEY_CURRENT_USER, clsRoot.c_str(), REG_SZ, cmd.c_str(), cmd.length() * 2);
+
+		//"Icon" = "C:\\Program Files\\ConsoleZ\\Console.exe"
+	}
+	else {
+		std::wstring clsRoot2 = clsRoot + L"\\Copy to Disk...";
+		std::wstring clsRoot3 = clsRoot2 + L"\\command";
+		RegDeleteKey(HKEY_CURRENT_USER, clsRoot3.c_str());
+		RegDeleteKey(HKEY_CURRENT_USER, clsRoot2.c_str());
+	}
 }
 
 void fs::mounted(const std::wstring& mountPoint, bool wasMounted) {
@@ -373,7 +406,10 @@ void fs::mounted(const std::wstring& mountPoint, bool wasMounted) {
 	SectorCacheEngine* cache = (SectorCacheEngine*)m_adfDevice->nativeDev;
 	const bool physicalDisk = m_adfDevice && m_adfDevice->nativeDev && (cache->isPhysicalDisk());
 	const bool copyToADF = m_adfDevice && m_adfDevice->nativeDev && (cache->allowCopyToADF());
-	if (physicalDisk) controlADFMenu(false);
+	if (physicalDisk) {
+		controlADFMenu(false);
+		controlDMSMenu(false);
+	}
 
 	swprintf_s(path, L"Software\\Classes\\Applications\\Explorer.exe\\Drives\\%s\\DefaultIcon", m_drive.substr(0, 1).c_str());
 
@@ -385,14 +421,14 @@ void fs::mounted(const std::wstring& mountPoint, bool wasMounted) {
 		if (copyToADF) {
 			applyRegistryAction(L"ADFMounterSystemCopy", L"&Copy to ADF...", 0, L"BACKUP");
 			controlADFMenu(true);
-		}
-		if (!physicalDisk) applyRegistryAction(L"ADFMounterSystemEject", L"&Eject", 0, L"EJECT");
-
+			controlDMSMenu(true);
+		}			
 		if (m_adfVolume && cache && !cache->isDiskWriteProtected()) {
 			if (m_adfVolume->dev->devType == DEVTYPE_FLOPDD || m_adfVolume->dev->devType == DEVTYPE_FLOPHD) {
 				applyRegistryAction(L"ADFMounterSystemBB", L"&Install Bootblock...", 0, L"BB");
 			}
 		}
+		applyRegistryAction(L"ADFMounterSystemEject", physicalDisk ? L"&Remove Drive" : L"&Eject", 0, L"EJECT");
 	}
 }
 

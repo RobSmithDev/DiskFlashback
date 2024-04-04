@@ -52,7 +52,11 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_ICON1               ICON                    "floppy.ico"
+IDI_AMIGADISK           ICON                    "floppy.ico"
+
+IDI_PCDISK              ICON                    "floppy2.ico"
+
+IDI_AMIGAFOLDER         ICON                    "drawer.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////

@@ -164,5 +164,7 @@
     <Image Include="floppy.ico">
       <Filter>res</Filter>
     </Image>
+    <Image Include="floppy2.ico" />
+    <Image Include="drawer.ico" />
   </ItemGroup>
 </Project>

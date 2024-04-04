@@ -9,14 +9,19 @@
 #include <sstream>
 #include <unordered_map>
 
+// Turning this on is cool but a little confusing
+bool useCustomFolderIcons = false;
+
 std::wstring mainEXE;
+#define DESKTOP_INI L"\xFEFF[.ShellClassInfo]\r\nIconResource=" + mainEXE + L",2\r\n"
+#define DESKTOP_INI_ATTRIBUTES FILE_ATTRIBUTE_HIDDEN
 
 static NTSTATUS DOKAN_CALLBACK fs_deletefile(LPCWSTR filename, PDOKAN_FILE_INFO dokanfileinfo);
 
 // Convert Amiga file attributes to Windows file attributes - only a few actually match
-DWORD amigaToWindowsAttributes(const int32_t access, int32_t type) {
+DWORD amigaToWindowsAttributes(const int32_t access, int32_t type, bool disableCustomIcons = false) {
     DWORD result = 0;
-    if (type == ST_DIR) result |= FILE_ATTRIBUTE_DIRECTORY;
+    if (type == ST_DIR) result |= FILE_ATTRIBUTE_DIRECTORY | ((useCustomFolderIcons && !disableCustomIcons) ? FILE_ATTRIBUTE_READONLY : 0);
     if (type == ST_ROOT) result |= FILE_ATTRIBUTE_DIRECTORY;
     if (hasA(access)) result |= FILE_ATTRIBUTE_ARCHIVE;
     if (hasW(access)) result |= FILE_ATTRIBUTE_READONLY;  // no write, its read only    
@@ -81,6 +86,22 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
 
     fs* f = reinterpret_cast<fs*>(dokanfileinfo->DokanOptions->GlobalContext);
     std::wstring windowsPath = filename;
+
+    if (useCustomFolderIcons) {
+        // check for desktop ini file
+        size_t pos = windowsPath.find(L"\\desktop.ini");
+        if (pos != std::wstring::npos) {
+            // Is this the desktop.ini file, and NOT the first one!
+            if (pos) {
+                DokanMapKernelToUserCreateFileFlags(desiredaccess, fileattributes, createoptions, createdisposition, &generic_desiredaccess, &file_attributes_and_flags, &creation_disposition);
+                if (generic_desiredaccess & GENERIC_WRITE) return STATUS_ACCESS_DENIED;
+                if ((creation_disposition == CREATE_NEW || (creation_disposition == CREATE_ALWAYS && createdisposition != FILE_SUPERSEDE) || creation_disposition == TRUNCATE_EXISTING)) return STATUS_ACCESS_DENIED;
+                return STATUS_SUCCESS;                
+            }
+            return STATUS_NO_SUCH_FILE;
+        } 
+    }
+
     if (windowsPath.length() && (windowsPath[0] == '\\')) windowsPath.erase(windowsPath.begin());
     if (windowsPath.substr(0, 25) == L"System Volume Information" || windowsPath.substr(0, 12) == L"$RECYCLE.BIN") return STATUS_NO_SUCH_FILE;
     if (!f->isDiskInDrive()) {
@@ -344,8 +365,30 @@ static NTSTATUS DOKAN_CALLBACK fs_readfile(LPCWSTR filename, LPVOID buffer, DWOR
 
         // This shouldn't ever happen
         if (fle->curDataPtr == 0) return STATUS_DATA_ERROR;
-}
-    else *readlength = 0;
+    }
+    else {
+        *readlength = 0;
+        if (useCustomFolderIcons) {
+            std::wstring windowsPath = filename;
+            // check for desktop ini file
+            size_t pos = windowsPath.find(L"\\desktop.ini");
+            if (pos != std::wstring::npos) {
+                // Is this the desktop.ini file, and NOT the first one!
+                if (pos) {
+                    const std::wstring desktopIni = DESKTOP_INI;
+                    const DWORD maxBytes = desktopIni.length() * 2;
+                    if (offset > maxBytes) *readlength = 0; else {
+                        *readlength = bufferlength;
+                        DWORD allowed = (DWORD)offset + bufferlength;
+                        if (allowed > maxBytes) *readlength = maxBytes - (DWORD)offset;
+                        const char* start = (char*)desktopIni.c_str();
+                        memcpy_s(buffer, bufferlength, start + offset, *readlength);
+                    }
+                }
+            }
+        }
+    }
+
     return STATUS_SUCCESS;
 }
 
@@ -487,6 +530,32 @@ static NTSTATUS DOKAN_CALLBACK fs_getfileInformation(LPCWSTR filename, LPBY_HAND
     if (f->isLocked()) return STATUS_DEVICE_BUSY;
     if (!f->isDiskInDrive()) return STATUS_NO_MEDIA_IN_DEVICE;
     if (!f->volume()) return STATUS_UNRECOGNIZED_MEDIA;
+
+    if (useCustomFolderIcons) {
+        std::wstring windowsPath = filename;
+        // check for desktop ini file
+        size_t pos = windowsPath.find(L"\\desktop.ini");
+        if (pos != std::wstring::npos) {
+            // Is this the desktop.ini file, and NOT the first one!
+            if (pos) {
+                buffer->dwFileAttributes = DESKTOP_INI_ATTRIBUTES;
+                buffer->nNumberOfLinks = 1;
+                buffer->nFileIndexHigh = 0;
+                buffer->nFileIndexLow = 0;
+                buffer->nFileSizeHigh = 0;
+                buffer->nFileSizeLow = std::wstring(DESKTOP_INI).length() * 2;
+                buffer->dwVolumeSerialNumber = f->volumeSerial();
+                SYSTEMTIME tm;
+                GetSystemTime(&tm);
+                SystemTimeToFileTime(&tm, &buffer->ftLastWriteTime);
+                SystemTimeToFileTime(&tm, &buffer->ftCreationTime);
+                SystemTimeToFileTime(&tm, &buffer->ftLastAccessTime);
+                return STATUS_SUCCESS;
+            }
+            return STATUS_OBJECT_NAME_NOT_FOUND;
+        }
+    }
+
     struct AdfVolume* v = f->volume();
 
     // This is queried for folders and volume id
@@ -503,7 +572,7 @@ static NTSTATUS DOKAN_CALLBACK fs_getfileInformation(LPCWSTR filename, LPBY_HAND
  
     e.access = parent.access;
     e.type = parent.secType;
-    buffer->dwFileAttributes =amigaToWindowsAttributes(parent.access, search);
+    buffer->dwFileAttributes = amigaToWindowsAttributes(parent.access, search, true);
     buffer->nNumberOfLinks = 1;
     buffer->nFileIndexHigh = 0;
     buffer->nFileIndexLow = 0;
@@ -541,13 +610,13 @@ static NTSTATUS DOKAN_CALLBACK fs_findfiles(LPCWSTR filename, PFillFindData fill
     if (!f->volume()) return STATUS_UNRECOGNIZED_MEDIA;
 
     struct AdfVolume* v = f->volume();
-
+     
     WIN32_FIND_DATAW findData;
     ZeroMemory(&findData, sizeof(WIN32_FIND_DATAW));
 
     int32_t search = locatePath(filename, dokanfileinfo);
     if ((search != ST_DIR) && (search != ST_ROOT)) return STATUS_OBJECT_NAME_NOT_FOUND;
-
+   
     struct AdfList* list = adfGetDirEnt(v, v->curDirPtr);
     for (struct AdfList* node = list; node; node = node->next) {
         struct AdfEntry* e = (struct AdfEntry* ) node->content;
@@ -651,6 +720,18 @@ static NTSTATUS DOKAN_CALLBACK fs_deletefile(LPCWSTR filename, PDOKAN_FILE_INFO 
     if (!f->isDiskInDrive()) return STATUS_NO_MEDIA_IN_DEVICE;
     if (f->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
     if (!f->volume()) return STATUS_UNRECOGNIZED_MEDIA;
+
+    if (useCustomFolderIcons) {
+        std::wstring windowsPath = filename;
+        // check for desktop ini file
+        size_t pos = windowsPath.find(L"\\desktop.ini");
+        if (pos != std::wstring::npos) {
+            // Is this the desktop.ini file, and NOT the first one!
+            if (pos) return STATUS_SUCCESS;
+            return STATUS_OBJECT_NAME_NOT_FOUND;
+        }
+    }
+
     struct AdfVolume* v = f->volume();
 
     std::string amigaName;

@@ -3,7 +3,6 @@
   <ItemGroup>
     <ClCompile Include="ADF.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="ADF_operations.cpp" />
     <ClCompile Include="floppybridge_lib.cpp">
       <Filter>Interfaces\floppybridge</Filter>
     </ClCompile>
@@ -11,15 +10,6 @@
       <Filter>Dialogs</Filter>
     </ClCompile>
     <ClCompile Include="amiga_sectors.cpp">
-      <Filter>Interfaces\amiga</Filter>
-    </ClCompile>
-    <ClCompile Include="readwrite_file.cpp">
-      <Filter>Interfaces\amiga</Filter>
-    </ClCompile>
-    <ClCompile Include="readwrite_floppybridge.cpp">
-      <Filter>Interfaces\amiga</Filter>
-    </ClCompile>
-    <ClCompile Include="sectorCache.cpp">
       <Filter>Interfaces\amiga</Filter>
     </ClCompile>
     <ClCompile Include="SignalWnd.cpp">
@@ -61,10 +51,27 @@
     <ClCompile Include="xdms\src\u_rle.c">
       <Filter>Interfaces\amiga\xDMS</Filter>
     </ClCompile>
+    <ClCompile Include="ibm_sectors.cpp">
+      <Filter>Interfaces\IBM</Filter>
+    </ClCompile>
+    <ClCompile Include="readwrite_file.cpp">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="sectorCache.cpp">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="readwrite_floppybridge.cpp">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="dokaninterface.cpp">
+      <Filter>DokanInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="ADF_operations.cpp">
+      <Filter>DokanInterface</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ADF.h" />
-    <ClInclude Include="ADF_operations.h" />
     <ClInclude Include="resource.h">
       <Filter>res</Filter>
     </ClInclude>
@@ -78,15 +85,6 @@
       <Filter>Dialogs</Filter>
     </ClInclude>
     <ClInclude Include="amiga_sectors.h">
-      <Filter>Interfaces\amiga</Filter>
-    </ClInclude>
-    <ClInclude Include="readwrite_file.h">
-      <Filter>Interfaces\amiga</Filter>
-    </ClInclude>
-    <ClInclude Include="readwrite_floppybridge.h">
-      <Filter>Interfaces\amiga</Filter>
-    </ClInclude>
-    <ClInclude Include="sectorCache.h">
       <Filter>Interfaces\amiga</Filter>
     </ClInclude>
     <ClInclude Include="SignalWnd.h">
@@ -131,6 +129,24 @@
     <ClInclude Include="xdms\src\u_rle.h">
       <Filter>Interfaces\amiga\xDMS</Filter>
     </ClInclude>
+    <ClInclude Include="ibm_sectors.h">
+      <Filter>Interfaces\IBM</Filter>
+    </ClInclude>
+    <ClInclude Include="readwrite_file.h">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="sectorCache.h">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="readwrite_floppybridge.h">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="dokaninterface.h">
+      <Filter>DokanInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="ADF_operations.h">
+      <Filter>DokanInterface</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">
@@ -153,6 +169,15 @@
     </Filter>
     <Filter Include="Interfaces\amiga\xDMS">
       <UniqueIdentifier>{d82c00ec-ee11-4c69-901c-29d12bbe279d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interfaces\IBM">
+      <UniqueIdentifier>{738e5d49-19fa-4016-a6d4-0c14c35ea091}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interfaces\Sector Interface">
+      <UniqueIdentifier>{71376405-0754-4db6-9118-9bdf754f1458}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DokanInterface">
+      <UniqueIdentifier>{ed5641a6-398f-4e1e-96ab-fe022775219a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

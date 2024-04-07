@@ -18,6 +18,8 @@ private:
 	std::wstring m_filename;
 	HCURSOR m_lastCursor = 0;
 	bool m_backup;
+	std::wstring m_fileExtension;
+	std::wstring m_titleExtension;
 
 	// Thread to handle the actual operation
 	std::thread* m_copyThread = nullptr;

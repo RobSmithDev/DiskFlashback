@@ -1,9 +1,90 @@
 
 #include "readwrite_file.h"
+#include "ibm_sectors.h"
+#include "amiga_sectors.h"
 
-SectorRW_File::SectorRW_File(const uint32_t maxCacheMem, HANDLE fle) : SectorCacheEngine(maxCacheMem), m_file(fle) {
-    m_sectorsPerTrack = (GetFileSize(fle, NULL) < 89 * 2 * 11 * 512) ? 11 : 22;  // not actually used
+// Attempts to guess the number of sectors per track based on the supplied image size
+uint32_t SectorRW_File::GuessSectorsPerTrackFromImageSize(const uint32_t imageSize, const uint32_t sectorSize = 512) {
+    const uint32_t fs = imageSize / sectorSize;
+
+    switch (fs) {
+        // IBM DD Sector
+    case 80 * 2 * 9:
+    case 81 * 2 * 9:
+    case 82 * 2 * 9:
+    case 83 * 2 * 9: return 9; 
+        // Atari DD 10 Sector 
+    case 80 * 2 * 10:
+    case 81 * 2 * 10:
+    case 82 * 2 * 10:
+    case 83 * 2 * 10: return 10;
+        // Atari DD 11 Sector / Amiga DD Sector
+    case 80 * 2 * 11:
+    case 81 * 2 * 11:
+    case 82 * 2 * 11:
+    case 83 * 2 * 11: return 11;
+        // IBM HD Sector
+    case 80 * 2 * 18:
+    case 81 * 2 * 18:
+    case 82 * 2 * 18:
+    case 83 * 2 * 18: return 18;
+        // Amiga HD Sector
+    case 2 * 80 * 2 * 11:
+    case 2 * 81 * 2 * 11:
+    case 2 * 82 * 2 * 11:
+    case 2 * 83 * 2 * 11: return 22;
+    default:
+        if (fs > 84 * 2 * 11) {
+            // HD
+            return 22;
+        }
+        else {
+            // DD
+            return 11;
+        }
+    }
 }
+
+
+SectorRW_File::SectorRW_File(const std::wstring& filename, const uint32_t maxCacheMem, HANDLE fle) : SectorCacheEngine(maxCacheMem), m_file(fle) {
+    m_fileType = SectorType::stAmiga;  // default to Amiga
+
+    m_serialNumber = 0x41444630;    // Default AMIGA serial number (ADF0)
+    m_bytesPerSector = 512;
+    m_sectorsPerTrack = 0;
+
+    // See what type of file it is
+    size_t i = filename.rfind(L".");
+    if (i != std::wstring::npos) {
+        std::wstring ext = filename.substr(1);
+        for (WCHAR& c : ext) c = towupper(c);
+
+        // See what type of file it is
+        if ((ext == L"IMG") || (ext == L"IMA")) {
+            m_fileType = SectorType::stIBM;
+            m_serialNumber = 0x494D4130;
+        } else
+        if (ext == L"ST") {
+            m_fileType = SectorType::stAtari;
+            m_serialNumber = 0x53544630;
+        }
+
+        if (SUCCEEDED(SetFilePointer(m_file, 0, NULL, FILE_BEGIN))) {
+            DWORD read;
+            uint8_t data[128];
+            if (ReadFile(m_file, data, 128, &read, NULL)) {
+                if (read == 128) {
+                    if (!getTrackDetails_IBM(data, m_serialNumber, m_sectorsPerTrack, m_bytesPerSector)) {
+                        m_bytesPerSector = 512;
+                        m_serialNumber = 0x41444630;
+                    }
+                }
+            }
+        }
+    }
+    if (!m_sectorsPerTrack) m_sectorsPerTrack = SectorRW_File::GuessSectorsPerTrackFromImageSize(GetFileSize(fle, NULL));
+}
+
 
 SectorRW_File::~SectorRW_File() {
     CloseHandle(m_file);

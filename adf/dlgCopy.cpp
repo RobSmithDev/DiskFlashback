@@ -36,10 +36,33 @@ INT_PTR DialogCOPY::doModal() {
 		memset(&dlg, 0, sizeof(dlg));
 		dlg.lStructSize = sizeof(dlg);
 		dlg.hwndOwner = m_hParent;
-		dlg.lpstrFilter = L"Amiga Disk Files (*.adf)\0*.adf\0All Files (*.*)\0*.*\0\0";
-		dlg.lpstrTitle = L"Save Disk to ADF...";
+		std::wstring filter;
+		std::wstring defaultFormat;
+		switch (m_io->getSystemType()) {
+		case SectorType::stAmiga:
+			filter += L"Amiga Disk Files (*.adf)\0*.adf\0";
+			m_fileExtension = L"adf";
+			break;
+		case SectorType::stIBM:
+			filter += L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0";
+			m_fileExtension = L"img";
+			break;
+		case SectorType::stAtari:
+			filter += L"Atari ST Disk Files (*.st)\0*.st\0";
+			m_fileExtension = L"st";
+			break;
+		default:
+			return; // not supported
+		}
+		filter += L"All Files(*.*)\0 * .*\0\0";
+		dlg.lpstrFilter = filter.c_str();
+
+		m_titleExtension = m_fileExtension;
+		for (WCHAR& c : m_titleExtension) c = towupper(c);
+		std::wstring title = L"Save Disk to " + m_titleExtension + L" File...";
+
 		dlg.Flags = OFN_CREATEPROMPT | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT | OFN_HIDEREADONLY | OFN_NOREADONLYRETURN | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
-		dlg.lpstrDefExt = L"adf";
+		dlg.lpstrDefExt = m_fileExtension.c_str();
 		dlg.lpstrFile = filename;
 		dlg.nMaxFile = MAX_PATH;
 		if (!GetSaveFileName(&dlg)) {
@@ -49,6 +72,13 @@ INT_PTR DialogCOPY::doModal() {
 		m_filename = filename;
 	}
 	else {
+		// Extract extension
+		size_t pos = m_filename.rfind(L".");
+		if (pos != std::wstring::npos) {
+			m_titleExtension = m_filename.substr(pos + 1);
+			for (WCHAR& c : m_titleExtension) c = towupper(c);
+		}
+
 		std::wstring msg = L"All data on disk in drive "+m_fs->driveLetter().substr(0,2) + L" will be overwritten.\nAre you sure you want to continue?";
 		if (MessageBox(m_hParent, msg.c_str(), L"Copy file to Disk", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return 0;
 	}
@@ -76,11 +106,11 @@ void DialogCOPY::handleInitDialog(HWND hwnd) {
 	if (pos != std::wstring::npos) fname = fname.substr(pos + 1);
 
 	if (m_backup) {
-		m_windowCaption = L"Copy Disk " + m_fs->driveLetter().substr(0, 2) + L" to ADF File";
+		m_windowCaption = L"Copy Disk " + m_fs->driveLetter().substr(0, 2) + L" to " + m_titleExtension + L" File";
 		SetWindowText(ctrl, (L"Copying disk to " + fname).c_str());
 	}
 	else {
-		m_windowCaption = L"Copy file to Disk " + m_fs->driveLetter().substr(0, 2);
+		m_windowCaption = L"Copy " + m_titleExtension + L" file to Disk " + m_fs->driveLetter().substr(0, 2);
 		SetWindowText(ctrl, (L"Copying " + fname+ L" to disk").c_str());
 	}
 	SetWindowText(hwnd, m_windowCaption.c_str());
@@ -115,107 +145,115 @@ bool DialogCOPY::shouldClose() {
 bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 	m_fs->unmountVolume();
 
-	uint8_t sector[512];
-	uint32_t sectorNumber = 0;
-
 	if (m_backup) {		
 		uint32_t totalTracks = m_fs->device()->cylinders * m_fs->device()->heads;
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 		DWORD written;
+
+		uint32_t sectorNumber = 0;
+		void* sectorData = malloc(m_io->sectorSize());
+		if (!sectorData) return false;  // out of memory
 		
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < m_fs->device()->sectors; sec++) {
-				if (!m_io->readData(sectorNumber, 512, sector)) 
-					return false;
-				if (m_abortCopy) 
-					return false;
-				if (!WriteFile(fle, sector, 512, &written, NULL)) {
-					MessageBox(m_hParent, L"Error writing to ADF file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
+				if (!m_io->readData(sectorNumber, m_io->sectorSize(), sectorData)) {
+					free(sectorData);
 					return false;
 				}
-				if (m_abortCopy) 
+				if (m_abortCopy) {
+					free(sectorData);
 					return false;
+				}
+
+				if (!WriteFile(fle, sectorData, m_io->sectorSize(), &written, NULL)) {
+					free(sectorData);
+					MessageBox(m_hParent, L"Error writing to file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
+					return false;
+				}
+				if (m_abortCopy) {
+					free(sectorData);
+					return false;
+				}
 				sectorNumber++;
 			}
 			SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, track + 1, 0);
 		}
+
+		free(sectorData);
+
 		return true;
 	}
 	else {
 		if (!source) return false;
-		SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
-		if (!bridge) return false; // *shouldnt* happen
+		SectorRW_FloppyBridge* target = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
+		if (!target) return false; // *shouldnt* happen
 
 		// Find out whats in the supplied file
-		uint32_t totalSectors = source->getDiskDataSize() / 512;
-		uint32_t numCyl = totalSectors / (2 * 11);
+		const uint32_t sectorSize = source->sectorSize();
+		const uint32_t totalSectors = source->getDiskDataSize() / source->sectorSize();
+		const uint32_t secPerTrack = source->numSectorsPerTrack();
+		const uint32_t numCyl = totalSectors / (2 * secPerTrack);
+		const uint32_t totalTracks = numCyl * 2;
 
 		// Double density?
-		bool isHD = false;
-		uint32_t secPerTrack = 0;
-		if (numCyl < 84) {
-			secPerTrack = 11;
-		}
-		else {
-			numCyl /= 2;
-			if (numCyl < 84) {
-				secPerTrack = 22;
-				isHD = true;
-			}
-			else {
-				MessageBox(m_hParent, L"Unrecognised input file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
-				return false;
-			}
-		}
-		
+		bool isHD = secPerTrack > 11;		
 		// Is the actual disk HD?
-		if (m_io->numSectorsPerTrack() == 22) {
+		if (target->numSectorsPerTrack() > 11) {
 			if (!isHD) {
 				if (MessageBox(m_hParent, L"Inserted disk was detected as High Density.\nSelected file is Double Density.\nAttempt to force writing as Double Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
-				bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmDDOnly);
+				target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmDDOnly);
 			}
 		}
 		else {
 			if (isHD) {
 				if (MessageBox(m_hParent, L"Inserted disk was detected as Double Density.\nSelected file is High Density.\nAttempt to force writing as High Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
-				bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmHDOnly);
+				target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmHDOnly);
 			}
 		}		
-		m_io->resetCache();
+		// Force the target to be the same as the source
+		target->overwriteSectorSettings(source->getSystemType(), source->numSectorsPerTrack(), source->sectorSize());
 
-		uint32_t totalTracks = numCyl * 2;
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 		DWORD written;
 
+		uint32_t sectorNumber = 0;
+		void* sectorData = malloc(source->sectorSize());
+		if (!sectorData) return false;  // out of memory
+
 		uint32_t i = 0;
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < secPerTrack; sec++) {
-				if (!source->readData(i++, 512, sector)) {
+				if (!source->readData(i++, source->sectorSize(), sectorData)) {
 					MessageBox(m_hParent, L"Error reading from input file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
-					bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+					target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+					free(sectorData);
 					return false;
 				}
-				if (!m_io->writeData(sectorNumber, 512, sector)) {
-					bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+				if (!target->writeData(sectorNumber, source->sectorSize(), sectorData)) {
+					target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+					free(sectorData);
 					return false;
 				}				
 				if (m_abortCopy) {
-					bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+					target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+					free(sectorData);
 					return false;
 				}
 				sectorNumber++;
 			}
-			if (!m_io->flushWriteCache()) {
-				bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+			if (!target->flushWriteCache()) {
+				target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+				free(sectorData);
 				return false;
 			}
 			SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, track + 1, 0);
 		}
 
-		
-		bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+		free(sectorData);
+
+		target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
 
 		return true;
 	}
@@ -244,7 +282,7 @@ void DialogCOPY::doCopy() {
 					if (strcmp(buf, "DMS!") == 0) {
 						source = new SectorRW_DMS(fle);
 					}
-					else source = new SectorRW_File(512 * 44, fle);
+					else source = new SectorRW_File(m_filename, 512 * 44, fle);
 				}
 			}
 			bool ret = false;

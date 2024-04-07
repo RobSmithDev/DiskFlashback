@@ -1,15 +1,13 @@
 #pragma once
 
-// Handles reading and writing to a file, with sector cache for improved speed
+// Handles reading and writing from real disks, with *hopefully* reliable detection of the type of disk inserted
 #include <Windows.h>
 #include <map>
 #include "sectorCache.h"
 #include "floppybridge_lib.h"
-#include "amiga_sectors.h"
+#include "sectorCommon.h"
 #include <mutex>
 
-
-#define MFM_BUFFER_MAX_TRACK_LENGTH			(0x3A00 * 2)    // 29,696 bytes
 #define MAX_TRACKS                          164
 #define MOTOR_TIMEOUT_TIME                  2500    // Timeout to wait for the motor to spin up
 #define TRACK_READ_TIMEOUT                  1000    // Should be enough to read it 5 times!
@@ -21,8 +19,8 @@
 
 class SectorRW_FloppyBridge : public SectorCacheEngine {
 private:
+    SectorType m_diskType           = SectorType::stAmiga;
     FloppyBridgeAPI* m_bridge       = nullptr;
-    int m_sectorsPerTrack;
     ULONGLONG m_motorTurnOnTime     = 0;
     void* m_mfmBuffer               = nullptr;
     bool m_ignoreErrors             = false;   // should get reset when motor goes off
@@ -32,9 +30,13 @@ private:
     bool m_diskInDrive              = false;  // Monitor for disk change
     PDOKAN_FILE_INFO m_dokanfileinfo = nullptr; // active file i/o
     std::mutex m_motorTimerProtect;
-    bool m_writeOnly = false;
-    bool m_lockedOut = false;
-    std::function<void(bool diskInserted)> m_diskChangeCallback;
+    bool m_writeOnly                = false;
+    bool m_lockedOut                = false;
+    std::function<void(bool diskInserted, SectorType diskFormat)> m_diskChangeCallback;
+
+    uint32_t m_sectorsPerTrack      = 0;
+    uint32_t m_bytesPerSector       = 512;
+    uint32_t m_serialNumber = 0x554E4B4E;    
 
     // Tracks that need committing to disk
     // NOTE: Using MAP not UNORDERED_MAP. This *should* make the disk head stepping fairly sequential and faster
@@ -57,6 +59,13 @@ private:
 
     // Show disk removed warning - returns TRUE if disk was re-inserted
     bool diskRemovedWarning();
+
+    // Reads some data to see what kind of disk it is
+    void identifyFileSystem();
+
+    // Returns TRUE if the inserted disk is HD
+    bool isHD();
+
 protected:
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
     virtual bool internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) override;
@@ -67,16 +76,20 @@ protected:
     bool waitForMotor(bool upperSide);
 
 public:
-    SectorRW_FloppyBridge(const std::string& profile, std::function<void(bool diskInserted)> diskChangeCallback);
+    SectorRW_FloppyBridge(const std::string& profile, std::function<void(bool diskInserted, SectorType diskFormat)> diskChangeCallback);
     ~SectorRW_FloppyBridge();
 
     // Fetch the size of the disk file
     virtual uint32_t getDiskDataSize() override;
     virtual bool available() override;
 
+    // Return TRUE if theres a disk in the drive
     virtual bool isDiskPresent() override;
+
+    // Return TRUE if the disk is write protected
     virtual bool isDiskWriteProtected() override;
 
+    // Used to set what file is currently being accessed - to help dokan know we're busy
     virtual void setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo) override;
 
     // Return TRUE if this is actually a physical "REAL" drive
@@ -98,17 +111,30 @@ public:
     virtual uint32_t id() override;
 
     // Restore and release for remote usage
-    virtual void releaseDrive() override;
-    virtual bool restoreDrive() override;
+    void releaseDrive();
+    bool restoreDrive();
 
-    // Return TRUE if yu can export this to an ADF
-    virtual bool allowCopyToADF() override { return true; };
+    // Override sector infomration - this also wipes the cache and resets everything
+    void overwriteSectorSettings(const SectorType systemType, const uint32_t sectorsPerTrack, const uint32_t sectorSize);
+
+    // Return TRUE if you can export this to an ADF
+    virtual bool allowCopyToFile() override { return true; };
+
+    // Get the type of file that is loaded
+    virtual SectorType getSystemType() override { return m_diskType; };
 
     // Return the current number of sectors per track
     virtual uint32_t numSectorsPerTrack() override { return m_sectorsPerTrack; }
 
+    // Fetch the sector size in bytes
+    virtual uint32_t sectorSize() override { return m_bytesPerSector; };
+
+    // Fetch the serial number of the disk
+    virtual uint32_t serialNumber() override { return m_serialNumber; };
+
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() override;
 
+    // Monitoring keeping the motor spinning or not when not in use
     void motorMonitor();
 };

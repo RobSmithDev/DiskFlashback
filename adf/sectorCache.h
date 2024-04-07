@@ -6,11 +6,15 @@
 #include <dokan/dokan.h>
 #include <atomic>
 
+// Possible types of sector / file
+enum class SectorType  {stAmiga, stIBM, stAtari, stHybrid, stUnknown};
+
 class SectorCacheEngine {
 private:
     struct SectorData {
         void* data;
         ULONGLONG lastUse;
+        uint32_t sectorSize;
     };
 
     uint32_t m_maxCacheEntries;
@@ -57,7 +61,7 @@ public:
     // Flush changes to disk
     virtual bool flushWriteCache() { return true; };
 
-    // Force writing only, so no read-by back first
+    // Force writing only, so no read-by back first - useful for formatting disks
     virtual void setWritingOnlyMode(bool only) {  };
 
     // Fetch the size of the disk file
@@ -66,21 +70,27 @@ public:
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() = 0;
 
-    // Restore and release for remote usage
-    virtual void releaseDrive() {};
-    virtual bool restoreDrive() { return true; };
+    // Fetch the sector size in bytes
+    virtual uint32_t sectorSize() { return 512; };
 
     // Return TRUE if this is actually a physical "REAL" drive
     virtual bool isPhysicalDisk() { return false; };
 
-    // Return TRUE if yu can export this to an ADF
-    virtual bool allowCopyToADF() { return false; };
+    // Return TRUE if yu can export this to an image file
+    virtual bool allowCopyToFile() { return false; };
 
     // Return the current number of sectors per track
     virtual uint32_t numSectorsPerTrack() = 0;
 
+    // Get the type of file that is loaded
+    virtual SectorType getSystemType() = 0;
+
     // Return an ID to identify this with
     virtual uint32_t id() { return 0xFFFF; };
 
+    // Fetch the serial number of the disk
+    virtual uint32_t serialNumber() = 0;
+
+    // Is this working and available
     virtual bool available() = 0;
 };

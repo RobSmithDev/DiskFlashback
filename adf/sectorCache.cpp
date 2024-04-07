@@ -27,17 +27,23 @@ void SectorCacheEngine::writeCache(const uint32_t sectorNumber, const uint32_t s
     SectorData* secData;
 
     if (f == m_cache.end()) {
-        if (m_maxCacheEntries == 0) m_maxCacheEntries = m_cacheMaxMem / sectorSize;
+        if (m_maxCacheEntries == 0) m_maxCacheEntries = m_cacheMaxMem / sectorSize; // approx
 
         // If cache size is ZERO it means cache everything
         if (m_cache.size() > m_maxCacheEntries) {
             secData = getAndReleaseOldestSector();
             if (!secData) return;
+            if (secData->sectorSize != sectorSize) {
+                free(secData->data);
+                secData->data = malloc(sectorSize);
+                secData->sectorSize = sectorSize;
+            }
         }
         else {
             secData = new SectorData();
             if (!secData) return;
             secData->data = malloc(sectorSize);
+            secData->sectorSize = sectorSize;
             if (!secData->data) {
                 delete secData;
                 return;
@@ -62,26 +68,26 @@ bool SectorCacheEngine::readCache(const uint32_t sectorNumber, const uint32_t se
     if (f == m_cache.end()) return false;
     if (m_maxCacheEntries == 0) m_maxCacheEntries = m_cacheMaxMem / sectorSize;
 
-    memcpy_s(data, sectorSize, f->second->data, sectorSize);
+    memcpy_s(data, sectorSize, f->second->data, min(sectorSize, f->second->sectorSize));
     f->second->lastUse = GetTickCount64();
     return true;
 }
 
 // Reset the cache
 void SectorCacheEngine::resetCache() {
+    for (auto it : m_cache) {
+        if (it.second->data) free(it.second->data);
+        delete it.second;
+    }
     m_cache.clear();
 }
-
 
 SectorCacheEngine::SectorCacheEngine(const uint32_t maxCacheMem) : m_maxCacheEntries(0), m_cacheMaxMem(maxCacheMem) {
 
 }
 
 SectorCacheEngine::~SectorCacheEngine() {
-    for (auto it : m_cache) {
-        free(it.second->data);
-        delete it.second;
-    }
+    resetCache();
 }
 
 bool SectorCacheEngine::readData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) {

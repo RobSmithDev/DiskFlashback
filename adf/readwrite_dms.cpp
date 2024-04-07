@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "readwrite_file.h"
 
 #define HEADLEN 56
 #define THLEN 20
@@ -37,9 +38,15 @@ extern "C" {
 }
 */
 
+// Fetch the sector size in bytes
+uint32_t SectorRW_DMS::sectorSize() {
+    return SECTORSIZE;
+}
+
+
 // We force the cache size so the entire DMS file fits into memory
 SectorRW_DMS::SectorRW_DMS(HANDLE fle) : SectorCacheEngine(512 * 84 * 2 * 2 * 11) {
-    
+    m_sectorsPerTrack = 11;
     // Buffers needs internally by DMS
     uint8_t* b1 = (uint8_t*)malloc((size_t)TRACK_BUFFER_LEN);
     uint8_t* b2 = (uint8_t*)malloc((size_t)TRACK_BUFFER_LEN);
@@ -97,9 +104,9 @@ bool SectorRW_DMS::unpackCylinders(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t
                 if (unpklen > 2048) {
                     memset(b2, 0, unpklen);
                     if (decompressTrack(b1, b2, text, pklen2, unpklen, cmode, flags)) {
-                        if (usum != Calc_CheckSum(b2, (ULONG)unpklen)) {
-                            OutputDebugStringA("CHGECKFAIL");
-                        }
+                        //if (usum != Calc_CheckSum(b2, (ULONG)unpklen)) {
+                         //   OutputDebugStringA("CHGECKFAIL");
+                       // }
 
                         // Save sectors into cache
                         uint32_t sectorStart = number * 2 * m_sectorsPerTrack;
@@ -175,7 +182,7 @@ bool SectorRW_DMS::decompressTrack(uint8_t* b1, uint8_t* b2, uint8_t* text, uint
 
 // Parse the DMS
 bool SectorRW_DMS::parseDMSHeader(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t* text) {
-    m_sectorsPerTrack = (GetFileSize(fle, NULL) < 89 * 2 * 11 * SECTORSIZE) ? 11 : 22;
+    m_sectorsPerTrack = SectorRW_File::GuessSectorsPerTrackFromImageSize(GetFileSize(fle, NULL), sectorSize());
 
     // Read header and validate
     DWORD read;
@@ -187,6 +194,8 @@ bool SectorRW_DMS::parseDMSHeader(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t*
     m_geninfo = (USHORT)((b1[10] << 8) | b1[11]);
     m_diskSize = (ULONG)((((ULONG)b1[25]) << 16) | (((ULONG)b1[26]) << 8) | (ULONG)b1[27]);
     m_diskType = (USHORT)((b1[50] << 8) | b1[51]);
+
+    m_sectorsPerTrack = SectorRW_File::GuessSectorsPerTrackFromImageSize(m_diskSize);
 
     // Not supported >6
     if (m_diskType > 6) return false;
@@ -201,11 +210,6 @@ bool SectorRW_DMS::parseDMSHeader(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t*
 
 SectorRW_DMS::~SectorRW_DMS() {
 }
-
-// Fetch the size of the disk file
-uint32_t SectorRW_DMS::getDiskDataSize() {
-    return m_diskSize;
-};
 
 bool SectorRW_DMS::isDiskPresent() {
     return available();

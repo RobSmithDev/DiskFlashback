@@ -31,13 +31,22 @@ public:
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() override { return L"DMS File"; };
 
-    // Return TRUE if yu can export this to an ADF
-    virtual bool allowCopyToADF() override { return true; };
+    // Return TRUE if yu can export this to a file
+    virtual bool allowCopyToFile() override { return true; };
 
     // Return the current number of sectors per track
     virtual uint32_t numSectorsPerTrack() override { return m_sectorsPerTrack; };
 
+    // Fetch the sector size in bytes
+    virtual uint32_t sectorSize() override;
+
+    // Get the type of file that is loaded
+    virtual SectorType getSystemType() override { return SectorType::stAmiga; };
+
+    // Fetch the serial number of the disk
+    virtual uint32_t serialNumber() override { return 0x444D5330; };
+
     // Fetch the size of the disk file
-    virtual uint32_t getDiskDataSize() override;
+    virtual uint32_t getDiskDataSize() override { return m_diskSize; };
     virtual bool available() override;
 };

@@ -2,11 +2,15 @@
 
 #include "amiga_sectors.h"
 
-#define MFM_MASK    0x55555555L		
+#define NUM_SECTORS_PER_TRACK_DD	11			// Number of sectors per track
+#define NUM_SECTORS_PER_TRACK_HD	22			// Same but for HD disks
+#define SECTOR_BYTES DEFAULT_SECTOR_BYTES
 #define AMIGA_WORD_SYNC  0x4489							 // Disk SYNC code for the Amiga start of sector
 #define RAW_SECTOR_SIZE (8+56+SECTOR_BYTES+SECTOR_BYTES)      // Size of a sector, *Including* the sector sync word longs
 #define ADF_TRACK_SIZE_DD (SECTOR_BYTES*NUM_SECTORS_PER_TRACK_DD)   // Bytes required for a single track dd
 #define ADF_TRACK_SIZE_HD (SECTOR_BYTES*NUM_SECTORS_PER_TRACK_HD)   // Bytes required for a single track hd
+#define PRE_FILLER 1654
+
 
 typedef unsigned char RawEncodedSector[RAW_SECTOR_SIZE];
 
@@ -17,6 +21,35 @@ typedef struct alignas(8) {
 	unsigned char sectorNumber;       // The sector we just read (0 to 11)
 	unsigned char sectorsRemaining;   // How many more sectors remain until the gap (0 to 10)
 } SectorHeader;
+
+
+// These were borrowed from the WinUAE source code, HOWEVER, they're identical to what the Amiga OS writes with the INSTALL command
+static uint8_t bootblock_ofs[] = {
+	0x44,0x4f,0x53,0x00,0xc0,0x20,0x0f,0x19,0x00,0x00,0x03,0x70,0x43,0xfa,0x00,0x18,
+	0x4e,0xae,0xff,0xa0,0x4a,0x80,0x67,0x0a,0x20,0x40,0x20,0x68,0x00,0x16,0x70,0x00,
+	0x4e,0x75,0x70,0xff,0x60,0xfa,0x64,0x6f,0x73,0x2e,0x6c,0x69,0x62,0x72,0x61,0x72,
+	0x79
+};
+static uint8_t bootblock_ffs[] = {
+	0x44, 0x4F, 0x53, 0x01, 0xE3, 0x3D, 0x0E, 0x72, 0x00, 0x00, 0x03, 0x70, 0x43, 0xFA, 0x00, 0x3E,
+	0x70, 0x25, 0x4E, 0xAE, 0xFD, 0xD8, 0x4A, 0x80, 0x67, 0x0C, 0x22, 0x40, 0x08, 0xE9, 0x00, 0x06,
+	0x00, 0x22, 0x4E, 0xAE, 0xFE, 0x62, 0x43, 0xFA, 0x00, 0x18, 0x4E, 0xAE, 0xFF, 0xA0, 0x4A, 0x80,
+	0x67, 0x0A, 0x20, 0x40, 0x20, 0x68, 0x00, 0x16, 0x70, 0x00, 0x4E, 0x75, 0x70, 0xFF, 0x4E, 0x75,
+	0x64, 0x6F, 0x73, 0x2E, 0x6C, 0x69, 0x62, 0x72, 0x61, 0x72, 0x79, 0x00, 0x65, 0x78, 0x70, 0x61,
+	0x6E, 0x73, 0x69, 0x6F, 0x6E, 0x2E, 0x6C, 0x69, 0x62, 0x72, 0x61, 0x72, 0x79, 0x00, 0x00, 0x00,
+};
+
+
+
+
+
+
+// Very simple 
+void getTrackDetails_AMIGA(const bool isHD, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
+	sectorsPerTrack = isHD ? NUM_SECTORS_PER_TRACK_HD : NUM_SECTORS_PER_TRACK_DD;
+	bytesPerSector = SECTOR_BYTES;
+}
+
 
 // Copys the data from inTrack into outSector so that it is aligned to byte properly
 void extractRawSector(const unsigned char* inTrack, const uint32_t dataLengthInBits, const uint32_t bitPos, RawEncodedSector& outSector) {
@@ -68,7 +101,7 @@ uint32_t decodeMFMdata(const uint32_t* input, uint32_t* output, const unsigned i
 }
 
 // Decode the sector.  Returns the number of checksum/errors found
-void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber, const bool isHD, DecodedTrack& decodedTrack) {
+void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack) {
 	DecodedSector sector;
 	SectorHeader header;
 	sector.numErrors = 0;
@@ -91,10 +124,10 @@ void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber,
 	// Check if the header contains valid fields
 	if (header.trackFormat != 0xFF) sector.numErrors+= 10;
 	// Can't use this sector anyway
-	if (header.sectorNumber > (isHD ? NUM_SECTORS_PER_TRACK_HD : NUM_SECTORS_PER_TRACK_DD)-1) return;
+	if (header.sectorNumber > (expectedNumSectors - 1)) return;
 	if (header.trackNumber > 166) 
 		sector.numErrors++;
-	if (header.sectorsRemaining > (isHD ? NUM_SECTORS_PER_TRACK_HD : NUM_SECTORS_PER_TRACK_DD)) 
+	if (header.sectorsRemaining > expectedNumSectors)
 		sector.numErrors++;
 	if (header.sectorsRemaining < 1) 
 		sector.numErrors++;
@@ -108,6 +141,7 @@ void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber,
 	decodeMFMdata((uint32_t*)(sectorData + 48), (uint32_t*)&dataChecksum, 4);
 
 	// Decode the data and receive it's checksum
+	sector.data.resize(SECTOR_BYTES);
 	uint32_t dataChecksumCalculated = decodeMFMdata((uint32_t*)(sectorData + 56), (uint32_t*)&sector.data[0], SECTOR_BYTES); // (from 64 to 1088 == 2*512 bytes)
 
 	if (dataChecksum != dataChecksumCalculated) 
@@ -126,7 +160,7 @@ void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber,
 }
 
 // Search for sectors in the data supplied
-void findSectors(const unsigned char* track, const uint32_t dataLengthInBits, const bool isHD, const unsigned int trackNumber, DecodedTrack& decodedTrack) {
+void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack) {
 	// Work out what we need to search for which is syncsync
 	const uint32_t search = (AMIGA_WORD_SYNC | (((uint32_t)AMIGA_WORD_SYNC) << 16));
 
@@ -135,10 +169,9 @@ void findSectors(const unsigned char* track, const uint32_t dataLengthInBits, co
 
 	// Search with an overlap of approx 3 raw sectors worth of data
 	const uint32_t totalBitsToSearch = dataLengthInBits + (RAW_SECTOR_SIZE * 8 * 3);
+	const uint32_t expectedSectors = expectedNumSectors ? expectedNumSectors : (isHD ? NUM_SECTORS_PER_TRACK_HD : NUM_SECTORS_PER_TRACK_DD);
 
 	int nextTrackBitCount = 0;
-
-	const uint32_t maxSectors = isHD ? NUM_SECTORS_PER_TRACK_HD : NUM_SECTORS_PER_TRACK_DD;
 
 	RawEncodedSector alignedSector;
 
@@ -155,26 +188,29 @@ void findSectors(const unsigned char* track, const uint32_t dataLengthInBits, co
 			extractRawSector(track, dataLengthInBits, (bit + 1) % dataLengthInBits, alignedSector);
 
 			// Now see if there's a valid sector there.  We now only skip the sector if its valid, incase rogue data gets in there
-			decodeSector(alignedSector, trackNumber, isHD, decodedTrack);
+			decodeSector(alignedSector, trackNumber, expectedSectors, decodedTrack);
 			
 			// Stop if we find them all
-			if (decodedTrack.sectors.size() == maxSectors) break;
+			if (decodedTrack.sectors.size() == expectedSectors) break;
 		}
 	}
 
 	// Fill in the missing ones
 	decodedTrack.sectorsWithErrors = 0;
-	for (uint32_t sec = 0; sec < maxSectors; sec++) {
+	for (uint32_t sec = 0; sec < expectedSectors; sec++) {
 		auto it = decodedTrack.sectors.find(sec);
 
 		// Does a sector with this number exist?
 		if (it == decodedTrack.sectors.end()) {
-			// No. Create a dummy one - VERY NOT IDEAL!
-			DecodedSector tmp;
-			memset(&tmp, 0, sizeof(tmp));
-			tmp.numErrors = 0xFFFF;
-			decodedTrack.sectors.insert(std::make_pair(sec, tmp));
-			decodedTrack.sectorsWithErrors++;
+			if (expectedNumSectors) {
+				// No. Create a dummy one - VERY NOT IDEAL!
+				DecodedSector tmp;
+				tmp.data.resize(SECTOR_BYTES);
+				memset(&tmp.data[0], 0, sizeof(tmp));
+				tmp.numErrors = 0xFFFF;
+				decodedTrack.sectors.insert(std::make_pair(sec, tmp));
+				decodedTrack.sectorsWithErrors++;
+			}
 		}
 		else
 			if (it->second.numErrors) decodedTrack.sectorsWithErrors++;
@@ -233,6 +269,9 @@ void encodeSector(const uint32_t trackNumber, const uint32_t sectorNumber, const
 	header.sectorNumber = sectorNumber;
 	header.sectorsRemaining = totalSectors - sectorNumber;  //1..11
 
+	// Shouldnt happen but important
+	if (input.size() != SECTOR_BYTES) return;
+
 	uint32_t sectorLabel[4] = { 0,0,0,0 };
 	uint32_t headerChecksumCalculated = encodeMFMdata((const uint32_t*)&header, (uint32_t*)&encodedSector[8], 4);
 	// Then theres the 16 bytes of the volume label that isnt used anyway
@@ -240,7 +279,7 @@ void encodeSector(const uint32_t trackNumber, const uint32_t sectorNumber, const
 	// Thats 40 bytes written as everything doubles (8+4+4+16+16). - Encode the header checksum
 	encodeMFMdata((const uint32_t*)&headerChecksumCalculated, (uint32_t*)&encodedSector[48], 4);
 	// And move on to the data section.  Next should be the checksum, but we cant encode that until we actually know its value!
-	uint32_t dataChecksumCalculated = encodeMFMdata((const uint32_t*)&input, (uint32_t*)&encodedSector[64], SECTOR_BYTES);
+	uint32_t dataChecksumCalculated = encodeMFMdata((const uint32_t*)&input[0], (uint32_t*)&encodedSector[64], SECTOR_BYTES);
 	// And add the checksum
 	encodeMFMdata((const uint32_t*)&dataChecksumCalculated, (uint32_t*)&encodedSector[56], 4);
 
@@ -265,12 +304,9 @@ void encodeSector(const uint32_t trackNumber, const uint32_t sectorNumber, const
 	lastByte = encodedSector[RAW_SECTOR_SIZE - 1];
 }
 
-#define PRE_FILLER 1654
-
-
 // Encodes all sectors into the buffer provided and returns the number of bytes that need to be written to disk 
-// mfmBufferSizeBytes needs to be at least 13542 or DD and 27076 for HD
-uint32_t encodeSectorsIntoMFM(const bool isHD, const DecodedTrack& decodedTrack, const uint32_t trackNumber, const uint32_t mfmBufferSizeBytes, void* memBuffer) {
+// mfmBufferSizeBytes needs to be at least 13542 or DD and 27076 for HD                                
+uint32_t encodeSectorsIntoMFM_AMIGA(const bool isHD, const DecodedTrack& decodedTrack, const uint32_t trackNumber, const uint32_t mfmBufferSizeBytes, void* memBuffer) {
 	// Filler padding added to the front of the data to wipe old data nd to provide a very stable clock for the data
 	const uint32_t fillerSize = PRE_FILLER + (isHD ? PRE_FILLER : 0);
 

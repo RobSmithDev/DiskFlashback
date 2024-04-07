@@ -1,36 +1,11 @@
 #include "adf.h"
 #include "sectorCache.h"
+#include "amiga_sectors.h"
 #include <Shlobj.h>
 
 #pragma comment(lib,"Shell32.lib")
 
-// These were borrowed from the WinUAE source code, HOWEVER, they're identical to what the Amiga OS writes with the INSTALL command
-static uint8_t bootblock_ofs[] = {
-	0x44,0x4f,0x53,0x00,0xc0,0x20,0x0f,0x19,0x00,0x00,0x03,0x70,0x43,0xfa,0x00,0x18,
-	0x4e,0xae,0xff,0xa0,0x4a,0x80,0x67,0x0a,0x20,0x40,0x20,0x68,0x00,0x16,0x70,0x00,
-	0x4e,0x75,0x70,0xff,0x60,0xfa,0x64,0x6f,0x73,0x2e,0x6c,0x69,0x62,0x72,0x61,0x72,
-	0x79
-};
-static uint8_t bootblock_ffs[] = {
-	0x44, 0x4F, 0x53, 0x01, 0xE3, 0x3D, 0x0E, 0x72, 0x00, 0x00, 0x03, 0x70, 0x43, 0xFA, 0x00, 0x3E,
-	0x70, 0x25, 0x4E, 0xAE, 0xFD, 0xD8, 0x4A, 0x80, 0x67, 0x0C, 0x22, 0x40, 0x08, 0xE9, 0x00, 0x06,
-	0x00, 0x22, 0x4E, 0xAE, 0xFE, 0x62, 0x43, 0xFA, 0x00, 0x18, 0x4E, 0xAE, 0xFF, 0xA0, 0x4A, 0x80,
-	0x67, 0x0A, 0x20, 0x40, 0x20, 0x68, 0x00, 0x16, 0x70, 0x00, 0x4E, 0x75, 0x70, 0xFF, 0x4E, 0x75,
-	0x64, 0x6F, 0x73, 0x2E, 0x6C, 0x69, 0x62, 0x72, 0x61, 0x72, 0x79, 0x00, 0x65, 0x78, 0x70, 0x61,
-	0x6E, 0x73, 0x69, 0x6F, 0x6E, 0x2E, 0x6C, 0x69, 0x62, 0x72, 0x61, 0x72, 0x79, 0x00, 0x00, 0x00,
-};
 
-
-
-ActiveFileIO::ActiveFileIO(fs* owner) : m_owner(owner) {};
-// Add Move constructor
-ActiveFileIO::ActiveFileIO(ActiveFileIO&& source) noexcept {
-	this->m_owner = source.m_owner;
-	source.m_owner = nullptr;
-}
-ActiveFileIO::~ActiveFileIO() {
-	if (m_owner) m_owner->clearFileIO();
-}
 
 // Return true if the drive has files open
 bool fs::driveInUse() {
@@ -202,32 +177,6 @@ void fs::start() {
 	default:
 		throw std::runtime_error("Unknown error");
 	}
-}
-
-// Return TRUE if file is in use
-bool fs::isFileInUse(const char* const name, const AdfFileMode mode) {
-	if (!m_adfVolume) return false;
-
-	// Horrible way to do this 
-	AdfFile* fle = adfFileOpen(m_adfVolume, name, AdfFileMode::ADF_FILE_MODE_READ);
-	if (!fle) return false;
-	SECTNUM fleKey = fle->fileHdr->headerKey;
-	adfFileClose(fle);
-
-	for (const auto& openFle : m_inUse) 
-		if (openFle.first->fileHdr->headerKey == fleKey) {
-			// Match - if its read only and we're read only thats ok
-			if ((mode & AdfFileMode::ADF_FILE_MODE_WRITE) || (openFle.first->modeWrite)) return true;
-		}
-
-	return false;
-}
-void fs::addTrackFileInUse(AdfFile* handle) {
-	m_inUse.insert(std::make_pair(handle, 1));
-}
-void fs::releaseFileInUse(AdfFile* handle) {
-	auto f = m_inUse.find(handle);
-	if (f != m_inUse.end()) m_inUse.erase(f);
 }
 
 
@@ -432,22 +381,6 @@ void fs::mounted(const std::wstring& mountPoint, bool wasMounted) {
 	}
 }
 
-// Sets a current file info block as active (or NULL for not) so DokanResetTimeout can be called if needed
-void fs::setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo) {
-	if (!m_adfDevice->nativeDev) return;
-	((SectorCacheEngine*)m_adfDevice->nativeDev)->setActiveFileIO(dokanfileinfo);
-}
-
-// Let the system know I/O is currently happenning.  ActiveFileIO must be kepyt in scope until io is complete
-ActiveFileIO fs::notifyIOInUse(PDOKAN_FILE_INFO dokanfileinfo) {
-	setActiveFileIO(dokanfileinfo);
-	return ActiveFileIO(this);
-}
-
-void fs::clearFileIO() {
-	setActiveFileIO(nullptr);
-}
-
 bool fs::isRunning() {
 	return DokanIsFileSystemRunning(m_instance);
 }
@@ -466,72 +399,4 @@ void fs::stop() {
 	}
 }
 
-// Handles fixing filenames so they're amiga compatable
-void fs::amigaFilenameToWindowsFilename(const std::string& amigaFilename, std::wstring& windowsFilename) {
-	auto fle = m_safeFilenameMap.find(amigaFilename);
-	if (fle != m_safeFilenameMap.end()) {
-		windowsFilename = fle->second;
-		return;
-	}
-
-	std::string name = amigaFilename;
-
-	// work forwards through name, replacing forbidden characters
-	for (char& o : name)
-		if (o < 32 || o == ':' || o == '*' || o == '"' || o == '?' || o == '<' || o == '>' || o == '|' || o == '/' || o == '\\')
-			o = '_';
-
-	// work backwards through name, replacing forbidden trailing chars 
-	for (size_t i = name.length() - 1; i > 0; i--)
-		if ((name[i] == '.') || (name[i] == ' '))
-			name[i] = '_'; else break;
-
-	// Check name without any extension
-	const size_t pos = name.find('.');
-	const size_t lenToCheck = (pos == std::string::npos) ? name.length() : pos;
-
-	// is the name (excluding extension) a reserved name in Windows? 
-	static const char* reserved_names[] = { "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9" };
-	for (unsigned int i = 0; i < sizeof(reserved_names) / sizeof(char**); i++)
-		if ((lenToCheck >= strlen(reserved_names[i])) && (_strnicmp(reserved_names[i], name.c_str(), lenToCheck) == 0)) {
-			name.insert(name.begin(), '_');
-			break;
-		}
-
-	ansiToWide(name, windowsFilename);
-
-	if (amigaFilename != name) {
-		m_safeFilenameMap.insert(std::make_pair(amigaFilename, windowsFilename));
-	}
-}
-
-void fs::windowsFilenameToAmigaFilename(const std::wstring& windowsFilename, std::string& amigaFilename) {
-	auto it = std::find_if(std::begin(m_safeFilenameMap), std::end(m_safeFilenameMap),
-		[&windowsFilename](auto&& p) { return p.second == windowsFilename; });
-	if (it != m_safeFilenameMap.end())
-		amigaFilename = it->first;
-	else {
-		wideToAnsi(windowsFilename, amigaFilename);
-	}
-}
-
-
-
-void wideToAnsi(const std::wstring& wstr, std::string& str) {
-
-	int size = WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
-	if (size) {
-		str.resize(size);
-		WideCharToMultiByte(CP_ACP, 0, wstr.c_str(), -1, &str[0], size, NULL, NULL);
-		str.resize(size - 1);
-	}
-}
-
-void ansiToWide(const std::string& wstr, std::wstring& str) {
-	int size = MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), -1, NULL, 0);
-	if (size) {
-		str.resize(size * 2);
-		MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), -1, &str[0], size * 2);
-	}
-}
 

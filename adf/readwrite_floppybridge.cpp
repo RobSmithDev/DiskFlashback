@@ -414,7 +414,7 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
         uint32_t bytesPerSector;
         if (trAmiga.sectors.size()) {
             m_diskType = SectorType::stAmiga;
-            m_sectorsPerTrack = max(m_sectorsPerTrack, trAmiga.sectors.size());
+            m_sectorsPerTrack = max(m_sectorsPerTrack, (uint32_t)trAmiga.sectors.size());
             m_serialNumber = 0x414D4644; // AMFD
         } 
         else m_diskType = SectorType::stUnknown;

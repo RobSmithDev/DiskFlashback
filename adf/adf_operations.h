@@ -4,8 +4,8 @@
 #include <string>
 #include "dokaninterface.h"
 #include "adflib/src/adflib.h"
-#include "adf_operations.h"
 #include "adflib/src/adf_blk.h"
+#include "adf_operations.h"
 #include <map>
 #include <unordered_map>
 
@@ -31,6 +31,7 @@ private:
     bool m_autoRemapFileExtensions = false;  // remap mod.* to *.mod for example
 
     struct AdfVolume* m_volume;             // The volume
+    std::wstring m_desktopIniFileResource;
 
     // Reverse mapping for badly (non-windows) named files
     std::map<std::string, std::wstring> m_safeFilenameMap;
@@ -62,6 +63,7 @@ private:
     void amigaFilenameToWindowsFilename(const std::string& amigaFilename, std::wstring& windowsFilename);
     void windowsFilenameToAmigaFilename(const std::wstring& windowsFilename, std::string& amigaFilename);
 public:
+    DokanFileSystemAmigaFS(DokanFileSystemManager* owner);
     virtual NTSTATUS fs_createfile(const std::wstring& filename, const PDOKAN_IO_SECURITY_CONTEXT security_context, const ACCESS_MASK generic_desiredaccess, const uint32_t file_attributes, const uint32_t shareaccess, const uint32_t creation_disposition, const bool fileSupersede, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual void fs_cleanup(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual NTSTATUS fs_readfile(const std::wstring& filename, void* buffer, const uint32_t bufferlength, uint32_t& actualReadLength, const int64_t offset, PDOKAN_FILE_INFO dokanfileinfo) override;
@@ -78,6 +80,8 @@ public:
     virtual NTSTATUS fs_movefile(const std::wstring& filename, const std::wstring& newFilename, const bool replaceExisting, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual NTSTATUS fs_getdiskfreespace(uint64_t& freeBytesAvailable, uint64_t& totalNumBytes, uint64_t& totalNumFreeBytes, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual NTSTATUS fs_getvolumeinformation(std::wstring& volumeName, uint32_t& volumeSerialNumber, uint32_t& maxComponentLength, uint32_t& filesystemFlags, std::wstring& filesystemName, PDOKAN_FILE_INFO dokanfileinfo) override;
-    virtual bool isFileSystsemReady() override;
+    virtual bool isFileSystemReady() override;
+    virtual bool isDiskInUse() override;
+    void setCurrentVolume(AdfVolume* volume) { m_volume = volume; };
 };
 

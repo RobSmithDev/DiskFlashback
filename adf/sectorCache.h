@@ -1,9 +1,8 @@
 #pragma once
 
 
-#include <Windows.h>
-#include <unordered_map>
 #include <dokan/dokan.h>
+#include <unordered_map>
 #include <atomic>
 
 // Possible types of sector / file
@@ -56,7 +55,11 @@ public:
     virtual bool isDiskPresent() = 0;
     virtual bool isDiskWriteProtected() = 0;
 
+    // Set the active file io
     virtual void setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo) { UNREFERENCED_PARAMETER(dokanfileinfo); };
+
+    // Total number of tracks avalable
+    virtual uint32_t totalNumTracks() = 0;
 
     // Flush changes to disk
     virtual bool flushWriteCache() { return true; };

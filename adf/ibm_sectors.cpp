@@ -1,7 +1,6 @@
 // fat12decode.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
-
-#include <Windows.h>
+#include <dokan/dokan.h>
 #include <iostream>
 #include <vector>
 #include <unordered_map>
@@ -192,13 +191,13 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 					extractMFMDecodeRaw(track, dataLengthInBits, bitStart, 4, (uint8_t*)&sector.data.dataMark);
 					// Extract the sector data
 					bitStart += 4 * 8 * 2;
-					extractMFMDecodeRaw(track, dataLengthInBits, bitStart, sector.data.data.size(), (uint8_t*)&sector.data.data[0]);
+					extractMFMDecodeRaw(track, dataLengthInBits, bitStart, (uint32_t)sector.data.data.size(), (uint8_t*)&sector.data.data[0]);
 					// Extract the sector CRC
 					bitStart += sectorDataSize * 8 * 2;
 					extractMFMDecodeRaw(track, dataLengthInBits, bitStart, 2, (uint8_t*)&sector.data.crc);
 					// Validate
 					uint16_t crc = crc16((char*)&sector.data, 4);
-					crc = crc16((char*)sector.data.data.data(), sector.data.data.size(), crc);
+					crc = crc16((char*)sector.data.data.data(), (uint32_t)sector.data.data.size(), crc);
 					sector.dataValid = crc == wordSwap(*(uint16_t*)sector.data.crc);
 
 					// Standardize the sector
@@ -270,7 +269,7 @@ uint32_t gapFillMFM(uint8_t* mem, const uint32_t size, const uint8_t value, uint
 	std::vector<uint8_t> data;
 	if (size < 1) return 0;
 	data.resize(size, value);
-	return encodeMFMdata(data.data(), mem, data.size(), lastByte, memOverflow);
+	return encodeMFMdata(data.data(), mem, (uint32_t)data.size(), lastByte, memOverflow);
 }
 
 // The fill is 0x4E, which endoded as MFM is
@@ -379,7 +378,7 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 		header.cylinder = cylinder;
 		header.head = upperSide ? 1 : 0;
 		header.sector = sec;
-		header.length = max(0,log2(sector.data.size()) - 7);
+		header.length = (unsigned char)(max(0,log2(sector.data.size()) - 7));
 		*((uint16_t*)header.crc) = wordSwap(crc16((char*)&header, sizeof(header) - 2));
 
 		mem += writeMarkerMFM(mem, MFM_SYNC_SECTOR_HEADER, lastByte, memOverflow);
@@ -391,10 +390,10 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 		// Need this just for the CRC
 		const uint8_t dataMark[4] = { 0xA1, 0xA1, 0xA1, 0xFB };
 		uint16_t crc = crc16((char*)&dataMark, 4);
-		crc = wordSwap(crc16((char*)sector.data.data(), sector.data.size(), crc));
+		crc = wordSwap(crc16((char*)sector.data.data(), (int)sector.data.size(), crc));
 
 		mem += writeMarkerMFM(mem, MFM_SYNC_SECTOR_DATA, lastByte, memOverflow);
-		mem += encodeMFMdata(sector.data.data(), mem, sector.data.size(), lastByte, memOverflow);
+		mem += encodeMFMdata(sector.data.data(), mem, (uint32_t)sector.data.size(), lastByte, memOverflow);
 		mem += encodeMFMdata((uint8_t*)&crc, mem, sizeof(crc), lastByte, memOverflow);
 
 		mem += gapFillMFM(mem, gap3Size, 0x4E, lastByte, memOverflow);
@@ -402,7 +401,7 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 	// dont care to write this
 	//mem += gapFillMFM(mem, gap4bSize, 0x4E, lastByte);
 	mem += gapFillMFM(mem, gap4bSize/2, 0x4E, lastByte, memOverflow);
-	return mem - ((uint8_t*)trackData);
+	return (uint32_t)(mem - ((uint8_t*)trackData));
 }
 
 // Feed in Track 0, sector 0 and this will try to extract the number of sectors per track, or 0 on error
@@ -417,7 +416,7 @@ bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t
 	if (sectorsPerTrack < 3) return false;
 	if (sectorsPerTrack > 22) return false;
 	bytesPerSector = (sector[0x0B + 1] << 8) | sector[0x0B];
-	return ((bytesPerSector == 128) || (bytesPerSector == 256) || (bytesPerSector == 512) || (bytesPerSector == 1024) || (bytesPerSector == 2048) || (bytesPerSector == 4096);
+	return ((bytesPerSector == 128) || (bytesPerSector == 256) || (bytesPerSector == 512) || (bytesPerSector == 1024) || (bytesPerSector == 2048) || (bytesPerSector == 4096));
 }
 
 

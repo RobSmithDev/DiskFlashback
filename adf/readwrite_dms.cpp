@@ -70,6 +70,7 @@ bool SectorRW_DMS::unpackCylinders(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t
 
     // Run until we run out of data
     for (size_t c = 0; c < 80; c++) {
+        m_totalTracks = (uint32_t)((c + 1) * 2);
         if (!ReadFile(fle, b1, THLEN, &read, NULL)) return false;
         if (read != THLEN) return false;
 
@@ -182,8 +183,6 @@ bool SectorRW_DMS::decompressTrack(uint8_t* b1, uint8_t* b2, uint8_t* text, uint
 
 // Parse the DMS
 bool SectorRW_DMS::parseDMSHeader(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t* text) {
-    m_sectorsPerTrack = SectorRW_File::GuessSectorsPerTrackFromImageSize(GetFileSize(fle, NULL), sectorSize());
-
     // Read header and validate
     DWORD read;
     if (!ReadFile(fle, b1, HEADLEN, &read, NULL)) return false;

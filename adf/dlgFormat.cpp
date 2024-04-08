@@ -1,16 +1,18 @@
+#include <dokan/dokan.h>
+#include <CommCtrl.h>
+
 #include "dlgFormat.h"
-#include <Windows.h>
 #include "sectorCache.h"
 #include "resource.h"
 #include "adflib/src/adflib.h"
 #include "adf.h"
-#include <CommCtrl.h>
+#include "MountedVolume.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-DialogFORMAT::DialogFORMAT(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, fs* fs) : 
+DialogFORMAT::DialogFORMAT(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs) :
 	m_hInstance(hInstance), m_hParent(hParent), m_io(io), m_fs(fs) {
 }
 
@@ -30,7 +32,7 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	m_dialogBox = hwnd;
 	m_windowCaption = L"Format ";
 	m_windowCaption += (m_io->isPhysicalDisk() ? L"Disk Drive " : L"ADF File ");
-	m_windowCaption += m_fs->driveLetter().substr(0, 2);
+	m_windowCaption += m_fs->getMountPoint().substr(0, 2);
 
 	SetWindowText(hwnd, m_windowCaption.c_str());
 	if (m_hParent) {
@@ -104,13 +106,14 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		MessageBox(m_hParent, L"Disk in drive is write protected. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 		return false;
 	}
-	m_fs->unmountVolume();
+	m_fs->temporaryUnmountDrive();
 
 	uint8_t mode = doFFS ? FSMASK_FFS : 0;
 	if (intMode) mode |= FSMASK_INTL;
 	if (dirCache) mode |= FSMASK_DIRCACHE;
 
-	uint32_t totalTracks = m_fs->device()->cylinders * m_fs->device()->heads;
+	uint32_t totalTracks = m_fs->getTotalTracks();
+	if (totalTracks == 0) totalTracks = 80 * 2;
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks + 4));
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 
@@ -122,7 +125,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		uint32_t sectorNumber = 0;
 		memset(sector, 0, 512);
 		for (uint32_t track = 0; track < totalTracks; track++) {
-			for (uint32_t sec = 0; sec < m_fs->device()->sectors; sec++) {
+			for (uint32_t sec = 0; sec < m_fs->getADFDevice()->sectors; sec++) {
 				if (m_abortFormat) return false;
 				if (!m_io->writeData(sectorNumber, 512, sector)) 
 					return false;
@@ -135,7 +138,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	}
 
 	if (m_abortFormat) return false;
-	if (adfCreateFlop(m_fs->device(), volumeLabel.c_str(), mode) != RC_OK) return false;
+	if (adfCreateFlop(m_fs->getADFDevice(), volumeLabel.c_str(), mode) != RC_OK) return false;
 	if (!m_io->flushWriteCache()) return false;
 
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, progress + 2, 0);
@@ -144,10 +147,10 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		if (m_abortFormat) return false;
 		m_io->setWritingOnlyMode(false);
 		m_fs->setLocked(false);
-		m_fs->remountVolume();
-		if (!m_fs->installBootBlock()) return false;
+		m_fs->restoreUnmountedDrive();
+		if (!m_fs->installAmigaBootBlock()) return false;
 		if (!m_io->flushWriteCache()) return false;
-	}
+	} 
 
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks + 4));
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, totalTracks + 4, 0);
@@ -176,7 +179,7 @@ void DialogFORMAT::doFormat() {
 			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, doFFS, volumeLabel);
 			m_io->setWritingOnlyMode(false);
 			m_fs->setLocked(false);
-			m_fs->remountVolume();
+			m_fs->restoreUnmountedDrive();
 			enableControls(true);
 			if (ret) {
 				MessageBox(m_dialogBox, L"Format complete.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);

@@ -4,7 +4,7 @@
 #include "amiga_sectors.h"
 
 // Attempts to guess the number of sectors per track based on the supplied image size
-uint32_t SectorRW_File::GuessSectorsPerTrackFromImageSize(const uint32_t imageSize, const uint32_t sectorSize = 512) {
+uint32_t SectorRW_File::GuessSectorsPerTrackFromImageSize(const uint32_t imageSize, const uint32_t sectorSize) {
     const uint32_t fs = imageSize / sectorSize;
 
     switch (fs) {
@@ -46,7 +46,7 @@ uint32_t SectorRW_File::GuessSectorsPerTrackFromImageSize(const uint32_t imageSi
 }
 
 
-SectorRW_File::SectorRW_File(const std::wstring& filename, const uint32_t maxCacheMem, HANDLE fle) : SectorCacheEngine(maxCacheMem), m_file(fle) {
+SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorCacheEngine(512 * 84 * 2 * 2 * 11), m_file(fle) {
     m_fileType = SectorType::stAmiga;  // default to Amiga
 
     m_serialNumber = 0x41444630;    // Default AMIGA serial number (ADF0)
@@ -83,6 +83,7 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, const uint32_t maxCac
         }
     }
     if (!m_sectorsPerTrack) m_sectorsPerTrack = SectorRW_File::GuessSectorsPerTrackFromImageSize(GetFileSize(fle, NULL));
+    m_totalTracks = m_sectorsPerTrack ? 0 : (GetFileSize(fle, NULL) / m_sectorsPerTrack);
 }
 
 

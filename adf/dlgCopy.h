@@ -5,14 +5,14 @@
 #include <thread>
 
 class SectorCacheEngine;
-class fs;
+class MountedVolume;
 
 class DialogCOPY {
 private:
 	HINSTANCE m_hInstance;
 	HWND m_hParent;
 	SectorCacheEngine* m_io;
-	fs* m_fs;
+	MountedVolume* m_fs;
 	HWND m_dialogBox = 0;
 	std::wstring m_windowCaption;
 	std::wstring m_filename;
@@ -38,8 +38,8 @@ private:
 	bool runCopyCommand(HANDLE fle, SectorCacheEngine* source);
 
 public:
-	DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, fs* fs);
-	DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, fs* fs, const std::wstring& sourceADF);
+	DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs);
+	DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs, const std::wstring& sourceADF);
 	INT_PTR doModal();
 
 	// Dialog window message handler

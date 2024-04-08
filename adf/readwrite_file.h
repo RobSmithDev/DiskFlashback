@@ -1,7 +1,7 @@
 #pragma once
 
 // Handles reading and writing to a file.  The ADF, IMG and ST formats are all basically the same thing!
-#include <Windows.h>
+#include <dokan/dokan.h>
 #include <unordered_map>
 #include "sectorCache.h"
 
@@ -13,12 +13,13 @@ private:
     SectorType m_fileType;
     uint32_t m_serialNumber;
     uint32_t m_bytesPerSector;
+    uint32_t m_totalTracks;
 protected:
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
     virtual bool internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) override;
 
 public:
-    SectorRW_File(const std::wstring& filename, const uint32_t maxCacheMem, HANDLE fle);
+    SectorRW_File(const std::wstring& filename, HANDLE fle);
     ~SectorRW_File();
 
     virtual bool isDiskPresent() override;
@@ -32,6 +33,9 @@ public:
 
     // Fetch the sector size in bytes
     virtual uint32_t sectorSize() override { return m_bytesPerSector; };
+
+    // Total number of tracks avalable
+    virtual uint32_t totalNumTracks() override { return m_totalTracks; };
 
     // Fetch the size of the disk file
     virtual uint32_t getDiskDataSize() override;

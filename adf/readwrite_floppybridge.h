@@ -1,7 +1,7 @@
 #pragma once
 
 // Handles reading and writing from real disks, with *hopefully* reliable detection of the type of disk inserted
-#include <Windows.h>
+#include <dokan/dokan.h>
 #include <map>
 #include "sectorCache.h"
 #include "floppybridge_lib.h"
@@ -94,6 +94,9 @@ public:
 
     // Return TRUE if this is actually a physical "REAL" drive
     virtual bool isPhysicalDisk() override { return true; };
+
+    // Total number of tracks avalable - 0 is not specified
+    virtual uint32_t totalNumTracks() override { return 0; };
 
     // Flush changes to disk
     virtual bool flushWriteCache() override;

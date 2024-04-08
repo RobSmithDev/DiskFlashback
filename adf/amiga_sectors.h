@@ -2,14 +2,13 @@
 
 // The code in these files was taken from ADFWriter which is part of the DrawBridge - aka ArduinoFloppyReader (and writer) code
 // ... also by me!
-#include <Windows.h>
+#include <dokan/dokan.h>
 #include <stdint.h>
 #include <unordered_map>
 #include "sectorCommon.h"
 
-// These were borrowed from the WinUAE source code, HOWEVER, they're identical to what the Amiga OS writes with the INSTALL command
-extern uint8_t bootblock_ofs[];
-extern uint8_t bootblock_ffs[];
+// Grabs a copy of the bootblock for the system required.  target must be 1024 bytes in size
+void fetchBootBlockCode_AMIGA(bool ffs, uint8_t* target, const std::string& comment);
 
 // Very simple 
 void getTrackDetails_AMIGA(const bool isID, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector);

@@ -1,7 +1,7 @@
 #pragma once
 
 // Handles reading and writing to a file, with sector cache for improved speed
-#include <Windows.h>
+#include <dokan/dokan.h>
 #include <unordered_map>
 #include "sectorCache.h"
 
@@ -11,6 +11,7 @@ private:
     uint16_t m_diskType = 0; // type of archive
     uint16_t m_geninfo = 0; // flags
     uint16_t m_sectorsPerTrack = 0;   
+    uint32_t m_totalTracks = 0;
     bool m_validFile = false;
     
     bool parseDMSHeader(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t* text);
@@ -36,6 +37,9 @@ public:
 
     // Return the current number of sectors per track
     virtual uint32_t numSectorsPerTrack() override { return m_sectorsPerTrack; };
+
+    // Total number of tracks avalable
+    virtual uint32_t totalNumTracks() override { return m_totalTracks; };
 
     // Fetch the sector size in bytes
     virtual uint32_t sectorSize() override;

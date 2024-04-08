@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include <Windows.h>
+#include <dokan/dokan.h>
 #include <stdint.h>
 #include <unordered_map>
 #include "sectorCommon.h"

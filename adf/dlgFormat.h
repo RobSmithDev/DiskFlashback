@@ -4,15 +4,15 @@
 #include "adf_operations.h"
 #include <thread>
 
+class MountedVolume;
 class SectorCacheEngine;
-class fs;
 
 class DialogFORMAT {
 private:
 	HINSTANCE m_hInstance;
 	HWND m_hParent;
 	SectorCacheEngine* m_io;
-	fs* m_fs;
+	MountedVolume* m_fs;
 	HWND m_dialogBox = 0;
 	std::wstring m_windowCaption;
 	HCURSOR m_lastCursor = 0;
@@ -37,7 +37,7 @@ private:
 	bool runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, bool doFFS, const std::string& volumeLabel);
 
 public:
-	DialogFORMAT(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, fs* fs);
+	DialogFORMAT(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs);
 	INT_PTR doModal();
 
 	// Dialog window message handler

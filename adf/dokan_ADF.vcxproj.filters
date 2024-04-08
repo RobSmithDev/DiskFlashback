@@ -69,6 +69,13 @@
     <ClCompile Include="ADF_operations.cpp">
       <Filter>DokanInterface</Filter>
     </ClCompile>
+    <ClCompile Include="MountedVolume.cpp">
+      <Filter>DokanInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="MountedVolumes.cpp">
+      <Filter>DokanInterface</Filter>
+    </ClCompile>
+    <ClCompile Include="shellMenus.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ADF.h" />
@@ -147,6 +154,16 @@
     <ClInclude Include="ADF_operations.h">
       <Filter>DokanInterface</Filter>
     </ClInclude>
+    <ClInclude Include="MountedVolume.h">
+      <Filter>DokanInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="MountedVolumes.h">
+      <Filter>DokanInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="drivecontrol.h">
+      <Filter>DokanInterface</Filter>
+    </ClInclude>
+    <ClInclude Include="shellMenus.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">

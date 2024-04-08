@@ -41,6 +41,19 @@ static uint8_t bootblock_ffs[] = {
 
 
 
+// Grabs a copy of the bootblock for the system required.  target must be 1024 bytes in size
+void fetchBootBlockCode_AMIGA(bool ffs, uint8_t* target, const std::string& comment) {
+	if (ffs) {
+		size_t size = sizeof(bootblock_ofs) / sizeof(*bootblock_ofs);
+		memcpy_s(target, 1024, bootblock_ofs, size);
+		strcpy_s((char*)(target + size + 8), 1024 - (size + 8), comment.c_str());
+	}
+	else {
+		size_t size = sizeof(bootblock_ffs) / sizeof(*bootblock_ffs);
+		memcpy_s(target, 1024, bootblock_ffs, size);
+		strcpy_s((char*)(target + size + 8), 1024 - (size + 8), comment.c_str());
+	}
+}
 
 
 
@@ -311,7 +324,7 @@ uint32_t encodeSectorsIntoMFM_AMIGA(const bool isHD, const DecodedTrack& decoded
 	const uint32_t fillerSize = PRE_FILLER + (isHD ? PRE_FILLER : 0);
 
 	// Calculate total bytes we want to write - the extra 8 bytes is for post padding to clean up clock bits
-	const uint32_t bytesRequired = (sizeof(RawEncodedSector) * decodedTrack.sectors.size()) + fillerSize + 8;
+	const uint32_t bytesRequired = (uint32_t)((sizeof(RawEncodedSector) * decodedTrack.sectors.size()) + fillerSize + 8);
 
 	// Not enough space?
 	if (mfmBufferSizeBytes < bytesRequired) return 0;
@@ -324,7 +337,7 @@ uint32_t encodeSectorsIntoMFM_AMIGA(const bool isHD, const DecodedTrack& decoded
 	// The order of the sectors does not matter
 	for (const auto& sec : decodedTrack.sectors) {
 		RawEncodedSector* out = (RawEncodedSector*)output;			
-		encodeSector(trackNumber, sec.first, decodedTrack.sectors.size(), sec.second.data, *out, lastByte);
+		encodeSector(trackNumber, (uint32_t)sec.first, (uint32_t)decodedTrack.sectors.size(), sec.second.data, *out, lastByte);
 		output += sizeof(RawEncodedSector);
 	}
 

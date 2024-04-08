@@ -1,13 +1,9 @@
 #include "adf_operations.h"
 #include "adflib/src/adflib.h"
 
-
-std::wstring mainEXE;
-#define DESKTOP_INI L"\xFEFF[.ShellClassInfo]\r\nIconResource=" + mainEXE + L",2\r\n"
-#define DESKTOP_INI_ATTRIBUTES FILE_ATTRIBUTE_HIDDEN
-
-
-
+DokanFileSystemAmigaFS::DokanFileSystemAmigaFS(DokanFileSystemManager* owner) : DokanFileSystemBase(owner) {
+    m_desktopIniFileResource = L"\xFEFF[.ShellClassInfo]\r\nIconResource=" + owner->getMainEXEName() + L",2\r\n";
+}
 DokanFileSystemAmigaFS::ActiveFileIO::ActiveFileIO(DokanFileSystemAmigaFS* owner) : m_owner(owner) {};
 // Add Move constructor
 DokanFileSystemAmigaFS::ActiveFileIO::ActiveFileIO(DokanFileSystemAmigaFS::ActiveFileIO&& source) noexcept {
@@ -33,8 +29,13 @@ void DokanFileSystemAmigaFS::clearFileIO() {
     setActiveFileIO(nullptr);
 }
 
-bool DokanFileSystemAmigaFS::isFileSystsemReady() {
+bool DokanFileSystemAmigaFS::isFileSystemReady() {
     return m_volume != nullptr;
+}
+
+bool DokanFileSystemAmigaFS::isDiskInUse() {
+    if (!m_volume) return false;
+    return !m_inUse.empty();
 }
 
 
@@ -126,7 +127,7 @@ void DokanFileSystemAmigaFS::windowsFilenameToAmigaFilename(const std::wstring& 
 }
 
 // Convert Amiga file attributes to Windows file attributes - only a few actually match
-DWORD DokanFileSystemAmigaFS::amigaToWindowsAttributes(const int32_t access, int32_t type, bool disableCustomIcons = false) {
+DWORD DokanFileSystemAmigaFS::amigaToWindowsAttributes(const int32_t access, int32_t type, bool disableCustomIcons) {
     DWORD result = 0;
     if (type == ST_DIR) result |= FILE_ATTRIBUTE_DIRECTORY | ((m_useCustomFolderIcons && !disableCustomIcons) ? FILE_ATTRIBUTE_READONLY : 0);
     if (type == ST_ROOT) result |= FILE_ATTRIBUTE_DIRECTORY;
@@ -442,13 +443,12 @@ NTSTATUS DokanFileSystemAmigaFS::fs_readfile(const std::wstring& filename, void*
             if (pos != std::wstring::npos) {
                 // Is this the desktop.ini file, and NOT the first one!
                 if (pos) {
-                    const std::wstring desktopIni = DESKTOP_INI;
-                    const DWORD maxBytes = desktopIni.length() * 2;
+                    const DWORD maxBytes = (DWORD)(m_desktopIniFileResource.length() * 2);
                     if (offset > maxBytes) actualReadLength = 0; else {
                         actualReadLength = bufferlength;
                         DWORD allowed = (DWORD)offset + bufferlength;
                         if (allowed > maxBytes) actualReadLength = maxBytes - (DWORD)offset;
-                        const char* start = (char*)desktopIni.c_str();
+                        const char* start = (char*)m_desktopIniFileResource.c_str();
                         memcpy_s(buffer, bufferlength, start + offset, actualReadLength);
                     }
                 }
@@ -580,12 +580,12 @@ NTSTATUS DokanFileSystemAmigaFS::fs_getfileInformation(const std::wstring& filen
         if (pos != std::wstring::npos) {
             // Is this the desktop.ini file, and NOT the first one!
             if (pos) {
-                buffer->dwFileAttributes = DESKTOP_INI_ATTRIBUTES;
+                buffer->dwFileAttributes = FILE_ATTRIBUTE_HIDDEN;
                 buffer->nNumberOfLinks = 1;
                 buffer->nFileIndexHigh = 0;
                 buffer->nFileIndexLow = 0;
                 buffer->nFileSizeHigh = 0;
-                buffer->nFileSizeLow = std::wstring(DESKTOP_INI).length() * 2;
+                buffer->nFileSizeLow = (DWORD)(m_desktopIniFileResource.length() * 2);
                 buffer->dwVolumeSerialNumber = volumeSerialNumber();
                 SYSTEMTIME tm;
                 GetSystemTime(&tm);
@@ -846,7 +846,7 @@ NTSTATUS DokanFileSystemAmigaFS::fs_getvolumeinformation(std::wstring& volumeNam
     if (m_volume) {
         if (m_volume->volName) ansiToWide(m_volume->volName, volumeName);
 
-        std::wstring filesystemName = L"Amiga ";
+        filesystemName = L"Amiga ";
         switch (m_volume->dev->devType) {
         case DEVTYPE_FLOPDD: filesystemName += L"DD Floppy "; break;
         case DEVTYPE_FLOPHD: filesystemName += L"HD Floppy "; break;

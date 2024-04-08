@@ -42,6 +42,10 @@ CMessageWindow::CMessageWindow(HINSTANCE hInstance, const std::wstring& windowCa
 	m_hWnd = CreateWindowEx(0, MESSAGEWINDOW_CLASS_NAME, windowCaption.c_str(), WS_OVERLAPPEDWINDOW, 0, 0, 0, 0, NULL, NULL, hInstance, (LPVOID)this);
 }
 
+void CMessageWindow::setWindowTitle(const std::wstring& windowCaption) {
+	SetWindowText(m_hWnd, windowCaption.c_str());
+}
+
 void CMessageWindow::setMessageHandler(UINT uMsg, std::function<LRESULT(_In_ WPARAM wParam, _In_ LPARAM lParam)> callback) {
 	m_messageMap[uMsg] = callback;
 }

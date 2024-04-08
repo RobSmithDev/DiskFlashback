@@ -8,16 +8,17 @@
 #include "readwrite_floppybridge.h"
 #include "readwrite_file.h"
 #include "readwrite_dms.h"
+#include "MountedVolume.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-DialogCOPY::DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, fs* fs, const std::wstring& sourceADF) :
+DialogCOPY::DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs, const std::wstring& sourceADF) :
 	m_hInstance(hInstance), m_hParent(hParent), m_io(io), m_fs(fs), m_backup(false), m_filename(sourceADF)  {
 }
 
-DialogCOPY::DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, fs* fs) :
+DialogCOPY::DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs) :
 	m_hInstance(hInstance), m_hParent(hParent), m_io(io), m_fs(fs), m_backup(true) {
 }
 
@@ -40,22 +41,20 @@ INT_PTR DialogCOPY::doModal() {
 		std::wstring defaultFormat;
 		switch (m_io->getSystemType()) {
 		case SectorType::stAmiga:
-			filter += L"Amiga Disk Files (*.adf)\0*.adf\0";
+			dlg.lpstrFilter = L"Amiga Disk Files (*.adf)\0*.adf\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"adf";
 			break;
 		case SectorType::stIBM:
-			filter += L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0";
+			dlg.lpstrFilter = L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"img";
 			break;
 		case SectorType::stAtari:
-			filter += L"Atari ST Disk Files (*.st)\0*.st\0";
+			dlg.lpstrFilter = L"Atari ST Disk Files (*.st)\0*.st\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"st";
 			break;
 		default:
-			return; // not supported
+			return 0; // not supported
 		}
-		filter += L"All Files(*.*)\0 * .*\0\0";
-		dlg.lpstrFilter = filter.c_str();
 
 		m_titleExtension = m_fileExtension;
 		for (WCHAR& c : m_titleExtension) c = towupper(c);
@@ -79,7 +78,7 @@ INT_PTR DialogCOPY::doModal() {
 			for (WCHAR& c : m_titleExtension) c = towupper(c);
 		}
 
-		std::wstring msg = L"All data on disk in drive "+m_fs->driveLetter().substr(0,2) + L" will be overwritten.\nAre you sure you want to continue?";
+		std::wstring msg = L"All data on disk in drive "+m_fs->getMountPoint().substr(0,2) + L" will be overwritten.\nAre you sure you want to continue?";
 		if (MessageBox(m_hParent, msg.c_str(), L"Copy file to Disk", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return 0;
 	}
 
@@ -106,11 +105,11 @@ void DialogCOPY::handleInitDialog(HWND hwnd) {
 	if (pos != std::wstring::npos) fname = fname.substr(pos + 1);
 
 	if (m_backup) {
-		m_windowCaption = L"Copy Disk " + m_fs->driveLetter().substr(0, 2) + L" to " + m_titleExtension + L" File";
+		m_windowCaption = L"Copy Disk " + m_fs->getMountPoint().substr(0, 2) + L" to " + m_titleExtension + L" File";
 		SetWindowText(ctrl, (L"Copying disk to " + fname).c_str());
 	}
 	else {
-		m_windowCaption = L"Copy " + m_titleExtension + L" file to Disk " + m_fs->driveLetter().substr(0, 2);
+		m_windowCaption = L"Copy " + m_titleExtension + L" file to Disk " + m_fs->getMountPoint().substr(0, 2);
 		SetWindowText(ctrl, (L"Copying " + fname+ L" to disk").c_str());
 	}
 	SetWindowText(hwnd, m_windowCaption.c_str());
@@ -143,10 +142,14 @@ bool DialogCOPY::shouldClose() {
 
 // Actually do the format
 bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
-	m_fs->unmountVolume();
+	m_fs->temporaryUnmountDrive();
 
 	if (m_backup) {		
-		uint32_t totalTracks = m_fs->device()->cylinders * m_fs->device()->heads;
+		
+		uint32_t totalTracks = m_io->totalNumTracks();
+		if (totalTracks == 0) totalTracks = m_fs->getTotalTracks();
+		if (totalTracks == 0) totalTracks = 80 * 2; // unknown - default
+
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 		DWORD written;
@@ -156,7 +159,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 		if (!sectorData) return false;  // out of memory
 		
 		for (uint32_t track = 0; track < totalTracks; track++) {
-			for (uint32_t sec = 0; sec < m_fs->device()->sectors; sec++) {
+			for (uint32_t sec = 0; sec < m_io->numSectorsPerTrack(); sec++) {
 				if (!m_io->readData(sectorNumber, m_io->sectorSize(), sectorData)) {
 					free(sectorData);
 					return false;
@@ -216,7 +219,6 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
-		DWORD written;
 
 		uint32_t sectorNumber = 0;
 		void* sectorData = malloc(source->sectorSize());
@@ -282,7 +284,7 @@ void DialogCOPY::doCopy() {
 					if (strcmp(buf, "DMS!") == 0) {
 						source = new SectorRW_DMS(fle);
 					}
-					else source = new SectorRW_File(m_filename, 512 * 44, fle);
+					else source = new SectorRW_File(m_filename, fle);
 				}
 			}
 			bool ret = false;
@@ -297,7 +299,7 @@ void DialogCOPY::doCopy() {
 
 			m_io->setWritingOnlyMode(false);
 			m_fs->setLocked(false);
-			m_fs->remountVolume();
+			m_fs->restoreUnmountedDrive();
 			if (source) delete source;
 			if (ret) {
 				MessageBox(m_dialogBox, L"Copy completed.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);

@@ -1,5 +1,5 @@
 #pragma once
-
+/*
 #include <windows.h>
 
 #include <dokan/dokan.h>
@@ -13,9 +13,6 @@
 #include <iostream>
 #include <map>
 #include <unordered_map>
-
-#define APPLICATION_NAME "AMount"
-
 
 class fs;
 
@@ -105,3 +102,4 @@ class fs {
 };
 
 
+*/

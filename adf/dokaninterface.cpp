@@ -41,8 +41,6 @@ bool DokanFileSystemManager::isRunning() const {
 // Start the file system
 bool DokanFileSystemManager::start() {
     if (m_dokanInstance) return true;
-
-    DOKAN_OPTIONS dokan_options;
     ZeroMemory(&dokan_options, sizeof(DOKAN_OPTIONS));
     dokan_options.Version = DOKAN_VERSION;
     dokan_options.Options = DOKAN_OPTION_CURRENT_SESSION | DOKAN_OPTION_MOUNT_MANAGER;
@@ -416,7 +414,7 @@ static NTSTATUS DOKAN_CALLBACK fs_getdiskfreespace(PULONGLONG free_bytes_availab
 
         return t;
     }
-
+    
     return STATUS_ACCESS_DENIED;
 }
 
@@ -428,15 +426,6 @@ static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation(LPWSTR volumename_buffer,
         *filesystem_flags = FILE_READ_ONLY_VOLUME;
         return STATUS_SUCCESS;
     }
-
-
-    if (!manager->isDriveRecognised()) {
-        wcscpy_s(volumename_buffer, volumename_size, manager->getDriverName().c_str());
-        wcscpy_s(filesystem_name_buffer, filesystem_name_size, L"Unknown");
-        *filesystem_flags = FILE_READ_ONLY_VOLUME;
-        return STATUS_SUCCESS;
-    }
-    // Allow queries to \\ only
     if (manager->isDriveLocked()) {
         wcscpy_s(volumename_buffer, volumename_size, manager->getDriverName().c_str());
         wcscpy_s(filesystem_name_buffer, filesystem_name_size, L"Busy");
@@ -448,8 +437,14 @@ static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation(LPWSTR volumename_buffer,
         wcscpy_s(filesystem_name_buffer, filesystem_name_size, L"No Disk");
         *filesystem_flags = FILE_READ_ONLY_VOLUME;
         return STATUS_SUCCESS;
-    } 
-
+    }
+    if (!manager->isDriveRecognised()) {
+        wcscpy_s(volumename_buffer, volumename_size, manager->getDriverName().c_str());
+        wcscpy_s(filesystem_name_buffer, filesystem_name_size, L"Unknown");
+        *filesystem_flags = FILE_READ_ONLY_VOLUME;
+        return STATUS_SUCCESS;
+    }
+    
     DokanFileSystemBase* fs = manager->getActiveSystem();
     if (fs) {
         std::wstring volName;
@@ -482,7 +477,7 @@ static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation(LPWSTR volumename_buffer,
         *filesystem_flags = FILE_READ_ONLY_VOLUME;
         return STATUS_SUCCESS;
     }
-
+    
     return STATUS_ACCESS_DENIED;
 }
 

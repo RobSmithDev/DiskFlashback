@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="ADF.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="floppybridge_lib.cpp">
       <Filter>Interfaces\floppybridge</Filter>
@@ -66,19 +65,32 @@
     <ClCompile Include="dokaninterface.cpp">
       <Filter>DokanInterface</Filter>
     </ClCompile>
-    <ClCompile Include="ADF_operations.cpp">
-      <Filter>DokanInterface</Filter>
-    </ClCompile>
     <ClCompile Include="MountedVolume.cpp">
       <Filter>DokanInterface</Filter>
     </ClCompile>
     <ClCompile Include="MountedVolumes.cpp">
       <Filter>DokanInterface</Filter>
     </ClCompile>
-    <ClCompile Include="shellMenus.cpp" />
+    <ClCompile Include="shellMenus.cpp">
+      <Filter>General</Filter>
+    </ClCompile>
+    <ClCompile Include="..\fatfs\source\ff.c">
+      <Filter>FatFS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\fatfs\source\ffsystem.c">
+      <Filter>FatFS</Filter>
+    </ClCompile>
+    <ClCompile Include="..\fatfs\source\ffunicode.c">
+      <Filter>FatFS</Filter>
+    </ClCompile>
+    <ClCompile Include="ADF_operations.cpp">
+      <Filter>Interfaces\amiga</Filter>
+    </ClCompile>
+    <ClCompile Include="fat_operations.cpp">
+      <Filter>Interfaces\IBM</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ADF.h" />
     <ClInclude Include="resource.h">
       <Filter>res</Filter>
     </ClInclude>
@@ -151,9 +163,6 @@
     <ClInclude Include="dokaninterface.h">
       <Filter>DokanInterface</Filter>
     </ClInclude>
-    <ClInclude Include="ADF_operations.h">
-      <Filter>DokanInterface</Filter>
-    </ClInclude>
     <ClInclude Include="MountedVolume.h">
       <Filter>DokanInterface</Filter>
     </ClInclude>
@@ -163,7 +172,24 @@
     <ClInclude Include="drivecontrol.h">
       <Filter>DokanInterface</Filter>
     </ClInclude>
-    <ClInclude Include="shellMenus.h" />
+    <ClInclude Include="shellMenus.h">
+      <Filter>General</Filter>
+    </ClInclude>
+    <ClInclude Include="..\fatfs\source\ff.h">
+      <Filter>FatFS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\fatfs\source\ffconf.h">
+      <Filter>FatFS</Filter>
+    </ClInclude>
+    <ClInclude Include="..\fatfs\source\diskio.h">
+      <Filter>FatFS</Filter>
+    </ClInclude>
+    <ClInclude Include="ADF_operations.h">
+      <Filter>Interfaces\amiga</Filter>
+    </ClInclude>
+    <ClInclude Include="fat_operations.h">
+      <Filter>Interfaces\IBM</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">
@@ -195,6 +221,9 @@
     </Filter>
     <Filter Include="DokanInterface">
       <UniqueIdentifier>{ed5641a6-398f-4e1e-96ab-fe022775219a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FatFS">
+      <UniqueIdentifier>{b9b8b178-9866-4b17-a1f5-b0d06bce984a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

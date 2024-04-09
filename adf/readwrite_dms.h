@@ -35,7 +35,7 @@ public:
     // Return TRUE if yu can export this to a file
     virtual bool allowCopyToFile() override { return true; };
 
-    // Return the current number of sectors per track
+    // Return the current number of sectors per track 
     virtual uint32_t numSectorsPerTrack() override { return m_sectorsPerTrack; };
 
     // Total number of tracks avalable

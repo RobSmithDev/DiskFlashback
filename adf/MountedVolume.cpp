@@ -15,10 +15,12 @@ MountedVolume::MountedVolume(VolumeManager* manager, const std::wstring& mainEXE
 	DokanFileSystemManager(driveLetter, forceWriteProtect, mainEXE), m_io(io) {
     m_registry = new ShellRegistery(mainEXE);
     m_amigaFS = new DokanFileSystemAmigaFS(this);
+    m_IBMFS = new DokanFileSystemFATFS(this);
 }
 
 MountedVolume::~MountedVolume() {
     if (m_amigaFS) delete m_amigaFS;
+    if (m_IBMFS) delete m_IBMFS;
     if (m_registry) delete m_registry;
 }
 
@@ -75,9 +77,14 @@ RETCODE refreshAmigaVolume(struct AdfDevice* const dev) {
 
 void MountedVolume::restoreUnmountedDrive() {
     if (m_tempUnmount) {
-        if (m_ADFvolume) 
-            if (m_io->isPhysicalDisk()) refreshAmigaVolume(m_ADFdevice);
-        mountFileSystem(m_ADFdevice, m_partitionIndex);
+        if (m_ADFdevice) {
+            if (m_ADFvolume)
+                if (m_io->isPhysicalDisk()) refreshAmigaVolume(m_ADFdevice);
+            mountFileSystem(m_ADFdevice, m_partitionIndex);
+        }
+        if (m_FatFS) {
+            mountFileSystem(m_FatFS, m_partitionIndex);
+        }
         m_tempUnmount = false;
     }
 }
@@ -85,8 +92,10 @@ void MountedVolume::restoreUnmountedDrive() {
 void MountedVolume::temporaryUnmountDrive() {
     if (!m_tempUnmount) {
         AdfDevice* adfDevice = m_ADFdevice;
+        FATFS* fatFS = m_FatFS;
         unmountFileSystem();
         m_ADFdevice = adfDevice;
+        m_FatFS = fatFS;
         m_tempUnmount = true;
     }
 }
@@ -167,14 +176,37 @@ AdfDevice* MountedVolume::getADFDevice() {
 // Notifications of the file system being mounted
 void MountedVolume::onMounted(const std::wstring& mountPoint, PDOKAN_FILE_INFO dokanfileinfo) {
     DokanFileSystemManager::onMounted(mountPoint, dokanfileinfo);
+    m_registry->setupDriveIcon(true, mountPoint[0]);
 }
 void MountedVolume::onUnmounted(PDOKAN_FILE_INFO dokanfileinfo) {
     DokanFileSystemManager::onUnmounted(dokanfileinfo);
+    m_registry->setupDriveIcon(false, getMountPoint()[0]);
 }
 
 uint32_t MountedVolume::getTotalTracks() {
     if (m_ADFdevice) return m_ADFdevice->cylinders * m_ADFdevice->heads;
     return 0;
+}
+
+// Mount a Fat12 device
+bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex) {
+    m_partitionIndex = partitionIndex;
+
+    // Hook up FS_operations
+    m_IBMFS->setCurrentVolume(ftFSDevice);
+    setActiveFileSystem(m_IBMFS);
+    m_FatFS = ftFSDevice;
+
+    m_registry->mountDismount(ftFSDevice != nullptr, getMountPoint()[0], m_io);
+    if (m_ADFvolume) {
+        //SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
+        SHChangeNotify(SHCNE_DRIVEREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
+        SHChangeNotify(SHCNE_DRIVEADD, SHCNF_PATH, getMountPoint().c_str(), NULL);
+        //SHChangeNotify(SHCNE_MEDIAINSERTED, SHCNF_PATH, m_drive.c_str(), NULL);
+    }
+    m_tempUnmount = false;
+
+    return m_ADFvolume != nullptr;
 }
 
 bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex) {
@@ -184,7 +216,8 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     }
     m_ADFdevice = adfDevice;
     m_partitionIndex = partitionIndex;
-    m_ADFvolume = adfMount(m_ADFdevice, partitionIndex, isForcedWriteProtect());
+    m_ADFvolume = m_ADFdevice ? adfMount(m_ADFdevice, partitionIndex, isForcedWriteProtect()) : nullptr;
+   
 
     // Hook up ADF_operations
     if (m_ADFvolume) {
@@ -193,7 +226,7 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     }
     else setActiveFileSystem(nullptr);
 
-    m_registry->mountDiscount(true, getMountPoint()[0], m_io);
+    m_registry->mountDismount(m_ADFvolume != nullptr, getMountPoint()[0], m_io);
     if (m_ADFvolume) {
         //SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
         SHChangeNotify(SHCNE_DRIVEREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
@@ -210,9 +243,13 @@ void MountedVolume::unmountFileSystem() {
         adfUnMount(m_ADFvolume);
         m_ADFvolume = nullptr;
     }
+    m_amigaFS->setCurrentVolume(nullptr);
+    m_IBMFS->setCurrentVolume(nullptr);
     setActiveFileSystem(nullptr);
     m_ADFdevice = nullptr;
-    m_registry->mountDiscount(false, getMountPoint()[0], m_io);
+    m_FatFS = nullptr;
+
+    m_registry->mountDismount(false, getMountPoint()[0], m_io);
     SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
 }
 

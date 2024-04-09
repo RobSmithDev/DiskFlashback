@@ -3,7 +3,6 @@
 #include "sectorCache.h"
 #include "resource.h"
 #include "adflib/src/adflib.h"
-#include "adf.h"
 #include <CommCtrl.h>
 #include "readwrite_floppybridge.h"
 #include "readwrite_file.h"

@@ -3,21 +3,20 @@
 #include <dokan/dokan.h>
 #include <string>
 #include "dokaninterface.h"
-#include "adflib/src/adflib.h"
-#include "adflib/src/adf_blk.h"
+#include "fatfs/source/ff.h"
 #include <map>
 #include <unordered_map>
 
 // A class with all of the Dokan commands needed
-class DokanFileSystemAmigaFS : public DokanFileSystemBase {
+class DokanFileSystemFATFS : public DokanFileSystemBase {
 private:
     // Simple nasty class to auto release (so I don't forget) details about an active file i/o occuring. 
     // Everything is single threadded so this is OK
     class ActiveFileIO {
     private:
-        DokanFileSystemAmigaFS* m_owner;
+        DokanFileSystemFATFS* m_owner;
     public:
-        ActiveFileIO(DokanFileSystemAmigaFS* owner);
+        ActiveFileIO(DokanFileSystemFATFS* owner);
         // Remove copy constructor
         ActiveFileIO(const ActiveFileIO&) = delete;
         // Add Move constructor
@@ -26,25 +25,10 @@ private:
     };
     friend class ActiveFileIO;
 
-    bool m_useCustomFolderIcons = false;
-    bool m_autoRemapFileExtensions = false;  // remap mod.* to *.mod for example
-
-    struct AdfVolume* m_volume;             // The volume
-    std::wstring m_desktopIniFileResource;
-
-    // Reverse mapping for badly (non-windows) named files
-    std::map<std::string, std::wstring> m_safeFilenameMap;
+    FATFS* m_volume;             // The volume
 
     // Files in use
-    std::unordered_map<struct AdfFile*, int> m_inUse;
-
-    // Convert Amiga file attributes to Windows file attributes - only a few actually match
-    DWORD amigaToWindowsAttributes(const int32_t access, int32_t type, bool disableCustomIcons = false);
-    // Search for a file or folder, returns 0 if not found or the type of item (eg: ST_FILE)
-    int32_t locatePath(const std::wstring& path, PDOKAN_FILE_INFO dokanfileinfo, std::string& filename);
-    // Stub version of the above
-    int32_t locatePath(const std::wstring& path, PDOKAN_FILE_INFO dokanfileinfo);
-
+    std::unordered_map<std::wstring, bool> m_inUse;
 
     // Sets a current file info block as active (or NULL for not) so DokanResetTimeout can be called if needed
     void setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo);
@@ -54,15 +38,11 @@ private:
 
 
     // Return TRUE if file is in use for the new requested mode
-    bool isFileInUse(const char* const name, const AdfFileMode mode);
-    void addTrackFileInUse(struct AdfFile* handle);
-    void releaseFileInUse(struct AdfFile* handle);
-
-    // Handles fixing filenames so they're amiga compatable
-    void amigaFilenameToWindowsFilename(const std::string& amigaFilename, std::wstring& windowsFilename);
-    void windowsFilenameToAmigaFilename(const std::wstring& windowsFilename, std::string& amigaFilename);
+    bool isFileInUse(const std::wstring& fullPath, bool isWrite);
+    void addTrackFileInUse(const std::wstring& fullPath, bool isWrite);
+    void releaseFileInUse(const std::wstring& fullPath);
 public:
-    DokanFileSystemAmigaFS(DokanFileSystemManager* owner);
+    DokanFileSystemFATFS(DokanFileSystemManager* owner);
     virtual NTSTATUS fs_createfile(const std::wstring& filename, const PDOKAN_IO_SECURITY_CONTEXT security_context, const ACCESS_MASK generic_desiredaccess, const uint32_t file_attributes, const uint32_t shareaccess, const uint32_t creation_disposition, const bool fileSupersede, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual void fs_cleanup(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual NTSTATUS fs_readfile(const std::wstring& filename, void* buffer, const uint32_t bufferlength, uint32_t& actualReadLength, const int64_t offset, PDOKAN_FILE_INFO dokanfileinfo) override;
@@ -81,6 +61,6 @@ public:
     virtual NTSTATUS fs_getvolumeinformation(std::wstring& volumeName, uint32_t& volumeSerialNumber, uint32_t& maxComponentLength, uint32_t& filesystemFlags, std::wstring& filesystemName, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual bool isFileSystemReady() override;
     virtual bool isDiskInUse() override;
-    void setCurrentVolume(AdfVolume* volume);
+    void setCurrentVolume(FATFS* volume);
 };
 

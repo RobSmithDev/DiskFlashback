@@ -20,7 +20,8 @@ private:
 public:
 	ShellRegistery(const std::wstring& mainEXE) : m_mainEXE(mainEXE) {};
 
-	void mountDiscount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource);
+	void mountDismount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource);
 
+	void setupDriveIcon(bool enable, WCHAR driveLetter);
 
 };

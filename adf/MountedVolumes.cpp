@@ -9,6 +9,8 @@
 #include "amiga_sectors.h"
 #include "dlgFormat.h"
 #include "dlgCopy.h"
+#include "fatfs/source/ff.h"
+#include "fatfs/source/diskio.h"
 
 #define TIMERID_MONITOR_FILESYS 1000
 #define WM_DISKCHANGE (WM_USER + 1)
@@ -117,8 +119,85 @@ void Verbose(char* msg) {
 }
 #pragma endregion ADFLIB
 
-// Full path to main exe name (this program)
-const std::wstring m_mainExeFilename;
+#pragma region FATFS
+// I hate this being here
+static SectorCacheEngine* fatfsSectorCache = nullptr;
+DSTATUS disk_status(BYTE pdrv) {
+    if (fatfsSectorCache && (pdrv == 0)) {
+        if (!fatfsSectorCache->isDiskPresent()) return STA_NODISK;
+        if (fatfsSectorCache->isDiskWriteProtected()) return STA_PROTECT;
+        return 0;
+    }
+    return STA_NOINIT;
+}
+DSTATUS disk_initialize(BYTE pdrv) {
+    if (fatfsSectorCache && (pdrv==0)) {
+        if (!fatfsSectorCache->isDiskPresent()) return STA_NODISK;
+        if (!fatfsSectorCache->isDiskWriteProtected()) return STA_PROTECT;
+        return 0;
+    }
+    return STA_NOINIT;
+}
+DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
+    if (fatfsSectorCache && (pdrv == 0)) {
+        if (!fatfsSectorCache->isDiskPresent()) return RES_NOTRDY;
+        while (count) {
+            if (!fatfsSectorCache->readData(sector, fatfsSectorCache->sectorSize(), buff))
+                return RES_ERROR;
+            count--;
+            sector++;
+            buff += fatfsSectorCache->sectorSize();
+        }
+        return RES_OK;
+    }
+    return RES_PARERR;
+}
+DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
+    if (fatfsSectorCache && (pdrv == 0)) {
+        if (!fatfsSectorCache->isDiskPresent()) return RES_NOTRDY;
+        if (fatfsSectorCache->isDiskWriteProtected()) return RES_WRPRT;
+        while (count) {
+            if (!fatfsSectorCache->writeData(sector, fatfsSectorCache->sectorSize(), buff))
+                return RES_ERROR;
+
+            count--;
+            sector++;
+            buff += fatfsSectorCache->sectorSize();
+        }
+        return RES_OK;
+    }
+    return RES_PARERR;
+}
+DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
+    if (fatfsSectorCache && (pdrv == 0)) {
+        if (!fatfsSectorCache->isDiskPresent()) return RES_NOTRDY;
+        switch (cmd) {
+            case CTRL_SYNC			: // Complete pending write process (needed at FF_FS_READONLY == 0) 
+                if (!fatfsSectorCache->flushWriteCache()) return RES_ERROR;
+                return RES_OK;
+
+            case GET_SECTOR_COUNT	: // Get media size (needed at FF_USE_MKFS == 1) 
+                *((DWORD*)buff) = fatfsSectorCache->numSectorsPerTrack();
+                return RES_OK;
+
+            case GET_SECTOR_SIZE	: // Get sector size (needed at FF_MAX_SS != FF_MIN_SS) 
+                *((DWORD*)buff) = fatfsSectorCache->sectorSize();
+                return RES_OK;
+
+            case GET_BLOCK_SIZE		: // Get erase block size (needed at FF_USE_MKFS == 1) 
+                *((DWORD*)buff) = 1;  /// I think
+                return RES_OK;
+        }
+    }
+    return RES_PARERR;
+}
+DWORD get_fattime(void) {    
+    tm stm;
+    time_t t = time(0);
+    localtime_s(&stm, & t);
+    return (DWORD)(stm.tm_year - 80) << 25 | (DWORD)(stm.tm_mon + 1) << 21 | (DWORD)stm.tm_mday << 16 | (DWORD)stm.tm_hour << 11 | (DWORD)stm.tm_min << 5 | (DWORD)stm.tm_sec >> 1;
+}
+#pragma endregion
 
 VolumeManager::VolumeManager(HINSTANCE hInstance, const std::wstring& mainExe, WCHAR firstDriveLetter, bool forceReadOnly) :
     m_window(hInstance, L"Booting"), m_mainExeFilename(mainExe), m_firstDriveLetter(firstDriveLetter), 
@@ -135,41 +214,53 @@ VolumeManager::VolumeManager(HINSTANCE hInstance, const std::wstring& mainExe, W
     native.adfNativeWriteSector = adfNativeWriteSector;
     native.adfIsDevNative = adfIsDevNative;
     adfSetNative(&native);
+
+    // Prepare FatFS
+    fatfsSectorCache = nullptr;
 }
 
 VolumeManager::~VolumeManager()  {
     DokanShutdown();
-    if (m_adfDevice) adfUnMountDev(m_adfDevice);
+    diskChanged(false, SectorType::stUnknown);
+    for (MountedVolume* volume : m_volumes) delete volume;
+    m_volumes.clear();
     adfEnvCleanUp();
 }
 
 // start mounting IBM volumes using m_volume[startPoint]
 uint32_t VolumeManager::mountIBMVolumes(uint32_t startPoint) {
-    // TODO
-    return 0;
-}
+    if (!m_fatDevice) return startPoint;
+    
+    WCHAR letter = m_firstDriveLetter + startPoint;
 
+    if (startPoint <= m_volumes.size()) {
+        // new volume required
+        m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
+    }
+    if (m_volumes[startPoint]->mountFileSystem(m_fatDevice, 0)) startPoint++;
+
+    return startPoint;
+}
 
 // Mount the new amiga volumes
 uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
-    if (!m_adfDevice) return 0;
+    if (!m_adfDevice) return startPoint;
 
-    WCHAR letter = m_firstDriveLetter;
-    uint32_t fileSystems = 0;
+    WCHAR letter = m_firstDriveLetter + startPoint;
     
     // Attempt to mount all drives
     for (int volumeNumber = 0; volumeNumber < m_adfDevice->nVol; volumeNumber++) {
-        if (startPoint + m_volumes.size() <= volumeNumber) {
+        if (volumeNumber + startPoint <= m_volumes.size()) {
             // new volume required
             m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
         }
-
-        if (m_volumes[startPoint + volumeNumber]->mountFileSystem(m_adfDevice, volumeNumber)) {
-            if (letter != L'?') letter++;
-            fileSystems++;
+        if (m_volumes[volumeNumber + startPoint]->mountFileSystem(m_adfDevice, volumeNumber)) startPoint++;
+        if (letter != L'?') {
+            letter++;
+            if (letter > 'Z') letter = 'A';
         }
     }
-    return fileSystems;
+    return startPoint;
 }
 
 // Start any volumes that aren't running
@@ -185,10 +276,19 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
         for (MountedVolume* volume : m_volumes)
             volume->unmountFileSystem();
 
-        if (m_adfDevice) adfUnMountDev(m_adfDevice);
-        m_adfDevice = nullptr;
+        if (m_adfDevice) {
+            adfUnMountDev(m_adfDevice);
+            m_adfDevice = nullptr;
+        }
+
+        if (m_fatDevice) {
+            f_unmount(L"");
+            free(m_fatDevice);
+            m_fatDevice = nullptr;
+        }
     }
     else {
+        
         // Create device based on what system was detected
         switch (diskFormat) {
             case SectorType::stAmiga:
@@ -197,22 +297,42 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
                 break;
             case SectorType::stHybrid:
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
-                if (!m_adfDevice) diskFormat = SectorType::stUnknown;                 
+                m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
+                if (m_fatDevice) {
+                    memset(m_fatDevice, 0, sizeof(FATFS));
+                    if (f_mount(m_fatDevice, L"", 1) != FR_OK) {
+                        free(m_fatDevice);
+                        m_fatDevice = nullptr;
+                    }
+                }
+                if (m_adfDevice && !m_fatDevice) diskFormat = SectorType::stAmiga; else
+                    if (!m_adfDevice && m_fatDevice) diskFormat = SectorType::stIBM; else
+                        if (!m_adfDevice && !m_fatDevice) diskFormat = SectorType::stIBM;
+                break;
+            case SectorType::stAtari:
+            case SectorType::stIBM:
+                m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
+                if (m_fatDevice) {
+                    memset(m_fatDevice, 0, sizeof(FATFS));
+                    if (f_mount(m_fatDevice, L"", 1) != FR_OK) {
+                        free(m_fatDevice);
+                        m_fatDevice = nullptr;
+                    }
+                }
                 break;
         }
 
         // Mount all drives using the new file system
         mountIBMVolumes(mountAmigaVolumes(0));
-
-        // Start the physical drive letters
-        startVolumes();
-
-        // Update the window title based on what's left
-        std::wstring title = m_mountMode + std::to_wstring(m_io->id()) + L"_";
-
-        for (MountedVolume* volume : m_volumes) title += volume->getMountPoint().substr(0, 1);
-        m_window.setWindowTitle(title);
+        
     }
+    // Start the physical drive letters
+    startVolumes();
+
+    // Update the window title based on what's left
+    std::wstring title = m_mountMode + std::to_wstring(m_io->id()) + L"_";
+    for (MountedVolume* volume : m_volumes) title += volume->getMountPoint().substr(0, 1);
+    m_window.setWindowTitle(title);
 }
 
 // triggers the re-mounting of a disk
@@ -250,6 +370,7 @@ bool VolumeManager::mountFile(const std::wstring& filename) {
             CloseHandle(fle);
             return false;
         }        
+        fatfsSectorCache = m_io;
         return true;
     }
     else {
@@ -259,6 +380,7 @@ bool VolumeManager::mountFile(const std::wstring& filename) {
             CloseHandle(fle);
             return false;
         }
+        fatfsSectorCache = m_io;
         return true;
     }
 
@@ -281,6 +403,7 @@ bool VolumeManager::mountDrive(const std::wstring& floppyProfile) {
     }
 
     m_io = b;
+    fatfsSectorCache = m_io;
     m_mountMode = COMMANDLINE_MOUNTDRIVE;
     return true;
 }
@@ -442,6 +565,10 @@ bool VolumeManager::run() {
         return 0;
     });
 
+    // Not quite Highlander, as there There must always be one (at least one!)
+    m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, m_firstDriveLetter, m_forceReadOnly));
+    startVolumes();
+
     // Start a timer to monitor things
     SetTimer(m_window.hwnd(), TIMERID_MONITOR_FILESYS, 200, NULL);
 
@@ -451,16 +578,17 @@ bool VolumeManager::run() {
     MSG msg;
     BOOL bRet;
     while ((bRet = GetMessage(&msg, NULL, 0, 0)) != 0) {
-        if (bRet == -1) {
-            KillTimer(m_window.hwnd(), TIMERID_MONITOR_FILESYS);
-            for (MountedVolume* volume : m_volumes) volume->stop();
-            break;
-        }
-        else {
+        if (bRet == -1) break; else {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
     }
 
+    // Stop everything
+    m_io->flushWriteCache();
+    KillTimer(m_window.hwnd(), TIMERID_MONITOR_FILESYS);
+    for (MountedVolume* volume : m_volumes) volume->stop();
+
+    // end
     return true;
 }

@@ -5,7 +5,6 @@
 #include "sectorCache.h"
 #include "resource.h"
 #include "adflib/src/adflib.h"
-#include "adf.h"
 #include "MountedVolume.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \

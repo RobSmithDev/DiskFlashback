@@ -19,7 +19,7 @@
 
 class SectorRW_FloppyBridge : public SectorCacheEngine {
 private:
-    SectorType m_diskType           = SectorType::stAmiga;
+    SectorType m_diskType           = SectorType::stUnknown;
     FloppyBridgeAPI* m_bridge       = nullptr;
     ULONGLONG m_motorTurnOnTime     = 0;
     void* m_mfmBuffer               = nullptr;

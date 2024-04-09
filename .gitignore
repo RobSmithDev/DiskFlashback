@@ -1,0 +1,6 @@
+/Win32
+/x64
+*.adf
+/adflib/regtests/
+*.lnk
+fatfs/documents/

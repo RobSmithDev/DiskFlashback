@@ -135,7 +135,7 @@ void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber,
 	if (headerChecksum != headerChecksumCalculated) sector.numErrors+= 10;
 
 	// Check if the header contains valid fields
-	if (header.trackFormat != 0xFF) sector.numErrors+= 10;
+	if (header.trackFormat != 0xFF) return;  // this also blocks IBM sectors from being detected incorrectly
 	// Can't use this sector anyway
 	if (header.sectorNumber > (expectedNumSectors - 1)) return;
 	if (header.trackNumber > 166) 

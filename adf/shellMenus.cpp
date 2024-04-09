@@ -79,8 +79,6 @@ void ShellRegistery::setupDMSMenu(bool add, WCHAR driveLetter) {
 		RegSetKeyValue(HKEY_CURRENT_USER, clsRoot.c_str(), L"Icon", REG_SZ, iconNumber.c_str(), iconNumber.length() * 2);
 		clsRoot += L"\\command";
 		RegSetValue(HKEY_CURRENT_USER, clsRoot.c_str(), REG_SZ, cmd.c_str(), cmd.length() * 2);
-
-		//"Icon" = "C:\\Program Files\\ConsoleZ\\Console.exe"
 	}
 	else {
 		std::wstring clsRoot2 = clsRoot + L"\\Copy to Disk...";
@@ -90,40 +88,47 @@ void ShellRegistery::setupDMSMenu(bool add, WCHAR driveLetter) {
 	}
 }
 
-void ShellRegistery::mountDiscount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource) {
+void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter) {
 	WCHAR path[128];
 	swprintf_s(path, L"Software\\Classes\\Applications\\Explorer.exe\\Drives\\%c\\DefaultIcon", driveLetter);
 
-	// Clear anything previously there
+	mountDismount(false, driveLetter, nullptr);
+
+	if (enable) {
+		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, m_mainEXE.c_str(), (DWORD)(m_mainEXE.length() * 2));
+	}
+	else {
+		RegDeleteKeyValue(HKEY_CURRENT_USER, path, NULL);
+		RegDeleteKey(HKEY_CURRENT_USER, path);
+		path[wcslen(path) - 12] = L'\0';
+		RegDeleteKey(HKEY_CURRENT_USER, path);
+	}
+}
+
+
+void ShellRegistery::mountDismount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource) {
+	const bool physicalDisk = sectorSource ? sectorSource->isPhysicalDisk() : false;
+	const bool copyToADF = sectorSource ? sectorSource->allowCopyToFile() : false;
+	setupADFMenu(physicalDisk, driveLetter);
+	setupDMSMenu(physicalDisk, driveLetter);
+
 	removeRegisteryAction(driveLetter, L"ADFMounterSystemBB");
 	removeRegisteryAction(driveLetter, L"ADFMounterSystemFormat");
 	removeRegisteryAction(driveLetter, L"ADFMounterSystemEject");
 	removeRegisteryAction(driveLetter, L"ADFMounterSystemCopy");
 
-	RegDeleteKeyValue(HKEY_CURRENT_USER, path, NULL);
-	RegDeleteKey(HKEY_CURRENT_USER, path);
-	path[wcslen(path) - 12] = L'\0';
-	RegDeleteKey(HKEY_CURRENT_USER, path);
-
-	const bool physicalDisk = sectorSource->isPhysicalDisk();
-	const bool copyToADF = sectorSource->allowCopyToFile(); 
-	if (physicalDisk) {
-		setupADFMenu(false, driveLetter);
-		setupDMSMenu(false, driveLetter);
-	}
-
-	swprintf_s(path, L"Software\\Classes\\Applications\\Explorer.exe\\Drives\\%c\\DefaultIcon", driveLetter);
-
-	if (mounted) {
-		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, m_mainEXE.c_str(), (DWORD)(m_mainEXE.length() * 2));
-		if (physicalDisk && (!sectorSource->isDiskWriteProtected()))
+	if (mounted) {		
+		if (physicalDisk)
 			applyRegistryAction(driveLetter, L"ADFMounterSystemFormat", L"Form&at...", 0, L"FORMAT");
 
 		if (copyToADF) {
-			applyRegistryAction(driveLetter, L"ADFMounterSystemCopy", L"&Copy to ADF...", 0, L"BACKUP");
-			setupADFMenu(true, driveLetter);
-			setupDMSMenu(true, driveLetter);
+			switch (sectorSource->getSystemType()) {
+			case SectorType::stAmiga: applyRegistryAction(driveLetter, L"ADFMounterSystemCopy", L"&Copy to .ADF...", 0, L"BACKUP"); break;
+			case SectorType::stIBM: applyRegistryAction(driveLetter, L"ADFMounterSystemCopy", L"&Copy to .IMG...", 0, L"BACKUP"); break;
+			case SectorType::stAtari: applyRegistryAction(driveLetter, L"ADFMounterSystemCopy", L"&Copy to .ST...", 0, L"BACKUP"); break;
+			}
 		}
+
 		if ((sectorSource->getSystemType() == SectorType::stAmiga) && (!sectorSource->isDiskWriteProtected())) {
 			applyRegistryAction(driveLetter, L"ADFMounterSystemBB", L"&Install Bootblock...", 0, L"BB");
 		}

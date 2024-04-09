@@ -126,6 +126,11 @@ void DokanFileSystemAmigaFS::windowsFilenameToAmigaFilename(const std::wstring& 
     }
 }
 
+void DokanFileSystemAmigaFS::setCurrentVolume(AdfVolume* volume) { 
+    m_inUse.clear();
+    m_volume = volume; 
+}
+
 // Convert Amiga file attributes to Windows file attributes - only a few actually match
 DWORD DokanFileSystemAmigaFS::amigaToWindowsAttributes(const int32_t access, int32_t type, bool disableCustomIcons) {
     DWORD result = 0;

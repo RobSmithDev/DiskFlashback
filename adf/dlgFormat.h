@@ -1,6 +1,5 @@
 #pragma once
 
-#include "adf.h"
 #include "adf_operations.h"
 #include <thread>
 

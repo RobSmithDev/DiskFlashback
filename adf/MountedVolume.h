@@ -2,6 +2,8 @@
 
 #include "dokaninterface.h"
 #include "adf_operations.h"
+#include "fat_operations.h"
+#include "fatfs/source/ff.h"
 
 class ShellRegistery;
 class VolumeManager;
@@ -17,14 +19,18 @@ private:
     AdfVolume* m_ADFvolume = nullptr;
     uint32_t m_partitionIndex = 0;
     DokanFileSystemAmigaFS* m_amigaFS = nullptr;
+    DokanFileSystemFATFS* m_IBMFS = nullptr;
     bool m_tempUnmount = false;
     ShellRegistery* m_registry;
+    FATFS* m_FatFS = nullptr;
 public:
 	MountedVolume(VolumeManager* manager, const std::wstring& mainEXE, SectorCacheEngine* io, const WCHAR driveLetter, const bool forceWriteProtect);
     virtual ~MountedVolume();
 
     // mount AMIGA file system
 	bool mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex);
+    // Mount a Fat12 device
+    bool mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex);
 
     // Unmount *any* file system 
 	void unmountFileSystem();

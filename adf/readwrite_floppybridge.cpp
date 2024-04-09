@@ -40,7 +40,9 @@ bool SectorRW_FloppyBridge::restoreDrive() {
 
     // Its much faster, but of no use to *UAE!
     m_bridge->setDirectMode(true);
-
+    m_diskInDrive = false;
+    m_bridge->handleNoClickStep(false);
+/*
     // DUMP disk as MFM stream
 #define SIZ (0x3A00 * 2)
     char* b =(char*) malloc(SIZ);
@@ -59,7 +61,7 @@ bool SectorRW_FloppyBridge::restoreDrive() {
             CloseHandle(fle);
         }
     }
-
+    */
 
     m_lockedOut = false;
     return true;
@@ -122,7 +124,6 @@ SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile, std::fu
     // Force m_sectorsPerTrack to be populated
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
     motorInUse(false);
-    getDiskDataSize();
     CreateTimerQueueTimer(&m_timer, m_timerQueue, MotorMonitor, this, 500, 200, WT_EXECUTEDEFAULT | WT_EXECUTELONGFUNCTION);
 }
 
@@ -149,13 +150,13 @@ void SectorRW_FloppyBridge::setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo) {
 // Return TRUE if theres a disk in the drive
 bool SectorRW_FloppyBridge::isDiskPresent() {
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
-    return m_bridge->isDiskInDrive();
+    return m_diskInDrive;
 }
 
 // Return TRUE if the disk is write protected
 bool SectorRW_FloppyBridge::isDiskWriteProtected() {
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
-    return m_bridge->isWriteProtected();
+    return (m_diskType == SectorType::stHybrid) || m_bridge->isWriteProtected();
 }
 
 // Show disk removed warning - returns TRUE if disk was re-inserted
@@ -204,21 +205,20 @@ void SectorRW_FloppyBridge::motorMonitor() {
         }
 
         // Force writing etc
-        if (m_bridge)
-            if (m_bridge->isDiskInDrive() != m_diskInDrive) {
-                m_diskInDrive = !m_diskInDrive;
-                if (!m_diskInDrive) {
+        if (m_bridge) {
+            const bool isDiskNowInDrive = m_bridge->isDiskInDrive();
+            if (isDiskNowInDrive != m_diskInDrive) {
+                if (!isDiskNowInDrive) {
                     m_bridge->gotoCylinder(0, false);
                     m_bridge->setMotorStatus(false, false);
 
                     if (m_tracksToFlush.size()) {
                         if (diskRemovedWarning()) {
                             // Trigger re-writing
-                            m_motorTurnOnTime = GetTickCount64() - (MOTOR_IDLE_TIMEOUT+1);
-                            m_diskInDrive = m_bridge->isDiskInDrive();
+                            m_motorTurnOnTime = GetTickCount64() - (MOTOR_IDLE_TIMEOUT + 1);
                             return;
                         }
-                        else m_tracksToFlush.clear();                        
+                        else m_tracksToFlush.clear();
                     }
 
                     // cache really needs to be cleared!
@@ -227,8 +227,10 @@ void SectorRW_FloppyBridge::motorMonitor() {
                             m_trackCache[trk].sectors.clear();
                     }
                 }
+                m_diskInDrive = isDiskNowInDrive;
                 sendNotify = true;
             }
+        }
     }
 
     if (sendNotify) {
@@ -412,6 +414,7 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
         uint32_t serialNumber;
         uint32_t sectorsPerTrack;
         uint32_t bytesPerSector;
+
         if (trAmiga.sectors.size()) {
             m_diskType = SectorType::stAmiga;
             m_sectorsPerTrack = max(m_sectorsPerTrack, (uint32_t)trAmiga.sectors.size());
@@ -422,7 +425,10 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
         if (trIBM.sectors.size() >= 5) {
             m_diskType = SectorType::stIBM;
             if (getTrackDetails_IBM(&trIBM, serialNumber, sectorsPerTrack, bytesPerSector)) {
-                if ((trIBM.sectors.size() >= 5) && (trAmiga.sectors.size() > 1)) m_diskType = SectorType::stHybrid; else
+                if ((trIBM.sectors.size() >= 5) && (trAmiga.sectors.size() > 1)) {
+                    m_diskType = SectorType::stHybrid;
+                }
+                else
                     if (nonStandard) m_diskType = SectorType::stAtari;   
                 m_sectorsPerTrack = sectorsPerTrack;
                 m_bytesPerSector = bytesPerSector;

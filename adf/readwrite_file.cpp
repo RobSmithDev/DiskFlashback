@@ -56,7 +56,7 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
     // See what type of file it is
     size_t i = filename.rfind(L".");
     if (i != std::wstring::npos) {
-        std::wstring ext = filename.substr(1);
+        std::wstring ext = filename.substr(i+1);
         for (WCHAR& c : ext) c = towupper(c);
 
         // See what type of file it is

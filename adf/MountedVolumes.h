@@ -5,7 +5,7 @@
 #include "SignalWnd.h"
 #include "MountedVolume.h"
 #include "sectorCache.h"
-
+#include "fatfs/source/ff.h"
 
 class VolumeManager {
 private:
@@ -18,6 +18,7 @@ private:
 
 	// If we have an Amiga disk inserted
 	AdfDevice* m_adfDevice = nullptr;
+	FATFS* m_fatDevice = nullptr;
 
 	// Notification window
 	CMessageWindow m_window;

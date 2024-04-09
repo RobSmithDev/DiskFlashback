@@ -55,6 +55,7 @@ private:
     bool m_forceWriteProtect;
     bool m_driveLocked = false;
     DOKAN_HANDLE m_dokanInstance = 0;
+    DOKAN_OPTIONS dokan_options;   // stupidly these are always needed in scope!
 protected:
     void setActiveFileSystem(DokanFileSystemBase* fileSystem) { m_activeFileSystem = fileSystem; };
     bool isForcedWriteProtect() const { return m_forceWriteProtect; };

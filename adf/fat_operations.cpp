@@ -89,24 +89,10 @@ NTSTATUS makeFileOpenStatus(FRESULT status) {
         case FR_NO_PATH: return STATUS_OBJECT_PATH_NOT_FOUND;
         case FR_NO_FILE: return STATUS_OBJECT_NAME_NOT_FOUND;
         case FR_INVALID_NAME: return STATUS_OBJECT_NAME_INVALID;
-        case FR_DENIED: return STATUS_DISK_FULL;
+        case FR_DENIED: return STATUS_ACCESS_DENIED;
         case FR_EXIST: return STATUS_OBJECT_NAME_COLLISION;
         case FR_WRITE_PROTECTED: return STATUS_MEDIA_WRITE_PROTECTED;
         default: return STATUS_DATA_ERROR;
-    }
-}
-
-
-NTSTATUS makeFileUseStatus(FRESULT status) {
-    switch (status) {
-    case FR_OK: return STATUS_SUCCESS;
-    case FR_NO_PATH: return STATUS_OBJECT_PATH_NOT_FOUND;
-    case FR_NO_FILE: return STATUS_OBJECT_NAME_NOT_FOUND;
-    case FR_INVALID_NAME: return STATUS_OBJECT_NAME_INVALID;
-    case FR_DENIED: return STATUS_ACCESS_DENIED;
-    case FR_EXIST: return STATUS_OBJECT_NAME_COLLISION;
-    case FR_WRITE_PROTECTED: return STATUS_MEDIA_WRITE_PROTECTED;
-    default: return STATUS_DATA_ERROR;
     }
 }
 
@@ -139,7 +125,10 @@ NTSTATUS DokanFileSystemFATFS::fs_createfile(const std::wstring& filename, const
             if (res == FR_OK) return STATUS_OBJECT_NAME_COLLISION;
             if (isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
             ActiveFileIO io = notifyIOInUse(dokanfileinfo);
-            return makeFileOpenStatus(f_mkdir(filename.c_str()));
+            FRESULT res = f_mkdir(filename.c_str());
+            if (res == FR_DENIED) 
+                return STATUS_DISK_FULL;
+            return makeFileOpenStatus(res);
         }
         if (res != FR_OK) return STATUS_OBJECT_NAME_NOT_FOUND;
         return STATUS_SUCCESS;
@@ -194,11 +183,17 @@ NTSTATUS DokanFileSystemFATFS::fs_createfile(const std::wstring& filename, const
         }
 
         // No access requested?
-        if ((generic_desiredaccess & (GENERIC_READ | GENERIC_WRITE | GENERIC_ALL)) == 0) 
-            return (res == FR_OK) ? STATUS_SUCCESS : STATUS_OBJECT_NAME_NOT_FOUND;
+        if ((generic_desiredaccess & (GENERIC_READ | GENERIC_WRITE | GENERIC_ALL)) == 0) {
+            if ((creation_disposition == OPEN_EXISTING) && (!alreadyExists)) return STATUS_OBJECT_NAME_NOT_FOUND;
+            return STATUS_SUCCESS;
+        }
+           
 
         bool isWrite = (generic_desiredaccess & (GENERIC_WRITE | GENERIC_ALL)) != 0;
-        if (isFileInUse(filename, isWrite)) return STATUS_SHARING_VIOLATION;
+        if (isFileInUse(filename, isWrite)) 
+            return STATUS_SHARING_VIOLATION;
+
+        if ((alreadyExists) && (isWrite) && (info.fattrib & AM_RDO)) return STATUS_ACCESS_DENIED;
 
         FIL* f = (FIL*)malloc(sizeof(FIL)); if (!f) return STATUS_NO_MEMORY;
 
@@ -212,7 +207,7 @@ NTSTATUS DokanFileSystemFATFS::fs_createfile(const std::wstring& filename, const
                 free(f);
                 return STATUS_ACCESS_DENIED;
             }
-            res = f_open(f, filename.c_str(), FA_CREATE_ALWAYS | access);
+            res = f_open(f, filename.c_str(), FA_CREATE_ALWAYS | access);            
             break;
         case CREATE_NEW:
             res = f_open(f, filename.c_str(), FA_CREATE_NEW | access);
@@ -221,9 +216,13 @@ NTSTATUS DokanFileSystemFATFS::fs_createfile(const std::wstring& filename, const
             res = f_open(f, filename.c_str(), FA_OPEN_ALWAYS | access);
             break;
         case OPEN_EXISTING:
+            if (!alreadyExists) return STATUS_OBJECT_NAME_NOT_FOUND;
+            if (!access) return STATUS_SUCCESS;
             res = f_open(f, filename.c_str(), FA_OPEN_EXISTING | access);
             break;
         case TRUNCATE_EXISTING:
+            if (!alreadyExists) return STATUS_OBJECT_NAME_NOT_FOUND;
+            if (!access) return STATUS_SUCCESS;
             res = f_open(f, filename.c_str(), FA_OPEN_EXISTING | access);
             if (res == FR_OK) f_truncate(f);
             break;
@@ -232,12 +231,16 @@ NTSTATUS DokanFileSystemFATFS::fs_createfile(const std::wstring& filename, const
             return STATUS_ACCESS_DENIED;
         }
 
-        if (res == FR_OK) {
+        // Special handling of errors
+        switch (res) {
+        case FR_DENIED:
+            free(f);
+            return STATUS_DISK_FULL;
+        case FR_OK:
             dokanfileinfo->Context = (ULONG64)f;
             addTrackFileInUse(filename, isWrite);
             return STATUS_SUCCESS;
-        }
-        else {
+        default:
             free(f);
             return makeFileOpenStatus(res);
         }
@@ -259,6 +262,7 @@ void DokanFileSystemFATFS::fs_cleanup(const std::wstring& filename, PDOKAN_FILE_
         dokanfileinfo->Context = 0;
     }
     if (dokanfileinfo->DeleteOnClose) {
+        if (isFileInUse(filename, true)) return;
         // Delete happens during cleanup and not in close event.
         ActiveFileIO io = notifyIOInUse(dokanfileinfo);
         f_unlink(filename.c_str());
@@ -274,11 +278,11 @@ NTSTATUS DokanFileSystemFATFS::fs_readfile(const std::wstring& filename, void* b
 
         if (f_tell(fle) != offset) {
             FRESULT res = f_lseek(fle, offset);
-            if (res != FR_OK) return makeFileUseStatus(res);
+            if (res != FR_OK) return makeFileOpenStatus(res);
         }
         UINT actuallyRead;
         FRESULT res = f_read(fle, buffer, bufferlength, &actuallyRead);
-        if (res != FR_OK) return makeFileUseStatus(res);
+        if (res != FR_OK) return makeFileOpenStatus(res);
         actualReadLength = actuallyRead;
     }
     else {
@@ -290,6 +294,7 @@ NTSTATUS DokanFileSystemFATFS::fs_readfile(const std::wstring& filename, void* b
 NTSTATUS DokanFileSystemFATFS::fs_writefile(const std::wstring& filename, const void* buffer, const uint32_t bufferLength, uint32_t& actualWriteLength, const int64_t offset, PDOKAN_FILE_INFO dokanfileinfo) {
     if (dokanfileinfo->Context) {
         FIL* fle = (FIL*)dokanfileinfo->Context;
+        if (!(fle->flag & FA_WRITE)) return STATUS_ACCESS_DENIED;
 
         ActiveFileIO io = notifyIOInUse(dokanfileinfo);
         uint64_t actualOffset;
@@ -298,7 +303,7 @@ NTSTATUS DokanFileSystemFATFS::fs_writefile(const std::wstring& filename, const 
         if (offset == -1) {
             FRESULT res = f_lseek(fle, offset);
             actualOffset = f_size(fle);
-            if (res != FR_OK) return makeFileUseStatus(res);
+            if (res != FR_OK) return makeFileOpenStatus(res);
         }
         else actualOffset = (uint64_t)offset;
 
@@ -325,15 +330,16 @@ NTSTATUS DokanFileSystemFATFS::fs_writefile(const std::wstring& filename, const 
 
         if (f_tell(fle) != offset) {
             FRESULT res = f_lseek(fle, offset);
-            if (res != FR_OK) return makeFileUseStatus(res);
+            if (res != FR_OK) return makeFileOpenStatus(res);
         }
 
         UINT written;
         FRESULT res = f_write(fle, buffer, number_of_bytes_to_write, &written);
-        if (res != FR_OK) return makeFileUseStatus(res);
+        if (res != FR_OK) return makeFileOpenStatus(res);
         actualWriteLength = written;
 
-        if (written < number_of_bytes_to_write) return STATUS_DISK_FULL;
+        if (written < number_of_bytes_to_write) 
+            return STATUS_DISK_FULL;
 
         return STATUS_SUCCESS;
     }
@@ -348,7 +354,7 @@ NTSTATUS DokanFileSystemFATFS::fs_flushfilebuffers(const std::wstring& filename,
     if (dokanfileinfo->Context) {
         FIL* fle = (FIL*)dokanfileinfo->Context;
         ActiveFileIO io = notifyIOInUse(dokanfileinfo);
-        return makeFileUseStatus(f_sync(fle));
+        return makeFileOpenStatus(f_sync(fle));
     }
     else return STATUS_OBJECT_NAME_NOT_FOUND;
 
@@ -360,8 +366,11 @@ NTSTATUS DokanFileSystemFATFS::fs_setendoffile(const std::wstring& filename, con
    
     if (dokanfileinfo->Context) {
         FIL* fle = (FIL*)dokanfileinfo->Context;
-        FRESULT res = f_lseek(fle, ByteOffset); if (res != FR_OK) return makeFileUseStatus(res);
-        return makeFileUseStatus(f_truncate(fle));
+        if (!(fle->flag & FA_WRITE)) return STATUS_ACCESS_DENIED;
+
+        FRESULT res = f_lseek(fle, ByteOffset); 
+        if (res != FR_OK) return makeFileOpenStatus(res);
+        return makeFileOpenStatus(f_truncate(fle));
     } else return STATUS_OBJECT_NAME_NOT_FOUND;
 }
 
@@ -370,16 +379,26 @@ NTSTATUS DokanFileSystemFATFS::fs_setallocationsize(const std::wstring& filename
     
     if (dokanfileinfo->Context) {
         FIL* fle = (FIL*)dokanfileinfo->Context;
+        if (!(fle->flag & FA_WRITE)) return STATUS_ACCESS_DENIED;
+
         ActiveFileIO io = notifyIOInUse(dokanfileinfo);
 
         FSIZE_t siz = f_size(fle);
 
         if (alloc_size < siz) {
-            FRESULT res = f_lseek(fle, alloc_size); if (res != FR_OK) return makeFileUseStatus(res);
-            return makeFileUseStatus(f_truncate(fle));
+            FRESULT res = f_lseek(fle, alloc_size); if (res != FR_OK) return makeFileOpenStatus(res);
+            return makeFileOpenStatus(f_truncate(fle));
         }
         else {
-            return makeFileUseStatus(f_expand(fle, alloc_size, 1));
+            f_lseek(fle, 0);
+            f_truncate(fle);
+            if (alloc_size) {
+                FRESULT res = f_expand(fle, alloc_size, 1);
+                if (res == FR_DENIED)
+                    return STATUS_DISK_FULL;
+                return makeFileOpenStatus(res);
+            }
+            return STATUS_SUCCESS;
         }
     }
     else return STATUS_OBJECT_NAME_NOT_FOUND;
@@ -480,7 +499,7 @@ NTSTATUS DokanFileSystemFATFS::fs_setfileattributes(const std::wstring& filename
     if (fileattributes& FILE_ATTRIBUTE_SYSTEM     ) newAttr |= AM_SYS;
     if (fileattributes& FILE_ATTRIBUTE_ARCHIVE    ) newAttr |= AM_ARC;
 
-    return makeFileUseStatus(f_chmod(filename.c_str(), newAttr, AM_RDO | AM_HID | AM_SYS | AM_ARC));
+    return makeFileOpenStatus(f_chmod(filename.c_str(), newAttr, AM_RDO | AM_HID | AM_SYS | AM_ARC));
 }
 
 NTSTATUS DokanFileSystemFATFS::fs_setfiletime(const std::wstring& filename, CONST FILETIME* creationtime, CONST FILETIME* lastaccesstime, CONST FILETIME* lastwritetime, PDOKAN_FILE_INFO dokanfileinfo) {
@@ -492,97 +511,45 @@ NTSTATUS DokanFileSystemFATFS::fs_setfiletime(const std::wstring& filename, CONS
     inf.fdate = ((sys.wYear - 1980) << 9) | (sys.wMonth << 5) | (sys.wDay);
     inf.ftime = (sys.wHour << 11) | (sys.wMinute << 5) | (sys.wSecond >> 1);
 
-    return makeFileUseStatus(f_utime(filename.c_str(), &inf));
+    return makeFileOpenStatus(f_utime(filename.c_str(), &inf));
 }
 
 NTSTATUS DokanFileSystemFATFS::fs_deletefile(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) {   
-    /*
-    std::string amigaName;
-    int32_t search = locatePath(filename, dokanfileinfo, amigaName);
-    if (search == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
-    if (search != ST_FILE) return STATUS_ACCESS_DENIED;
-
-    if (isFileInUse(amigaName.c_str(), AdfFileMode::ADF_FILE_MODE_WRITE))
+    if (isFileInUse(filename, true)) 
         return STATUS_SHARING_VIOLATION;
 
-    struct bEntryBlock parent;
-    if (adfReadEntryBlock(m_volume, m_volume->curDirPtr, &parent) == RC_OK) {
-        if ((parent.secType == ST_FILE) && (hasW(parent.access)))
-            return STATUS_CANNOT_DELETE;
-    }
+    FILINFO info;
+    FRESULT res = f_stat(filename.c_str(), &info);
+    if (res != FR_OK) return makeFileOpenStatus(res);
+    // Cant delete a read only file
+    if (info.fattrib & AM_RDO) return STATUS_ACCESS_DENIED;
 
-    adfParentDir(m_volume);
-
-    if (adfRemoveEntry(m_volume, m_volume->curDirPtr, amigaName.c_str()) == RC_OK) return STATUS_SUCCESS;
-    */
-    return STATUS_DATA_ERROR;
+    return makeFileOpenStatus(f_unlink(filename.c_str()));
 }
 
 NTSTATUS DokanFileSystemFATFS::fs_deletedirectory(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) {
-    /*
-    std::string amigaName;
-    int32_t search = locatePath(filename, dokanfileinfo, amigaName);
-    if (search == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
-    if (search != ST_DIR) 
-        return STATUS_ACCESS_DENIED;
+    if (isFileInUse(filename, true)) 
+        return STATUS_SHARING_VIOLATION;
 
-    struct bDirBlock dirBlock;
-    if (adfReadEntryBlock(m_volume, m_volume->curDirPtr, (struct bEntryBlock*)&dirBlock) != RC_OK) return STATUS_DATA_ERROR;
+    FILINFO info;
+    FRESULT res = f_stat(filename.c_str(), &info);
+    if (res != FR_OK) return makeFileOpenStatus(res);
+    // Cant delete a read only file
+    if (info.fattrib & AM_RDO) return STATUS_ACCESS_DENIED;
+    if (info.fattrib & AM_DIR) return STATUS_NOT_A_DIRECTORY;
 
-    if (!isDirEmpty(&dirBlock)) return STATUS_DIRECTORY_NOT_EMPTY;
+    res = f_unlink(filename.c_str());
+    if (res == FR_DENIED) return STATUS_DIRECTORY_NOT_EMPTY;
 
-    adfParentDir(m_volume);
-
-    if (adfRemoveEntry(m_volume, m_volume->curDirPtr, amigaName.c_str()) == RC_OK) return STATUS_SUCCESS;
-    */
-    return STATUS_DATA_ERROR;
+    return makeFileOpenStatus(res);
 }
 
 NTSTATUS DokanFileSystemFATFS::fs_movefile(const std::wstring& filename, const std::wstring& new_filename, const bool replaceExisting, PDOKAN_FILE_INFO dokanfileinfo) {
-    /*
-    std::string amigaName;
-    int32_t srcFileFolder = locatePath(filename, dokanfileinfo, amigaName);
-    if (srcFileFolder == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
+    if (isFileInUse(filename, true)) 
+        return STATUS_SHARING_VIOLATION;
 
-    adfParentDir(m_volume);
-    SECTNUM srcSector = m_volume->curDirPtr;
-    SECTNUM dstSector = srcSector;
-
-    std::wstring newName = new_filename;
-    if (newName.length() && (newName[0] == '\\')) newName.erase(newName.begin());
-
-    std::string amigaTargetName;
-
-    std::string targetNameOutput;
-    int32_t target = locatePath(new_filename, dokanfileinfo, targetNameOutput);
-    if ((!replaceExisting) && (target != 0)) return STATUS_OBJECT_NAME_EXISTS;
-    SECTNUM targetNameSec = m_volume->curDirPtr;
-
-    size_t i = newName.rfind('\\');
-    if (i != std::wstring::npos) {
-        // Locate target path
-        int32_t dstFileFolder = locatePath(newName.substr(0, i), dokanfileinfo);
-        dstSector = m_volume->curDirPtr;
-        if (dstFileFolder == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
-       
-        windowsFilenameToAmigaFilename(newName.substr(i+1), amigaTargetName);       
-    }
-    else {
-        dstSector = m_volume->rootBlock;
-        windowsFilenameToAmigaFilename(newName, amigaTargetName);
-    }
-
-    // Try to remove the target first
-    if (target != 0) {
-        if (adfRemoveEntry(m_volume, targetNameSec, targetNameOutput.c_str()) != RC_OK)
-            return STATUS_ACCESS_DENIED;
-    }
-
-    if (amigaTargetName.length() > MAXNAMELEN) return STATUS_OBJECT_NAME_INVALID;
-
-    if (adfRenameEntry(m_volume, srcSector, amigaName.c_str(), dstSector, amigaTargetName.c_str()) == RC_OK) return STATUS_SUCCESS;
-    */
-    return STATUS_ACCESS_DENIED;
+    if (replaceExisting) f_unlink(new_filename.c_str());
+    return makeFileOpenStatus(f_rename(filename.c_str(), new_filename.c_str()));
 }
 
 NTSTATUS DokanFileSystemFATFS::fs_getdiskfreespace(uint64_t& freeBytesAvailable, uint64_t& totalNumBytes, uint64_t& totalNumFreeBytes, PDOKAN_FILE_INFO dokanfileinfo) {   

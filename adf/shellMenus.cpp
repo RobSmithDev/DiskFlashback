@@ -88,14 +88,15 @@ void ShellRegistery::setupDMSMenu(bool add, WCHAR driveLetter) {
 	}
 }
 
-void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter) {
+void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t iconIndex) {
 	WCHAR path[128];
 	swprintf_s(path, L"Software\\Classes\\Applications\\Explorer.exe\\Drives\\%c\\DefaultIcon", driveLetter);
 
 	mountDismount(false, driveLetter, nullptr);
 
 	if (enable) {
-		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, m_mainEXE.c_str(), (DWORD)(m_mainEXE.length() * 2));
+		std::wstring tmp = m_mainEXE + L"," + std::to_wstring(iconIndex);
+		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, tmp.c_str(), (DWORD)(tmp.length() * 2));
 	}
 	else {
 		RegDeleteKeyValue(HKEY_CURRENT_USER, path, NULL);

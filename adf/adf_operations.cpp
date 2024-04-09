@@ -2,7 +2,7 @@
 #include "adflib/src/adflib.h"
 
 DokanFileSystemAmigaFS::DokanFileSystemAmigaFS(DokanFileSystemManager* owner) : DokanFileSystemBase(owner) {
-    m_desktopIniFileResource = L"\xFEFF[.ShellClassInfo]\r\nIconResource=" + owner->getMainEXEName() + L",2\r\n";
+    m_desktopIniFileResource = L"\xFEFF[.ShellClassInfo]\r\nIconResource=" + owner->getMainEXEName() + L",3\r\n";
 }
 DokanFileSystemAmigaFS::ActiveFileIO::ActiveFileIO(DokanFileSystemAmigaFS* owner) : m_owner(owner) {};
 // Add Move constructor
@@ -309,20 +309,22 @@ NTSTATUS DokanFileSystemAmigaFS::fs_createfile(const std::wstring& filename, con
         if (amigaName.length() > MAXNAMELEN) return STATUS_OBJECT_NAME_INVALID;
 
         // Some small patches to the access rights that you can't control from windows, but only if needed
-        if ((rc == RC_OK) && (parent.secType == ST_FILE)) {
-            int32_t oldAccess = parent.access;
-            if ((file_attributes_and_flags & FILE_FLAG_DELETE_ON_CLOSE) || (access)) oldAccess &= ~(ACCMASK_R | ACCMASK_D);
-            if (oldAccess != parent.access) 
-                if (!isWriteProtected())
-                    adfSetEntryAccess(m_volume, m_volume->curDirPtr, amigaName.c_str(), oldAccess);
-        }
+       // if ((rc == RC_OK) && (parent.secType == ST_FILE)) {
+       //     int32_t oldAccess = parent.access;
+       //     if ((file_attributes_and_flags & FILE_FLAG_DELETE_ON_CLOSE) || (access)) oldAccess &= ~(ACCMASK_R | ACCMASK_D);
+       //     if (oldAccess != parent.access) 
+       //         if (!isWriteProtected())
+       //             adfSetEntryAccess(m_volume, m_volume->curDirPtr, amigaName.c_str(), oldAccess);
+       // }
 
         // Open fail?
         if (access == 0) {
-            if (search != ST_FILE) return STATUS_OBJECT_NAME_NOT_FOUND;
+            if (creation_disposition == OPEN_EXISTING) {
+                if (search != ST_FILE) return STATUS_OBJECT_NAME_NOT_FOUND;
+            }
             return STATUS_SUCCESS;
         }
-
+      
         AdfFile* fle = nullptr;
 
         if (isFileInUse(amigaName.c_str(), (AdfFileMode)access)) return STATUS_SHARING_VIOLATION;
@@ -789,9 +791,16 @@ NTSTATUS DokanFileSystemAmigaFS::fs_deletedirectory(const std::wstring& filename
 }
 
 NTSTATUS DokanFileSystemAmigaFS::fs_movefile(const std::wstring& filename, const std::wstring& new_filename, const bool replaceExisting, PDOKAN_FILE_INFO dokanfileinfo) {
+        
     std::string amigaName;
     int32_t srcFileFolder = locatePath(filename, dokanfileinfo, amigaName);
     if (srcFileFolder == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
+
+    int32_t search = locatePath(filename, dokanfileinfo, amigaName);
+    if (srcFileFolder == ST_FILE) {
+        if (isFileInUse(amigaName.c_str(), AdfFileMode::ADF_FILE_MODE_WRITE))
+            return STATUS_SHARING_VIOLATION;
+    }
 
     adfParentDir(m_volume);
     SECTNUM srcSector = m_volume->curDirPtr;

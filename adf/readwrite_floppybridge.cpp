@@ -403,7 +403,7 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
     if (m_diskType == SectorType::stUnknown) {
         // Some defaults
         m_serialNumber = 0x554E4B4E;
-        getTrackDetails_AMIGA(isHD(), m_bytesPerSector, m_bytesPerSector);
+        getTrackDetails_AMIGA(isHD(), m_sectorsPerTrack, m_bytesPerSector);
 
 
         DecodedTrack trAmiga;
@@ -433,6 +433,11 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
                 m_sectorsPerTrack = sectorsPerTrack;
                 m_bytesPerSector = bytesPerSector;
                 m_serialNumber = serialNumber;
+            }
+            else {
+                m_sectorsPerTrack = isHD() ? 18 : 9;
+                m_bytesPerSector = 512;
+                m_serialNumber = 0xAAAAAAAA;
             }
         }
     }

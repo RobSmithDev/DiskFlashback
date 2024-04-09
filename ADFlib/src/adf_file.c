@@ -725,10 +725,10 @@ struct AdfFile * adfFileOpen ( struct AdfVolume * const vol,
         return NULL;
     }
 
-    if ( modeRead && hasR ( entry.access ) ) {
-        adfEnv.wFct ( "adfFileOpen : read access denied to '%s'", name );
-        return NULL;
-    }
+   // if ( modeRead && hasR ( entry.access ) ) {
+   //     adfEnv.wFct ( "adfFileOpen : read access denied to '%s'", name );
+   //     return NULL;
+   // }
 
     if ( fileAlreadyExists && modeWrite && hasW ( entry.access ) ) {
         adfEnv.wFct ( "adfFileOpen : write access denied to '%s'", name );

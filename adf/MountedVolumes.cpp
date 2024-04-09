@@ -233,7 +233,7 @@ uint32_t VolumeManager::mountIBMVolumes(uint32_t startPoint) {
     
     WCHAR letter = m_firstDriveLetter + startPoint;
 
-    if (startPoint <= m_volumes.size()) {
+    if (startPoint >= m_volumes.size()) {
         // new volume required
         m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
     }
@@ -250,11 +250,11 @@ uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
     
     // Attempt to mount all drives
     for (int volumeNumber = 0; volumeNumber < m_adfDevice->nVol; volumeNumber++) {
-        if (volumeNumber + startPoint <= m_volumes.size()) {
+        if (startPoint >= m_volumes.size()) {
             // new volume required
             m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
         }
-        if (m_volumes[volumeNumber + startPoint]->mountFileSystem(m_adfDevice, volumeNumber)) startPoint++;
+        if (m_volumes[ startPoint]->mountFileSystem(m_adfDevice, volumeNumber)) startPoint++;
         if (letter != L'?') {
             letter++;
             if (letter > 'Z') letter = 'A';

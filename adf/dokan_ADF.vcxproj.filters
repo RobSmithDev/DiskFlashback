@@ -75,13 +75,13 @@
       <Filter>General</Filter>
     </ClCompile>
     <ClCompile Include="..\fatfs\source\ff.c">
-      <Filter>FatFS</Filter>
+      <Filter>Interfaces\IBM\FatFS</Filter>
     </ClCompile>
     <ClCompile Include="..\fatfs\source\ffsystem.c">
-      <Filter>FatFS</Filter>
+      <Filter>Interfaces\IBM\FatFS</Filter>
     </ClCompile>
     <ClCompile Include="..\fatfs\source\ffunicode.c">
-      <Filter>FatFS</Filter>
+      <Filter>Interfaces\IBM\FatFS</Filter>
     </ClCompile>
     <ClCompile Include="ADF_operations.cpp">
       <Filter>Interfaces\amiga</Filter>
@@ -176,13 +176,13 @@
       <Filter>General</Filter>
     </ClInclude>
     <ClInclude Include="..\fatfs\source\ff.h">
-      <Filter>FatFS</Filter>
+      <Filter>Interfaces\IBM\FatFS</Filter>
     </ClInclude>
     <ClInclude Include="..\fatfs\source\ffconf.h">
-      <Filter>FatFS</Filter>
+      <Filter>Interfaces\IBM\FatFS</Filter>
     </ClInclude>
     <ClInclude Include="..\fatfs\source\diskio.h">
-      <Filter>FatFS</Filter>
+      <Filter>Interfaces\IBM\FatFS</Filter>
     </ClInclude>
     <ClInclude Include="ADF_operations.h">
       <Filter>Interfaces\amiga</Filter>
@@ -222,7 +222,7 @@
     <Filter Include="DokanInterface">
       <UniqueIdentifier>{ed5641a6-398f-4e1e-96ab-fe022775219a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="FatFS">
+    <Filter Include="Interfaces\IBM\FatFS">
       <UniqueIdentifier>{b9b8b178-9866-4b17-a1f5-b0d06bce984a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -237,5 +237,6 @@
     </Image>
     <Image Include="floppy2.ico" />
     <Image Include="drawer.ico" />
+    <Image Include="ufloppy.ico" />
   </ItemGroup>
 </Project>

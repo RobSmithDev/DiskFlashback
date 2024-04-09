@@ -198,7 +198,8 @@ bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex) 
     m_FatFS = ftFSDevice;
 
     m_registry->mountDismount(ftFSDevice != nullptr, getMountPoint()[0], m_io);
-    if (m_ADFvolume) {
+    m_registry->setupDriveIcon(true, getMountPoint()[0], 0);
+    if (m_FatFS) {
         //SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
         SHChangeNotify(SHCNE_DRIVEREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
         SHChangeNotify(SHCNE_DRIVEADD, SHCNF_PATH, getMountPoint().c_str(), NULL);
@@ -206,7 +207,7 @@ bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex) 
     }
     m_tempUnmount = false;
 
-    return m_ADFvolume != nullptr;
+    return m_FatFS != nullptr;
 }
 
 bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex) {
@@ -225,7 +226,7 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
         setActiveFileSystem(m_amigaFS);
     }
     else setActiveFileSystem(nullptr);
-
+    m_registry->setupDriveIcon(true, getMountPoint()[0], 1);
     m_registry->mountDismount(m_ADFvolume != nullptr, getMountPoint()[0], m_io);
     if (m_ADFvolume) {
         //SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
@@ -248,7 +249,7 @@ void MountedVolume::unmountFileSystem() {
     setActiveFileSystem(nullptr);
     m_ADFdevice = nullptr;
     m_FatFS = nullptr;
-
+    m_registry->setupDriveIcon(true, getMountPoint()[0], 2);
     m_registry->mountDismount(false, getMountPoint()[0], m_io);
     SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
 }

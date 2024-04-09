@@ -47,20 +47,6 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 //
-// Icon
-//
-
-// Icon with lowest ID value placed first to ensure application icon
-// remains consistent on all systems.
-IDI_AMIGADISK           ICON                    "floppy.ico"
-
-IDI_PCDISK              ICON                    "floppy2.ico"
-
-IDI_AMIGAFOLDER         ICON                    "drawer.ico"
-
-
-/////////////////////////////////////////////////////////////////////////////
-//
 // DESIGNINFO
 //
 
@@ -136,6 +122,22 @@ IDD_COPY AFX_DIALOG_LAYOUT
 BEGIN
     0
 END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_ICON1               ICON                    "floppy2.ico"
+
+IDI_ICON2               ICON                    "floppy.ico"
+
+IDI_ICON3               ICON                    "ufloppy.ico"
+
+IDI_ICON4               ICON                    "drawer.ico"
 
 #endif    // English (United Kingdom) resources
 /////////////////////////////////////////////////////////////////////////////

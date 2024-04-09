@@ -54,6 +54,7 @@ bool DokanFileSystemManager::start() {
     dokan_options.Timeout = 5 * 60000; // 5 minutes
 
     if (m_forceWriteProtect) dokan_options.Options |= DOKAN_OPTION_WRITE_PROTECT;
+    //dokan_options.Options |= DOKAN_OPTION_STDERR;
 
     NTSTATUS status = DokanCreateFileSystem(&dokan_options, &fs_operations, &m_dokanInstance);
     return status == DOKAN_SUCCESS;

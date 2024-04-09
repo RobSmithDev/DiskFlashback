@@ -4,7 +4,7 @@
 #include <string>
 
 class SectorCacheEngine;
-
+ 
 class ShellRegistery {
 private:
 	std::wstring m_mainEXE;
@@ -22,6 +22,6 @@ public:
 
 	void mountDismount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource);
 
-	void setupDriveIcon(bool enable, WCHAR driveLetter);
+	void setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t iconIndex = 2);
 
 };

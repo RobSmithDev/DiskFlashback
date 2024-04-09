@@ -155,7 +155,7 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 			// Grab sector header
 			if (sectorEndPoint) {
 				uint32_t markerStart = bit + 1 - 64;
-				uint32_t bytesBetweenSectors = markerStart / 8;
+				uint32_t bytesBetweenSectors = (markerStart - sectorEndPoint) / 8;
 				char buf[100];
 				sprintf_s(buf, "Bytes: %i\n", bytesBetweenSectors);
 				OutputDebugStringA(buf);
@@ -165,6 +165,10 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 			uint16_t crc = crc16((char*)&sector.header, sizeof(sector.header) - 2);
 			headerFound = true;
 			sector.headerErrors = 0;
+			if (sector.header.sector < 1) {
+				sector.header.sector = 1;
+				sector.headerErrors++;
+			}
 			if (crc != wordSwap(*(uint16_t*)sector.header.crc)) sector.headerErrors++;
 			if (!sector.headerErrors) sectorSize = sector.header.length;
 			if (sector.header.cylinder != cylinder) sector.headerErrors++;
@@ -196,19 +200,19 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 					bitStart += sectorDataSize * 8 * 2;
 					extractMFMDecodeRaw(track, dataLengthInBits, bitStart, 2, (uint8_t*)&sector.data.crc);
 					// Validate
-					uint16_t crc = crc16((char*)&sector.data, 4);
+					uint16_t crc = crc16((char*)&sector.data.dataMark, 4);
 					crc = crc16((char*)sector.data.data.data(), (uint32_t)sector.data.data.size(), crc);
 					sector.dataValid = crc == wordSwap(*(uint16_t*)sector.data.crc);
 
 					// Standardize the sector
 					DecodedSector sec;
 					sec.data = sector.data.data;
-					sec.numErrors = sector.headerErrors + sector.dataValid ? 1 : 0;
+					sec.numErrors = sector.headerErrors + sector.dataValid ? 0 : 1;
 
 					// See if this already exists 
-					auto it = decodedTrack.sectors.find(sector.header.sector);
+					auto it = decodedTrack.sectors.find(sector.header.sector-1);
 					if (it == decodedTrack.sectors.end()) {
-						decodedTrack.sectors.insert(std::make_pair(sector.header.sector, sec));
+						decodedTrack.sectors.insert(std::make_pair(sector.header.sector-1, sec));
 					}
 					else {
 						// Does exist. Keep the better copy
@@ -239,7 +243,7 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 
 	// Add dummy sectors upto expectedSectors
 	decodedTrack.sectorsWithErrors = 0;
-	for (uint32_t sec = 1; sec <= expectedSectors; sec++) {
+	for (uint32_t sec = 0; sec <expectedSectors; sec++) {
 		auto it = decodedTrack.sectors.find(sec);
 
 		// Does a sector with this number exist?
@@ -365,7 +369,7 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 	mem += writeRawMFM(mem, 24, 0xAA, lastByte, memOverflow);
 	mem += writeMarkerMFM(mem, MFM_SYNC_TRACK_HEADER, lastByte, memOverflow);
 	mem += gapFillMFM(mem, gap1Size, 0x4E, lastByte, memOverflow);
-	for (uint32_t sec = 1; sec <= decodedTrack->sectors.size(); sec++) {
+	for (uint32_t sec = 0; sec < decodedTrack->sectors.size(); sec++) {
 		const DecodedSector& sector = decodedTrack->sectors[sec];
 
 		mem += writeRawMFM(mem, 24, 0xAA, lastByte, memOverflow);
@@ -377,7 +381,7 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 		header.addressMark[3] = 0xFE;
 		header.cylinder = cylinder;
 		header.head = upperSide ? 1 : 0;
-		header.sector = sec;
+		header.sector = sec + 1;
 		header.length = (unsigned char)(max(0,log2(sector.data.size()) - 7));
 		*((uint16_t*)header.crc) = wordSwap(crc16((char*)&header, sizeof(header) - 2));
 
@@ -426,7 +430,7 @@ bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumbe
 	serialNumber = 0;
 
 	if (!decodedTrack) return false;
-	auto it = decodedTrack->sectors.find(1);
+	auto it = decodedTrack->sectors.find(0);
 	if (it == decodedTrack->sectors.end()) return false;
 	if (it->second.data.size() < 128) return false;
 	return getTrackDetails_IBM(it->second.data.data(), serialNumber, sectorsPerTrack, bytesPerSector);

@@ -8,7 +8,7 @@
 #include "sectorCommon.h"
 #include <mutex>
 
-#define MAX_TRACKS                          164
+#define MAX_TRACKS                          168
 #define MOTOR_TIMEOUT_TIME                  2500    // Timeout to wait for the motor to spin up
 #define TRACK_READ_TIMEOUT                  1000    // Should be enough to read it 5 times!
 #define MAX_RETRIES                         10      // Attempts to re-read a sector to get a better one
@@ -36,6 +36,7 @@ private:
 
     uint32_t m_sectorsPerTrack      = 0;
     uint32_t m_bytesPerSector       = 512;
+    uint32_t m_totalCylinders       = 0;
     uint32_t m_serialNumber = 0x554E4B4E;    
 
     // Tracks that need committing to disk
@@ -62,9 +63,6 @@ private:
 
     // Reads some data to see what kind of disk it is
     void identifyFileSystem();
-
-    // Returns TRUE if the inserted disk is HD
-    bool isHD();
 
 protected:
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
@@ -96,7 +94,7 @@ public:
     virtual bool isPhysicalDisk() override { return true; };
 
     // Total number of tracks avalable - 0 is not specified
-    virtual uint32_t totalNumTracks() override { return 0; };
+    virtual uint32_t totalNumTracks() override { return m_totalCylinders * 2; };
 
     // Flush changes to disk
     virtual bool flushWriteCache() override;
@@ -117,8 +115,15 @@ public:
     void releaseDrive();
     bool restoreDrive();
 
+
+    // Returns TRUE if the inserted disk is HD
+    bool isHD();
+
+    // Pre-populate with blank sectors
+    void createBlankSectors();
+
     // Override sector infomration - this also wipes the cache and resets everything
-    void overwriteSectorSettings(const SectorType systemType, const uint32_t sectorsPerTrack, const uint32_t sectorSize);
+    void overwriteSectorSettings(const SectorType systemType, const uint32_t totalCylinders, const uint32_t sectorsPerTrack, const uint32_t sectorSize);
 
     // Return TRUE if you can export this to an ADF
     virtual bool allowCopyToFile() override { return true; };

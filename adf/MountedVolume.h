@@ -56,6 +56,9 @@ public:
     virtual void onMounted(const std::wstring& mountPoint, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual void onUnmounted(PDOKAN_FILE_INFO dokanfileinfo) override;
 
+    // Shut down the file system
+    virtual void shutdownFS() override;
+
     AdfDevice* getADFDevice();
     AdfVolume* getADFVolume();
 };

@@ -1,7 +1,8 @@
 #pragma once
 
 
-#define APPLICATION_NAME "AMount"
+#define APPLICATION_NAME "DiskFlashback"
+#define APPLICATION_NAME_L L"DiskFlashback"
 
 #include <dokan/dokan.h>
 #include <string>
@@ -86,6 +87,9 @@ public:
 
     // Returns TRUE if the DOKAN system is up and running
     virtual bool isRunning() const;
+
+    // Shut down the file system
+    virtual void shutdownFS() = 0;
 
     // Notifications of the file system being mounted
     virtual void onMounted(const std::wstring& mountPoint, PDOKAN_FILE_INFO dokanfileinfo);

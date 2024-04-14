@@ -18,6 +18,9 @@
 /
 /----------------------------------------------------------------------------*/
 
+// Uses modified version of f_mkfs() from 
+// https://github.com/maksgraczyk/Flopgen/blob/main/fatfs/ff.c
+
 
 #ifndef FF_DEFINED
 #define FF_DEFINED	80286	/* Revision ID */
@@ -263,11 +266,17 @@ typedef struct {
 /* Format parameter structure (MKFS_PARM) */
 
 typedef struct {
-	BYTE fmt;			/* Format option (FM_FAT, FM_FAT32, FM_EXFAT and FM_SFD) */
-	BYTE n_fat;			/* Number of FATs */
-	UINT align;			/* Data area alignment (sector) */
+	BYTE fmt;		/* Format option (FM_FAT, FM_FAT32, FM_EXFAT and FM_SFD) */
+	BYTE n_fat;		/* Number of FATs */
+	UINT align;		/* Data area alignment (sector) */
 	UINT n_root;		/* Number of root directory entries */
 	DWORD au_size;		/* Cluster size (byte) */
+
+	// Extra fields added from https://github.com/maksgraczyk/Flopgen/blob/main/fatfs/ff.h to make it Floppy Disk compatible
+	BYTE mdt;				/* Media descriptor type */
+	DWORD sec_per_track;	/* Number of sectors per track */
+	DWORD n_heads;			/* Number of heads */
+	BYTE d_num;				/* Drive number */
 } MKFS_PARM;
 
 

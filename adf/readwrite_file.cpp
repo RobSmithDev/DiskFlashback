@@ -74,9 +74,13 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
             uint8_t data[128];
             if (ReadFile(m_file, data, 128, &read, NULL)) {
                 if (read == 128) {
-                    if (!getTrackDetails_IBM(data, m_serialNumber, m_sectorsPerTrack, m_bytesPerSector)) {
+                    uint32_t totalSectors;
+                    if (!getTrackDetails_IBM(data, m_serialNumber, totalSectors, m_sectorsPerTrack, m_bytesPerSector)) {
                         m_bytesPerSector = 512;
                         m_serialNumber = 0x41444630;
+                    }
+                    else {
+                        m_totalTracks = (totalSectors / m_sectorsPerTrack) / 2;
                     }
                 }
             }

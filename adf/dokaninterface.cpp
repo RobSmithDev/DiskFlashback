@@ -3,6 +3,8 @@
 
 extern DOKAN_OPERATIONS fs_operations;
 
+#define SHOWDEBUG
+
 #pragma region DokanFileSystemBase
 DokanFileSystemBase::DokanFileSystemBase(DokanFileSystemManager* owner) : m_owner(owner) {
 
@@ -85,6 +87,7 @@ bool DokanFileSystemManager::start() {
 // Close the file system
 void DokanFileSystemManager::stop() {
     if (m_dokanInstance) {
+        shutdownFS();
         DokanCloseHandle(m_dokanInstance);
         m_dokanInstance = 0;
         m_mountPoint[0] = L'?';
@@ -138,7 +141,7 @@ void ansiToWide(const std::string& wstr, std::wstring& str) {
 
 #pragma region DokanInterface
 NTSTATUS fs_checkVolume(const std::wstring& fname, DokanFileSystemManager* manager) {
-    // Allow queries to \\ only
+
     if (manager->isDriveLocked()) {
         if (fname.length() <= 2) return STATUS_SUCCESS;
         return STATUS_DEVICE_BUSY;
@@ -176,7 +179,15 @@ static NTSTATUS DOKAN_CALLBACK fs_createfile(LPCWSTR filename, PDOKAN_IO_SECURIT
         DWORD creation_disposition;
 
         DokanMapKernelToUserCreateFileFlags(desiredaccess, fileattributes, createoptions, createdisposition, &generic_desiredaccess, &file_attributes_and_flags, &creation_disposition);
-        return fs->fs_createfile(fname, security_context, generic_desiredaccess, file_attributes_and_flags, shareaccess, creation_disposition, createdisposition == FILE_SUPERSEDE, dokanfileinfo);
+        NTSTATUS res = fs->fs_createfile(fname, security_context, generic_desiredaccess, file_attributes_and_flags, shareaccess, creation_disposition, createdisposition == FILE_SUPERSEDE, dokanfileinfo);
+#ifdef SHOWDEBUG
+        if (wcscmp(filename,L"\\")) {
+            WCHAR buffer[1024];
+            swprintf_s(buffer, L"CREATEFILE %08X %s\n", res, filename);
+            OutputDebugString(buffer);
+        }
+#endif
+        return res;
     }
     else {
         if (fname == L"\\") {
@@ -194,6 +205,13 @@ static void DOKAN_CALLBACK fs_cleanup(LPCWSTR filename, PDOKAN_FILE_INFO dokanfi
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
     if (fs) fs->fs_cleanup(filename, dokanfileinfo);
+#ifdef SHOWDEBUG
+    if (wcscmp(filename, L"\\")) {
+        WCHAR buffer[1024];
+        swprintf_s(buffer, L"CLEANUP %s\n", filename);
+        OutputDebugString(buffer);
+    }
+#endif
 }
 
 static void DOKAN_CALLBACK fs_closeFile(LPCWSTR filename, PDOKAN_FILE_INFO dokanfileinfo) {
@@ -202,6 +220,13 @@ static void DOKAN_CALLBACK fs_closeFile(LPCWSTR filename, PDOKAN_FILE_INFO dokan
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
     if (fs) fs->fs_closeFile(filename, dokanfileinfo);
+#ifdef SHOWDEBUG
+    if (wcscmp(filename, L"\\")) {
+        WCHAR buffer[1024];
+        swprintf_s(buffer, L"CLOSEFILE %s\n", filename);
+        OutputDebugString(buffer);
+    }
+#endif
 }
 
 static NTSTATUS DOKAN_CALLBACK fs_readfile(LPCWSTR filename, LPVOID buffer, DWORD bufferlength, LPDWORD readlength, LONGLONG offset, PDOKAN_FILE_INFO dokanfileinfo) {
@@ -210,15 +235,34 @@ static NTSTATUS DOKAN_CALLBACK fs_readfile(LPCWSTR filename, LPVOID buffer, DWOR
 
     // Some basic filtering
     NTSTATUS status = fs_checkVolume(filename, manager);
-    if (status != STATUS_SUCCESS) return status;
+    if (status != STATUS_SUCCESS) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"<-************ READFILE_1 %08X %s\n", status, filename);
+        OutputDebugString(_buffer);
+#endif
+        return status;
+    }
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
     if (fs) {
         uint32_t l;
         NTSTATUS t = fs->fs_readfile(filename, buffer, bufferlength, l, offset, dokanfileinfo);
         if (readlength) *readlength = l;
+
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"<-************ READFILE_2 %08X (Read=%i, Actually Read=%i, Offset=%i) %s\n", t, bufferlength, *readlength, offset, filename);
+        OutputDebugString(_buffer);
+#endif
         return t;
     }
+
+#ifdef SHOWDEBUG
+    WCHAR _buffer[1024];
+    swprintf_s(_buffer, L"<-************ READFILE_3 %08X %s\n", STATUS_ACCESS_DENIED, filename);
+    OutputDebugString(_buffer);
+#endif
 
     return STATUS_ACCESS_DENIED;
 }
@@ -229,8 +273,22 @@ static NTSTATUS DOKAN_CALLBACK fs_writefile(LPCWSTR filename, LPCVOID buffer, DW
 
     // Some basic filtering
     NTSTATUS status = fs_checkVolume(filename, manager);
-    if (status != STATUS_SUCCESS) return status;
-    if (manager->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+    if (status != STATUS_SUCCESS) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"****->  WRITEFILE_1 %08X %s\n", status, filename);
+        OutputDebugString(_buffer);
+#endif
+        return status;
+    }
+    if (manager->isWriteProtected()) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"****->  WRITEFILE_2 %08X %s\n", STATUS_MEDIA_WRITE_PROTECTED, filename);
+        OutputDebugString(_buffer);
+#endif
+        return STATUS_MEDIA_WRITE_PROTECTED;
+    }
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
     if (fs) {
@@ -239,10 +297,19 @@ static NTSTATUS DOKAN_CALLBACK fs_writefile(LPCWSTR filename, LPCVOID buffer, DW
         NTSTATUS l = fs->fs_writefile(filename, buffer, number_of_bytes_to_write, dataWritten, offset, dokanfileinfo);
 
         if (number_of_bytes_written) *number_of_bytes_written = dataWritten;
-
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"****->  WRITEFILE_3 %08X (Read=%i, Actually Read=%i, Offset=%i) %s\n", l, number_of_bytes_to_write, *number_of_bytes_written, offset, filename);
+        OutputDebugString(_buffer);
+#endif
         return l;
     }
 
+#ifdef SHOWDEBUG
+    WCHAR _buffer[1024];
+    swprintf_s(_buffer, L"****->  WRITEFILE_4 %08X %s\n", STATUS_ACCESS_DENIED, filename);
+    OutputDebugString(_buffer);
+#endif
     return STATUS_ACCESS_DENIED;
 }
 
@@ -252,12 +319,39 @@ static NTSTATUS DOKAN_CALLBACK fs_flushfilebuffers(LPCWSTR filename, PDOKAN_FILE
 
     // Some basic filtering
     NTSTATUS status = fs_checkVolume(filename, manager);
-    if (status != STATUS_SUCCESS) return status;
-    if (manager->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+    if (status != STATUS_SUCCESS) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"FLUSHFILEBUFFERS_1 %08X %s\n", status, filename);
+        OutputDebugString(_buffer);
+#endif
+        return status;
+    }
+    if (manager->isWriteProtected()) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"FLUSHFILEBUFFERS_2 %08X %s\n", STATUS_MEDIA_WRITE_PROTECTED, filename);
+        OutputDebugString(_buffer);
+#endif
+        return STATUS_MEDIA_WRITE_PROTECTED;
+    }
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
-    if (fs) return fs->fs_flushfilebuffers(filename, dokanfileinfo);
+    if (fs) {
+        NTSTATUS s = fs->fs_flushfilebuffers(filename, dokanfileinfo);
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"FLUSHFILEBUFFERS_3 %08X %s\n", s, filename);
+        OutputDebugString(_buffer);
+#endif
+        return s;
+    }
 
+#ifdef SHOWDEBUG
+    WCHAR _buffer[1024];
+    swprintf_s(_buffer, L"FLUSHFILEBUFFERS_4 %08X %s\n", STATUS_ACCESS_DENIED, filename);
+    OutputDebugString(_buffer);
+#endif
     return STATUS_ACCESS_DENIED;
 }
 
@@ -267,12 +361,39 @@ static NTSTATUS DOKAN_CALLBACK fs_setendoffile(LPCWSTR filename, LONGLONG ByteOf
 
     // Some basic filtering
     NTSTATUS status = fs_checkVolume(filename, manager);
-    if (status != STATUS_SUCCESS) return status;
-    if (manager->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+    if (status != STATUS_SUCCESS) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"SETENDOFFILE_1 %08X %s\n", status, filename);
+        OutputDebugString(_buffer);
+#endif
+        return status;
+    }
+    if (manager->isWriteProtected()) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"SETENDOFFILE_2 %08X %s\n", STATUS_MEDIA_WRITE_PROTECTED, filename);
+        OutputDebugString(_buffer);
+#endif
+        return STATUS_MEDIA_WRITE_PROTECTED;
+    }
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
-    if (fs) return fs->fs_setendoffile(filename, ByteOffset, dokanfileinfo);
+    if (fs) {
+        NTSTATUS s = fs->fs_setendoffile(filename, ByteOffset, dokanfileinfo);
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"SETENDOFFILE_3 %08X %s\n", s, filename);
+        OutputDebugString(_buffer);
+#endif
+        return s;
+    }
 
+#ifdef SHOWDEBUG
+    WCHAR _buffer[1024];
+    swprintf_s(_buffer, L"SETENDOFFILE_4 %08X %s\n", STATUS_ACCESS_DENIED, filename);
+    OutputDebugString(_buffer);
+#endif
     return STATUS_ACCESS_DENIED;
 }
 
@@ -282,12 +403,39 @@ static NTSTATUS DOKAN_CALLBACK fs_setallocationsize(LPCWSTR filename, LONGLONG a
 
     // Some basic filtering
     NTSTATUS status = fs_checkVolume(filename, manager);
-    if (status != STATUS_SUCCESS) return status;
-    if (manager->isWriteProtected()) return STATUS_MEDIA_WRITE_PROTECTED;
+    if (status != STATUS_SUCCESS) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"SETALLOCSIZE_1 %08X %s\n", status, filename);
+        OutputDebugString(_buffer);
+#endif
+        return status;
+    }
+    if (manager->isWriteProtected()) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"SETALLOCSIZE_2 %08X %s\n", STATUS_MEDIA_WRITE_PROTECTED, filename);
+        OutputDebugString(_buffer);
+#endif
+        return STATUS_MEDIA_WRITE_PROTECTED;
+    }
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
-    if (fs) return fs->fs_setallocationsize(filename, alloc_size, dokanfileinfo);
+    if (fs) {
+        NTSTATUS s = fs->fs_setallocationsize(filename, alloc_size, dokanfileinfo);;
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"SETALLOCSIZE_3 %08X %s\n", s, filename);
+        OutputDebugString(_buffer);
+#endif
+        return s;
+    }
 
+#ifdef SHOWDEBUG
+    WCHAR _buffer[1024];
+    swprintf_s(_buffer, L"SETALLOCSIZE_4 %08X %s\n", STATUS_ACCESS_DENIED, filename);
+    OutputDebugString(_buffer);
+#endif
     return STATUS_ACCESS_DENIED;
 }
 
@@ -297,11 +445,34 @@ static NTSTATUS DOKAN_CALLBACK fs_getfileInformation(LPCWSTR filename, LPBY_HAND
 
     // Some basic filtering
     NTSTATUS status = fs_checkVolume(filename, manager);
-    if (status != STATUS_SUCCESS) return status;
+    if (status != STATUS_SUCCESS) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"GETFILEINFO_1 %08X %s\n", status, filename);
+        OutputDebugString(_buffer);
+#endif
+        return status;
+    }
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
-    if (fs) return fs->fs_getfileInformation(filename, buffer, dokanfileinfo);
+    if (fs) {
+        NTSTATUS s = fs->fs_getfileInformation(filename, buffer, dokanfileinfo);
+#ifdef SHOWDEBUG
+        if (wcscmp(filename, L"\\")) {
+            WCHAR _buffer[1024];
+            swprintf_s(_buffer, L"GETFILEINFO_2 %08X %s (size= %i )\n", s, filename, buffer->nFileSizeLow);
+            OutputDebugString(_buffer);
+        }
+#endif
+        return s;
+    }
 
+
+#ifdef SHOWDEBUG
+    WCHAR _buffer[1024];
+    swprintf_s(_buffer, L"GETFILEINFO_3 %08X %s\n", STATUS_ACCESS_DENIED, filename);
+    OutputDebugString(_buffer);
+#endif
     return STATUS_ACCESS_DENIED;
 }
 
@@ -311,11 +482,34 @@ static NTSTATUS DOKAN_CALLBACK fs_findfiles(LPCWSTR filename, PFillFindData fill
 
     // Some basic filtering
     NTSTATUS status = fs_checkVolume(filename, manager);
-    if (status != STATUS_SUCCESS) return status;
+    if (status != STATUS_SUCCESS) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"FINDFILES_1 %08X %s\n", status, filename);
+        OutputDebugString(_buffer);
+#endif
+        return status;
+    }
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
-    if (fs) return fs->fs_findfiles(filename, fill_finddata, dokanfileinfo);
+    if (fs) {
+        NTSTATUS s = fs->fs_findfiles(filename, fill_finddata, dokanfileinfo);
 
+#ifdef SHOWDEBUG
+        if (s != STATUS_SUCCESS) {
+            WCHAR _buffer[1024];
+            swprintf_s(_buffer, L"FINDFILES_2 %08X %s\n", s, filename);
+            OutputDebugString(_buffer);
+        }
+#endif
+        return s;
+    }
+
+#ifdef SHOWDEBUG
+    WCHAR _buffer[1024];
+    swprintf_s(_buffer, L"FINDFILES_3 %08X %s\n", STATUS_ACCESS_DENIED, filename);
+    OutputDebugString(_buffer);
+#endif
     return STATUS_ACCESS_DENIED;
 }
 
@@ -400,7 +594,14 @@ static NTSTATUS DOKAN_CALLBACK fs_getdiskfreespace(PULONGLONG free_bytes_availab
 
     // Some basic filtering
     NTSTATUS status = fs_checkVolume(manager);
-    if (status != STATUS_SUCCESS) return status;
+    if (status != STATUS_SUCCESS) {
+#ifdef SHOWDEBUG
+        WCHAR _buffer[1024];
+        swprintf_s(_buffer, L"GETFREEDISKSPACE_1 %08X\n", status);
+        OutputDebugString(_buffer);
+#endif
+        return status;
+    }
 
     DokanFileSystemBase* fs = manager->getActiveSystem();
     if (fs) {
@@ -412,6 +613,14 @@ static NTSTATUS DOKAN_CALLBACK fs_getdiskfreespace(PULONGLONG free_bytes_availab
         if (free_bytes_available) *free_bytes_available = freeBytes;
         if (total_number_of_bytes) *total_number_of_bytes = numBytes;
         if (total_number_of_free_bytes) *total_number_of_free_bytes = totalBytes;
+
+#ifdef SHOWDEBUG
+        if (t != STATUS_SUCCESS) {
+            WCHAR _buffer[1024];
+            swprintf_s(_buffer, L"GETFREEDISKSPACE_2 %08X\n", t);
+            OutputDebugString(_buffer);
+        }
+#endif
 
         return t;
     }
@@ -470,6 +679,13 @@ static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation(LPWSTR volumename_buffer,
             wcscpy_s(filesystem_name_buffer, filesystem_name_size, filesysName.c_str());
         }
 
+#ifdef SHOWDEBUG
+        if (t != STATUS_SUCCESS) {
+            WCHAR _buffer[1024];
+            swprintf_s(_buffer, L"VOLINFO %08X\n", t);
+            OutputDebugString(_buffer);
+        }
+#endif
         return t;
     }
     else {
@@ -498,6 +714,14 @@ static NTSTATUS DOKAN_CALLBACK fs_unmounted(PDOKAN_FILE_INFO dokanfileinfo) {
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS DOKAN_CALLBACK fs_lockfile(LPCWSTR filename, LONGLONG byte_offset, LONGLONG length, PDOKAN_FILE_INFO dokanfileinfo) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static NTSTATUS DOKAN_CALLBACK fs_unlockfile(LPCWSTR filename, LONGLONG byte_offset, LONGLONG length, PDOKAN_FILE_INFO dokanfileinfo) {
+    return STATUS_NOT_IMPLEMENTED;
+}
+
 DOKAN_OPERATIONS    fs_operations = { fs_createfile,
                                         fs_cleanup,
                                         fs_closeFile,
@@ -514,8 +738,8 @@ DOKAN_OPERATIONS    fs_operations = { fs_createfile,
                                         fs_movefile,
                                         fs_setendoffile,
                                         fs_setallocationsize,
-                                        nullptr, // fs_lockfile,
-                                        nullptr, // fs_unlockfile,
+                                        fs_lockfile,
+                                        fs_unlockfile,
                                         fs_getdiskfreespace,
                                         fs_getvolumeinformation,
                                         fs_mounted,

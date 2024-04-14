@@ -25,6 +25,33 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     GetModuleFileName(NULL, exeName, MAX_PATH);
 
     LPWSTR* argv = CommandLineToArgvW(pCmdLine, &argc);
+
+    // See if its just a disk image on the command line
+ /*   if (argc == 1) {
+        std::wstring txt = pCmdLine;
+        size_t pos = txt.rfind(L".");
+        if (pos != std::wstring::npos) {
+            std::wstring ext = txt.substr(pos+1);
+            for (WCHAR& c : ext) c = towupper(c);
+            // Disk image file
+            if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"IMG") || (ext == L"IMA")) {
+                VolumeManager* vol = new VolumeManager(hInstance, exeName, '?', false);
+                if (!vol->mountFile(txt)) {
+                    delete vol;
+                    return RETURNCODE_MOUNTFAIL;
+                }
+                try {
+                    vol->run();
+                }
+                catch (const std::exception& ex) {
+                    UNREFERENCED_PARAMETER(ex);
+                }
+                delete vol;
+                return 0;
+            }
+        }
+    }*/
+
     if (argc < 3) return RETURNCODE_BADARGS;        
     // Check Drive Letter
     const WCHAR driveLetter = argv[1][0];
@@ -42,7 +69,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             if (param == CTRL_PARAM_COPY2DISK) {
                 // filename shoud be on the command line too
                 if (argc < 4) return RETURNCODE_BADARGS;
-                std::wstring msg = driveLetter + std::wstring(argv[4]);
+                std::wstring msg = driveLetter + std::wstring(argv[3]);
                 COPYDATASTRUCT tmp;
                 tmp.lpData = (void*)msg.c_str();
                 tmp.cbData = (DWORD)(msg.length() * 2);  // unicode

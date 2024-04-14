@@ -5,7 +5,9 @@
 #include "sectorCache.h"
 #include "resource.h"
 #include "adflib/src/adflib.h"
+#include "fatfs/source/ff.h"
 #include "MountedVolume.h"
+#include "readwrite_floppybridge.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -44,7 +46,9 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	HWND ctrl = GetDlgItem(hwnd, IDC_FILESYSTEM);
 	SendMessage(ctrl, CB_ADDSTRING, 0, (LPARAM)L"OFS");
 	SendMessage(ctrl, CB_ADDSTRING, 1, (LPARAM)L"FFS");
-	SendMessage(ctrl, CB_SETCURSEL, 0, 0);
+	SendMessage(ctrl, CB_ADDSTRING, 2, (LPARAM)L"FAT (IBM PC)");
+	SendMessage(ctrl, CB_ADDSTRING, 3, (LPARAM)L"FAT (Atari ST)");
+	SendMessage(ctrl, CB_SETCURSEL, (m_io->getSystemType() == SectorType::stAmiga) ? 0 : 2, 0);
 
 	ctrl = GetDlgItem(hwnd, IDC_LABEL);
 	SendMessage(ctrl, EM_SETLIMITTEXT, 34, 0);
@@ -70,16 +74,20 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 
 	BringWindowToTop(hwnd);
 	SetForegroundWindow(hwnd);
+	enableControls(true);
 } 
 	
 // Enable/disable controls on the dialog
 void DialogFORMAT::enableControls(bool enable) {
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), enable);
+
+	uint32_t sel = SendMessage(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), CB_GETCURSEL, 0, 0);
+
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_LABEL), enable);
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_QUICK), enable);
-	EnableWindow(GetDlgItem(m_dialogBox, IDC_CACHE), enable);
-	EnableWindow(GetDlgItem(m_dialogBox, IDC_INT), enable);
-	EnableWindow(GetDlgItem(m_dialogBox, IDC_BB), enable);
+	EnableWindow(GetDlgItem(m_dialogBox, IDC_CACHE), enable && (sel < 2));
+	EnableWindow(GetDlgItem(m_dialogBox, IDC_INT), enable && (sel < 2));
+	EnableWindow(GetDlgItem(m_dialogBox, IDC_BB), enable && (sel < 2));
 	EnableWindow(GetDlgItem(m_dialogBox, ID_START), enable);
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 }
@@ -96,7 +104,7 @@ bool DialogFORMAT::shouldClose() {
 }
 
 // Actually do the format
-bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, bool doFFS, const std::string& volumeLabel) {
+bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, uint32_t formatMode, const std::string& volumeLabel) {
 	if (!m_io->isDiskPresent()) {
 		MessageBox(m_hParent, L"No disk in drive. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 		return false;
@@ -107,7 +115,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	}
 	m_fs->temporaryUnmountDrive();
 
-	uint8_t mode = doFFS ? FSMASK_FFS : 0;
+	uint8_t mode = formatMode ? FSMASK_FFS : 0;
 	if (intMode) mode |= FSMASK_INTL;
 	if (dirCache) mode |= FSMASK_DIRCACHE;
 
@@ -117,6 +125,27 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 
 	m_io->resetCache();
+	SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
+	uint32_t numSectors = 0;
+	if (bridge) {
+		switch (formatMode) {
+		case 0:
+		case 1:
+			numSectors = bridge->isHD() ? 22 : 11;
+			bridge->overwriteSectorSettings(SectorType::stAmiga, totalTracks/2, numSectors, 512);
+			break;
+		case 2:
+			numSectors = bridge->isHD() ? 18 : 9;
+			bridge->overwriteSectorSettings(SectorType::stIBM, totalTracks/2, numSectors, 512);
+			break;
+		case 3:
+			numSectors = bridge->isHD() ? 18 : 9;
+			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks/2, numSectors, 512);
+			break;
+		default:
+			return false;
+		}
+	}
 
 	uint32_t progress = 0;
 	if (!quickFormat) {
@@ -124,7 +153,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		uint32_t sectorNumber = 0;
 		memset(sector, 0, 512);
 		for (uint32_t track = 0; track < totalTracks; track++) {
-			for (uint32_t sec = 0; sec < m_fs->getADFDevice()->sectors; sec++) {
+			for (uint32_t sec = 0; sec < numSectors; sec++) {
 				if (m_abortFormat) return false;
 				if (!m_io->writeData(sectorNumber, 512, sector)) 
 					return false;
@@ -135,14 +164,44 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		}
 		progress = totalTracks;
 	}
+	else bridge->createBlankSectors();
 
 	if (m_abortFormat) return false;
-	if (adfCreateFlop(m_fs->getADFDevice(), volumeLabel.c_str(), mode) != RC_OK) return false;
+	if (formatMode < 2) {
+		if (adfCreateFlop(m_fs->getADFDevice(), volumeLabel.c_str(), mode) != RC_OK) return false;
+	}
+	else {
+		BYTE work[FF_MAX_SS];
+		MKFS_PARM opt;
+		opt.fmt = FM_FAT | FM_SFD;
+		opt.align = 0;
+		opt.n_fat = 2;
+		opt.n_heads = 2;
+		opt.d_num = 0;
+
+		if (bridge->isHD()) {
+			opt.au_size = 512;
+			opt.n_root = 224;
+			opt.mdt = 0xF0;
+			opt.sec_per_track = 18;
+		}
+		else {
+			opt.au_size = 1024;
+			opt.n_root = 112;
+			opt.mdt = 0xF9;
+			opt.sec_per_track = 9;
+		}
+
+		if (f_mkfs(L"\\", &opt, work, sizeof(work)) != FR_OK) return false;
+		std::wstring t;
+		ansiToWide(volumeLabel, t);
+		if (f_setlabel(t.c_str()) != FR_OK) return false;
+	}
 	if (!m_io->flushWriteCache()) return false;
 
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, progress + 2, 0);
 
-	if (installBB) {
+	if (installBB && formatMode<2) {
 		if (m_abortFormat) return false;
 		m_io->setWritingOnlyMode(false);
 		m_fs->setLocked(false);
@@ -167,15 +226,15 @@ void DialogFORMAT::doFormat() {
 		bool dirCache = SendMessage(GetDlgItem(m_dialogBox, IDC_CACHE), BM_GETCHECK, 0, 0) == BST_CHECKED;
 		bool intMode = SendMessage(GetDlgItem(m_dialogBox, IDC_INT), BM_GETCHECK, 0, 0) == BST_CHECKED;
 		bool installBB = SendMessage(GetDlgItem(m_dialogBox, IDC_BB), BM_GETCHECK, 0, 0) == BST_CHECKED;
-		bool doFFS = SendMessage(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), CB_GETCURSEL, 0, 0) == 1;
+		uint32_t formatMode = SendMessage(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), CB_GETCURSEL, 0, 0);
 		std::string volumeLabel;
 		WCHAR name[64];
 		GetWindowText(GetDlgItem(m_dialogBox, IDC_LABEL), name, 64);
 		wideToAnsi(name, volumeLabel);
 
-		m_formatThread = new std::thread([this, quickFormat, dirCache, intMode, installBB, doFFS, volumeLabel]() {
+		m_formatThread = new std::thread([this, quickFormat, dirCache, intMode, installBB, formatMode, volumeLabel]() {
 			m_io->setWritingOnlyMode(true);
-			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, doFFS, volumeLabel);
+			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, formatMode, volumeLabel);
 			m_io->setWritingOnlyMode(false);
 			m_fs->setLocked(false);
 			m_fs->restoreUnmountedDrive();
@@ -228,6 +287,11 @@ INT_PTR DialogFORMAT::handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
+
+
+		case IDC_FILESYSTEM:
+			enableControls(true);
+			break;
 
 		case ID_START:
 			if (MessageBox(m_dialogBox, L"WARNING: Formatting will erase ALL data on this disk.\nTo format the disk click OK. To Quit click CANCEL", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONWARNING) != IDOK) return 0;

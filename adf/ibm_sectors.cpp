@@ -140,8 +140,10 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 	nonstandardTimings = false;
 
 	uint32_t expectedSectors = expectedNumSectors ? expectedNumSectors : (isHD ? IBM_HD_SECTORS : IBM_DD_SECTORS);
-
 	uint32_t sectorEndPoint = 0;
+
+	uint32_t gapTotal = 0;
+	uint32_t numGaps = 0;
 
 	// run the entire track length with some space to wrap around
 	for (uint32_t bit = 0; bit < dataLengthInBits; bit++) {
@@ -155,10 +157,12 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 			// Grab sector header
 			if (sectorEndPoint) {
 				uint32_t markerStart = bit + 1 - 64;
-				uint32_t bytesBetweenSectors = (markerStart - sectorEndPoint) / 8;
-				char buf[100];
-				sprintf_s(buf, "Bytes: %i\n", bytesBetweenSectors);
-				OutputDebugStringA(buf);
+				uint32_t bytesBetweenSectors = (markerStart - sectorEndPoint) / 16;
+				bytesBetweenSectors = max(0, bytesBetweenSectors - (12 * 2));   // these would be the SYNC AA or 55
+				if (bytesBetweenSectors > 200) bytesBetweenSectors = 200; // shouldnt get this high
+				// For a PC disk this should be around 84
+				gapTotal += bytesBetweenSectors;
+				numGaps++;
 			}
 
 			extractMFMDecodeRaw(track, dataLengthInBits, bit + 1 - 64, sizeof(sector.header), (uint8_t*)&sector.header);
@@ -226,7 +230,7 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 					sector.headerErrors = 0xFFFF;
 					sector.dataValid = false;
 					headerFound = false;
-					sectorEndPoint = bitStart + 4;  // mark the end of the sector
+					sectorEndPoint = bitStart + (4 * 8);  // mark the end of the sector
 				}
 			}
 			else
@@ -238,6 +242,19 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 					lastSectorNumber = -1;
 				}
 	}
+
+	// Work out the average gap size
+	if (numGaps) {
+		gapTotal /= numGaps;
+
+		// Should be around 84 for a standard PC disk
+		char buf[100];
+		sprintf_s(buf, "Actual Bytes: %i\n", gapTotal);
+		OutputDebugStringA(buf);
+		nonstandardTimings = gapTotal < 70;  // less than is probably an Atari ST disk
+
+	}
+
 
 	const uint32_t sectorDataSize = 1 << (7 + sector.header.length);
 
@@ -387,7 +404,6 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 
 		mem += writeMarkerMFM(mem, MFM_SYNC_SECTOR_HEADER, lastByte, memOverflow);
 		mem += encodeMFMdata(((uint8_t*)&header)+4, mem, sizeof(header) - 4, lastByte, memOverflow);
-		mem += 4;
 		mem += gapFillMFM(mem, gap2Size, 0x4E, lastByte, memOverflow);
 
 		mem += writeRawMFM(mem, 24, 0xAA, lastByte, memOverflow);
@@ -409,14 +425,21 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 }
 
 // Feed in Track 0, sector 0 and this will try to extract the number of sectors per track, or 0 on error
-bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
+bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
 	sectorsPerTrack = 0;
 	serialNumber = 0;
 
-	if (!sector) return false;
+	//HANDLE fle = CreateFile(L"d:\\moo.dat", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+	//DWORD d;
+	//WriteFile(fle, sector, 512, &d, NULL);
+	//CloseHandle(fle);
+		
 
+	if (!sector) return false;	
 	serialNumber = (sector[0x08 + 3] << 24) | (sector[0x08 + 2] << 16) | (sector[0x08 + 1] << 8) | sector[0x08];
 	sectorsPerTrack = (sector[0x18 + 1] << 8) | sector[0x18];
+	totalSectors = (sector[0x13 + 1] << 8) | sector[0x13];
+
 	if (sectorsPerTrack < 3) return false;
 	if (sectorsPerTrack > 22) return false;
 	bytesPerSector = (sector[0x0B + 1] << 8) | sector[0x0B];
@@ -425,7 +448,7 @@ bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t
 
 
 // Feed in Track 0, sector 0 and this will try to extract the number of sectors per track, or 0 on error
-bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumber, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
+bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumber, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
 	sectorsPerTrack = 0;
 	serialNumber = 0;
 
@@ -433,6 +456,6 @@ bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumbe
 	auto it = decodedTrack->sectors.find(0);
 	if (it == decodedTrack->sectors.end()) return false;
 	if (it->second.data.size() < 128) return false;
-	return getTrackDetails_IBM(it->second.data.data(), serialNumber, sectorsPerTrack, bytesPerSector);
+	return getTrackDetails_IBM(it->second.data.data(), serialNumber, totalSectors, sectorsPerTrack, bytesPerSector);
 }
 

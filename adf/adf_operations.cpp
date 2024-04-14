@@ -388,8 +388,8 @@ NTSTATUS DokanFileSystemAmigaFS::fs_createfile(const std::wstring& filename, con
                 if (search == 0)  return STATUS_OBJECT_NAME_NOT_FOUND;
 
                 fle = adfFileOpen(m_volume, amigaName.c_str(), (AdfFileMode)access);
-                if (fle) adfFileTruncate(fle, 0);
                 if (!fle) return STATUS_ACCESS_DENIED;
+                adfFileTruncate(fle, 0);
                 dokanfileinfo->Context = (ULONG64)fle;
                 addTrackFileInUse(fle);
                 break;

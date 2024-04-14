@@ -190,8 +190,7 @@ NTSTATUS DokanFileSystemFATFS::fs_createfile(const std::wstring& filename, const
            
 
         bool isWrite = (generic_desiredaccess & (GENERIC_WRITE | GENERIC_ALL)) != 0;
-        if (isFileInUse(filename, isWrite)) 
-            return STATUS_SHARING_VIOLATION;
+        if (isFileInUse(filename, isWrite)) return STATUS_SHARING_VIOLATION;
 
         if ((alreadyExists) && (isWrite) && (info.fattrib & AM_RDO)) return STATUS_ACCESS_DENIED;
 
@@ -248,7 +247,7 @@ NTSTATUS DokanFileSystemFATFS::fs_createfile(const std::wstring& filename, const
     return STATUS_ACCESS_DENIED;
 }
 
-void DokanFileSystemFATFS::fs_cleanup(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) {
+void DokanFileSystemFATFS::fs_closeFile(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) {
     if (!m_volume) return;
 
     if (dokanfileinfo->Context) {
@@ -258,14 +257,34 @@ void DokanFileSystemFATFS::fs_cleanup(const std::wstring& filename, PDOKAN_FILE_
         free(fle);
 
         releaseFileInUse(filename);
-
         dokanfileinfo->Context = 0;
     }
+}
+
+void DokanFileSystemFATFS::fs_cleanup(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) {
+    if (!m_volume) return;
+
+    if (dokanfileinfo->Context) {
+        ActiveFileIO io = notifyIOInUse(dokanfileinfo);
+        FIL* fle = (FIL*)dokanfileinfo->Context;
+        f_close(fle);
+        free(fle);
+#ifdef _DEBUG
+        if (filename != L"\\") {
+            WCHAR buffer[1024];
+            swprintf_s(buffer, L"########## fs_cleanup %s\n", filename.c_str());
+            OutputDebugString(buffer);
+        }
+#endif    
+        releaseFileInUse(filename);
+        dokanfileinfo->Context = 0;
+    }
+
     if (dokanfileinfo->DeleteOnClose) {
         if (isFileInUse(filename, true)) return;
         // Delete happens during cleanup and not in close event.
         ActiveFileIO io = notifyIOInUse(dokanfileinfo);
-        f_unlink(filename.c_str());
+        f_unlink(filename.c_str());        
     }
 }
 

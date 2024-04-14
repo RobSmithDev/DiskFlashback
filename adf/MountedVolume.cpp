@@ -7,6 +7,7 @@
 #include "dokaninterface.h"
 #include "shellMenus.h"
 #include <Shlobj.h>
+#include "readwrite_floppybridge.h"
 
 #pragma comment(lib,"Shell32.lib")
 
@@ -134,6 +135,13 @@ bool MountedVolume::setLocked(bool enableLock) {
     return true;
 }
 
+// Shut down the file system
+void MountedVolume::shutdownFS() {
+    unmountFileSystem();
+
+}
+
+
 // Install bootblock for Amiga drives
 bool MountedVolume::installAmigaBootBlock() {
     if (!getADFVolume()) return false;
@@ -176,15 +184,25 @@ AdfDevice* MountedVolume::getADFDevice() {
 // Notifications of the file system being mounted
 void MountedVolume::onMounted(const std::wstring& mountPoint, PDOKAN_FILE_INFO dokanfileinfo) {
     DokanFileSystemManager::onMounted(mountPoint, dokanfileinfo);
-    m_registry->setupDriveIcon(true, mountPoint[0]);
+    m_registry->setupDriveIcon(true, mountPoint[0], 2, m_io->isPhysicalDisk());
 }
 void MountedVolume::onUnmounted(PDOKAN_FILE_INFO dokanfileinfo) {
     DokanFileSystemManager::onUnmounted(dokanfileinfo);
-    m_registry->setupDriveIcon(false, getMountPoint()[0]);
+    m_registry->setupDriveIcon(false, getMountPoint()[0], 2, m_io->isPhysicalDisk());
 }
 
 uint32_t MountedVolume::getTotalTracks() {
+
     if (m_ADFdevice) return m_ADFdevice->cylinders * m_ADFdevice->heads;
+    if (m_FatFS) {
+        uint32_t totalSectorsPerTrack = m_FatFS->fsize * m_FatFS->n_fats;
+        if (!totalSectorsPerTrack) return 0;
+        uint32_t t = (((m_FatFS->n_fatent+(totalSectorsPerTrack-1)) / totalSectorsPerTrack) + 1) / 2;
+        return t;
+    }
+
+    if (m_io) return m_io->totalNumTracks();
+
     return 0;
 }
 
@@ -197,8 +215,8 @@ bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex) 
     setActiveFileSystem(m_IBMFS);
     m_FatFS = ftFSDevice;
 
+    m_registry->setupDriveIcon(true, getMountPoint()[0], 0, m_io->isPhysicalDisk());
     m_registry->mountDismount(ftFSDevice != nullptr, getMountPoint()[0], m_io);
-    m_registry->setupDriveIcon(true, getMountPoint()[0], 0);
     if (m_FatFS) {
         //SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
         SHChangeNotify(SHCNE_DRIVEREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
@@ -226,7 +244,7 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
         setActiveFileSystem(m_amigaFS);
     }
     else setActiveFileSystem(nullptr);
-    m_registry->setupDriveIcon(true, getMountPoint()[0], 1);
+    m_registry->setupDriveIcon(true, getMountPoint()[0], 1, m_io->isPhysicalDisk());
     m_registry->mountDismount(m_ADFvolume != nullptr, getMountPoint()[0], m_io);
     if (m_ADFvolume) {
         //SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);
@@ -249,7 +267,7 @@ void MountedVolume::unmountFileSystem() {
     setActiveFileSystem(nullptr);
     m_ADFdevice = nullptr;
     m_FatFS = nullptr;
-    m_registry->setupDriveIcon(true, getMountPoint()[0], 2);
+    m_registry->setupDriveIcon(true, getMountPoint()[0], 2, m_io->isPhysicalDisk());
     m_registry->mountDismount(false, getMountPoint()[0], m_io);
     SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
 }

@@ -214,7 +214,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 			}
 		}		
 		// Force the target to be the same as the source
-		target->overwriteSectorSettings(source->getSystemType(), source->numSectorsPerTrack(), source->sectorSize());
+		target->overwriteSectorSettings(source->getSystemType(), numCyl*2, source->numSectorsPerTrack(), source->sectorSize());
 
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);

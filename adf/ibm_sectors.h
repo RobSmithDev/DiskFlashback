@@ -7,8 +7,8 @@
 #include "sectorCommon.h"
 
 // Feed in Track 0, sector 0 and this will try to extract the number of sectors per track, or 0 on error
-bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector);
-bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumber, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector);
+bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector);
+bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumber, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector);
 
 // Searches for sectors - you can re-call this and it will update decodedTrack rather than replace it
 // nonstandardTimings is set to true if this uses non-standard timings like those used by Atari etc

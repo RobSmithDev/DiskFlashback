@@ -33,7 +33,7 @@ private:
 	void enableControls(bool enable);
 
 	// Actually do the format
-	bool runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, bool doFFS, const std::string& volumeLabel);
+	bool runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, uint32_t formatMode, const std::string& volumeLabel);
 
 public:
 	DialogFORMAT(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs);

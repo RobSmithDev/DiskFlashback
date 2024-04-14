@@ -42,26 +42,6 @@ bool SectorRW_FloppyBridge::restoreDrive() {
     m_bridge->setDirectMode(true);
     m_diskInDrive = false;
     m_bridge->handleNoClickStep(false);
-/*
-    // DUMP disk as MFM stream
-#define SIZ (0x3A00 * 2)
-    char* b =(char*) malloc(SIZ);
-    motorInUse(true);
-    waitForMotor(false);
-    for (int cyl = 0; cyl < 80; cyl++) {
-        for (int h = 0; h < 2; h++) {
-            WCHAR bbb[128];
-            swprintf_s(bbb, L"d:\\tmp\\CYL_%i_%i.raw", cyl, h);
-            HANDLE fle = CreateFile(bbb, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-
-            DWORD s = m_bridge->getMFMTrack(h == 1, cyl, true, SIZ, b);
-            DWORD r;
-            WriteFile(fle, &s, sizeof(s), &r, NULL);
-            WriteFile(fle, b, ((s+7)/8), &r, NULL);
-            CloseHandle(fle);
-        }
-    }
-    */
 
     m_lockedOut = false;
     return true;
@@ -129,6 +109,7 @@ SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile, std::fu
 
 // Reads some data to see what kind of disk it is
 void SectorRW_FloppyBridge::identifyFileSystem() {
+    m_totalCylinders = 0;
     m_diskType = SectorType::stUnknown;
     m_bridge->gotoCylinder(0, false);
     motorInUse(true);
@@ -176,17 +157,32 @@ bool SectorRW_FloppyBridge::diskRemovedWarning() {
 }
 
 // Override sector infomration
-void SectorRW_FloppyBridge::overwriteSectorSettings(const SectorType systemType, const uint32_t sectorsPerTrack, const uint32_t sectorSize) {
+void SectorRW_FloppyBridge::overwriteSectorSettings(const SectorType systemType, const uint32_t totalCylinders, const uint32_t sectorsPerTrack, const uint32_t sectorSize) {
     {
         std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
-
         m_sectorsPerTrack = sectorsPerTrack;
         m_bytesPerSector = sectorSize;
+        m_totalCylinders = min(totalCylinders, MAX_TRACKS / 2);
         m_diskType = systemType;
         m_tracksToFlush.clear();
     }
     resetCache();
 }
+
+// Pre-populate with blank sectors
+void SectorRW_FloppyBridge::createBlankSectors() {
+    DecodedSector blankSector;
+    blankSector.numErrors = 0;
+    blankSector.data.resize(m_bytesPerSector);
+
+    for (uint32_t trk = 0; trk < m_totalCylinders * 2; trk++) {
+        m_trackCache[trk].sectorsWithErrors = 0;
+        m_trackCache[trk].sectors.clear();
+        for (uint32_t sec = 0; sec < m_sectorsPerTrack; sec++)
+            m_trackCache[trk].sectors.insert(std::make_pair(sec, blankSector));
+    }
+}
+
 
 // The motor usage has timed out
 void SectorRW_FloppyBridge::motorMonitor() {
@@ -296,6 +292,7 @@ bool SectorRW_FloppyBridge::isHD() {
 // Get size of the disk in bytes
 uint32_t SectorRW_FloppyBridge::getDiskDataSize() {
     if (!m_bridge) return 0;
+    if (m_totalCylinders) return m_bytesPerSector * m_sectorsPerTrack * 2 * m_totalCylinders;
     return m_bytesPerSector * m_sectorsPerTrack * 2 * 82;
 }
 
@@ -424,7 +421,8 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
 
         if (trIBM.sectors.size() >= 5) {
             m_diskType = SectorType::stIBM;
-            if (getTrackDetails_IBM(&trIBM, serialNumber, sectorsPerTrack, bytesPerSector)) {
+            uint32_t totalSectors;
+            if (getTrackDetails_IBM(&trIBM, serialNumber, totalSectors, sectorsPerTrack, bytesPerSector)) {
                 if ((trIBM.sectors.size() >= 5) && (trAmiga.sectors.size() > 1)) {
                     m_diskType = SectorType::stHybrid;
                 }
@@ -433,11 +431,13 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
                 m_sectorsPerTrack = sectorsPerTrack;
                 m_bytesPerSector = bytesPerSector;
                 m_serialNumber = serialNumber;
+                m_totalCylinders = (totalSectors / sectorsPerTrack) / 2;
             }
             else {
                 m_sectorsPerTrack = isHD() ? 18 : 9;
                 m_bytesPerSector = 512;
                 m_serialNumber = 0xAAAAAAAA;
+                m_totalCylinders = 80;
             }
         }
     }
@@ -621,7 +621,7 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
                 }
             }
 
-            if (m_bridge->writeMFMTrackToBuffer(upperSurface, cylinder, false, numBytes, m_mfmBuffer)) {
+            if (m_bridge->writeMFMTrackToBuffer(upperSurface, cylinder, (m_diskType == SectorType::stIBM) || (m_diskType == SectorType::stHybrid), numBytes, m_mfmBuffer)) {
                 // Now wait until it completes - approx 400-500ms as this will also read it back to verify it
                 ULONGLONG start = GetTickCount64();
                 bool doRetry = false;

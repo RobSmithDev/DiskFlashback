@@ -133,7 +133,7 @@ DSTATUS disk_status(BYTE pdrv) {
 DSTATUS disk_initialize(BYTE pdrv) {
     if (fatfsSectorCache && (pdrv==0)) {
         if (!fatfsSectorCache->isDiskPresent()) return STA_NODISK;
-        if (!fatfsSectorCache->isDiskWriteProtected()) return STA_PROTECT;
+        if (fatfsSectorCache->isDiskWriteProtected()) return STA_PROTECT;
         return 0;
     }
     return STA_NOINIT;
@@ -175,9 +175,9 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
             case CTRL_SYNC			: // Complete pending write process (needed at FF_FS_READONLY == 0) 
                 if (!fatfsSectorCache->flushWriteCache()) return RES_ERROR;
                 return RES_OK;
-
+                
             case GET_SECTOR_COUNT	: // Get media size (needed at FF_USE_MKFS == 1) 
-                *((DWORD*)buff) = fatfsSectorCache->numSectorsPerTrack();
+                *((DWORD*)buff) = fatfsSectorCache->numSectorsPerTrack() * fatfsSectorCache->totalNumTracks();
                 return RES_OK;
 
             case GET_SECTOR_SIZE	: // Get sector size (needed at FF_MAX_SS != FF_MIN_SS) 
@@ -185,7 +185,7 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
                 return RES_OK;
 
             case GET_BLOCK_SIZE		: // Get erase block size (needed at FF_USE_MKFS == 1) 
-                *((DWORD*)buff) = 1;  /// I think
+                *((DWORD*)buff) = 1; 
                 return RES_OK;
         }
     }
@@ -220,8 +220,8 @@ VolumeManager::VolumeManager(HINSTANCE hInstance, const std::wstring& mainExe, W
 }
 
 VolumeManager::~VolumeManager()  {
-    DokanShutdown();
     diskChanged(false, SectorType::stUnknown);
+    DokanShutdown();
     for (MountedVolume* volume : m_volumes) delete volume;
     m_volumes.clear();
     adfEnvCleanUp();

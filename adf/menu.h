@@ -37,6 +37,7 @@ private:
 
     // Mount disk image
     void mountDisk();
+    
 public:
     CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName);
     ~CTrayMenu();

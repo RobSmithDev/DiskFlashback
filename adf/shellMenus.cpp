@@ -60,14 +60,15 @@ void ShellRegistery::populateDiskImageMenu(bool add, const std::wstring& path, W
 
 // Add data to the context menu for disk images
 void ShellRegistery::setupDiskImageMenu(bool add, WCHAR driveLetter) {
-	#define MAX_DISK_IMAGE_FILES 5
-	static const WCHAR* DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"adf",L"dms",L"st",L"img",L"ima" };
-	
+	#define MAX_DISK_IMAGE_FILES 7
+	static const WCHAR* DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"adf",L"dms",L"hda",L"hdf",L"st",L"img",L"ima" };
+	static const bool   DiskImageCopy[MAX_DISK_IMAGE_FILES] = { true, true, false, false, true, true, true };
+
 	WCHAR path[128];
 	WCHAR keyname[128];
 	for (uint32_t fType = 0; fType < MAX_DISK_IMAGE_FILES; fType++) {
 
-		// Add a entry to the ADF context menu
+		// Add entries to context menus
 		LONG len = 128;
 		swprintf_s(path, L"Software\\Classes\\.%s", DiskImageFiles[fType]);
 		if (((RegQueryValue(HKEY_CURRENT_USER, path, keyname, &len) != ERROR_SUCCESS)) || (len<=2)) {
@@ -80,7 +81,8 @@ void ShellRegistery::setupDiskImageMenu(bool add, WCHAR driveLetter) {
 		RegSetKeyValueW(HKEY_CURRENT_USER, tmp.c_str(), APPLICATION_NAME_L, REG_SZ, tmp2.c_str(), tmp2.length() * 2);
 
 		tmp = L"Software\\Classes\\" + std::wstring(keyname) + L"\\shell";
-		populateDiskImageMenu(add, tmp, driveLetter);
+
+		if (DiskImageCopy[fType]) populateDiskImageMenu(add, tmp, driveLetter);
 		
 	}
 

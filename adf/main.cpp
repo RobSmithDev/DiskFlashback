@@ -10,6 +10,10 @@
 #include "dlgCopy.h"
 #include "menu.h"
 
+#pragma comment(linker,"\"/manifestdependency:type='win32' \
+name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
 // Command line is:
 //   COMMANDLINE_ constant
 //   DRIVELETTER
@@ -19,10 +23,18 @@
 //          one of the CTRL_PARAM_ values
 //   Mount File/Drive Params (if mount)
 
+#include "dlgConfig.h"
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     int argc = 0;
     WCHAR exeName[MAX_PATH];
     GetModuleFileName(NULL, exeName, MAX_PATH);
+
+    {
+        DialogConfig config(hInstance, GetDesktopWindow());
+        config.doModal();
+        return 0;
+    }
 
     LPWSTR* argv = nullptr;
     if (wcslen(pCmdLine)) argv = CommandLineToArgvW(pCmdLine, &argc);
@@ -36,7 +48,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             std::wstring ext = txt.substr(pos+1);
             for (WCHAR& c : ext) c = towupper(c);
             // Disk image file
-            if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"IMG") || (ext == L"IMA")) {
+            if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF")) {
                 VolumeManager* vol = new VolumeManager(hInstance, exeName, '?', false);
                 if (!vol->mountFile(txt)) {
                     delete vol;

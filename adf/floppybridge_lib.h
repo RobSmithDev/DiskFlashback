@@ -66,6 +66,7 @@ public:
 	static const unsigned int ConfigOption_AutoDetectComport	= 0x04;	// The driver supports automatic com port detection and selection
 	static const unsigned int ConfigOption_DriveABCable			= 0x08;	// The driver allows you to specify using cable select for Drive A or Drive B
 	static const unsigned int ConfigOption_SmartSpeed			= 0x10;	// The driver supports dynamically switching between normal and Turbo hopefully without breaking copy protection
+	static const unsigned int ConfigOption_SupportsShugartMode  = 0x20; // The driver supports Shugart modes as well as IBM PC modes
 
 	// Information about a Bridge Driver (eg: DrawBridge, Greaseweazle etc)
 	struct DriverInformation {

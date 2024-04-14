@@ -9,9 +9,6 @@
 #include "readwrite_dms.h"
 #include "MountedVolume.h"
 
-#pragma comment(linker,"\"/manifestdependency:type='win32' \
-name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
-processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 DialogCOPY::DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs, const std::wstring& sourceADF) :
 	m_hInstance(hInstance), m_hParent(hParent), m_io(io), m_fs(fs), m_backup(false), m_filename(sourceADF)  {

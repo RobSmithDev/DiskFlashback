@@ -68,6 +68,14 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 74
     END
+
+    IDD_CONFIG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 210
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 82
+    END
 END
 #endif    // APSTUDIO_INVOKED
 
@@ -107,6 +115,22 @@ BEGIN
     LTEXT           "Progress:",IDC_STATIC,7,27,32,8
 END
 
+IDD_CONFIG DIALOGEX 0, 0, 217, 89
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Physical Drive Configuration"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,108,68,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,160,68,50,14
+    RTEXT           "Driver:",IDC_STATIC,27,9,23,8
+    COMBOBOX        IDC_DRIVER,55,7,156,165,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    RTEXT           "Cable Select:",IDC_STATIC,7,44,43,8
+    COMBOBOX        IDC_CABLE,55,41,155,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    RTEXT           "COM Port:",IDC_STATIC,16,26,34,8
+    COMBOBOX        IDC_COMPORT,55,24,96,124,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Auto Detect",IDC_AUTODETECT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,156,26,54,10
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -121,6 +145,20 @@ END
 IDD_COPY AFX_DIALOG_LAYOUT
 BEGIN
     0
+END
+
+IDD_CONFIG AFX_DIALOG_LAYOUT
+BEGIN
+    0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 100,
+    0, 0, 0, 0
 END
 
 

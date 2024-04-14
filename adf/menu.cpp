@@ -4,7 +4,7 @@
 #include "resource.h"
 #include "drivecontrol.h"
 #include "menu.h"
-
+#include "dlgConfig.h"
 
 // Search windows for one that uses the drive letter specified
 BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
@@ -56,15 +56,16 @@ void CTrayMenu::setupMenu() {
     m_hDriveMenu = CreatePopupMenu();
     m_hPhysicalMenu = CreatePopupMenu();
 
-    AppendMenu(m_hPhysicalMenu, MF_STRING,      0,                          L"Enabled");
-    AppendMenu(m_hPhysicalMenu, MF_STRING,      0,                          L"Configure...");
-
-    AppendMenu(m_hMenu,MF_STRING,               1,                          L"Mount Disk Image...");
-    AppendMenu(m_hMenu,MF_STRING | MF_POPUP,    (UINT_PTR)m_hDriveMenu,     L"Eject");
-    AppendMenu(m_hMenu,MF_SEPARATOR,            0,                          NULL);
-    AppendMenu(m_hMenu,MF_STRING | MF_POPUP,    (UINT_PTR)m_hPhysicalMenu,  L"&Physical Drive");
-    AppendMenu(m_hMenu,MF_SEPARATOR,            0,                          NULL);
-    AppendMenu(m_hMenu,MF_STRING,               2,                          L"&Quit");
+    AppendMenu(m_hPhysicalMenu, MF_STRING,      20,                          L"Enabled");
+    AppendMenu(m_hPhysicalMenu, MF_STRING,      21,                          L"Configure...");
+    
+    AppendMenu(m_hMenu, MF_STRING,              1,                          L"Create Disk Image...");
+    AppendMenu(m_hMenu, MF_STRING,              2,                          L"Mount Disk Image...");
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hDriveMenu,     L"Eject");
+    AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hPhysicalMenu,  L"&Physical Drive");
+    AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
+    AppendMenu(m_hMenu, MF_STRING,              10,                         L"&Quit");
 }
 
 void CTrayMenu::populateDrives() {
@@ -119,14 +120,23 @@ void CTrayMenu::handleMenuInput(UINT uID, UINT iMouseMsg) {
                 }
 
                 switch (index) {
-                case 1: mountDisk(); break;
-                case 2: 
+                
+                case 2: mountDisk(); break;
+                case 10: 
                     populateDrives();
                     if (m_drives.size())
                         if (MessageBox(m_window.hwnd(), L"Are you sure? This will eject all mounted disks", L"Quit DiskFlashback", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
                     for (const auto& it : m_drives) 
                         PostMessage(it.second.hWnd, WM_USER, REMOTECTRL_EJECT, (LPARAM)it.first[0]);
-                    PostQuitMessage(0); break;
+                    PostQuitMessage(0);
+                    break;
+
+                case 21: {
+                    DialogConfig config(m_hInstance, m_window.hwnd());
+                    config.doModal();
+                    }
+                       break;
+
                 }
             }
             break;
@@ -134,6 +144,7 @@ void CTrayMenu::handleMenuInput(UINT uID, UINT iMouseMsg) {
             break;
     }
 }
+
 
 void CTrayMenu::mountDisk() {
     // Request filename
@@ -144,7 +155,7 @@ void CTrayMenu::mountDisk() {
     dlg.hwndOwner = m_window.hwnd();
     std::wstring filter;
     std::wstring defaultFormat;
-    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.ima;*.st\0All Files(*.*)\0*.*\0\0";
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st\0All Files(*.*)\0*.*\0\0";
     dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
     dlg.lpstrTitle = L"Select disk image to mount";
     dlg.lpstrFile = filename;

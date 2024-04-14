@@ -90,6 +90,9 @@
       <Filter>Interfaces\IBM</Filter>
     </ClCompile>
     <ClCompile Include="menu.cpp" />
+    <ClCompile Include="dlgConfig.cpp">
+      <Filter>Dialogs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -192,6 +195,9 @@
       <Filter>Interfaces\IBM</Filter>
     </ClInclude>
     <ClInclude Include="menu.h" />
+    <ClInclude Include="dlgConfig.h">
+      <Filter>Dialogs</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">

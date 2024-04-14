@@ -9,10 +9,6 @@
 #include "MountedVolume.h"
 #include "readwrite_floppybridge.h"
 
-#pragma comment(linker,"\"/manifestdependency:type='win32' \
-name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
-processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
-
 DialogFORMAT::DialogFORMAT(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs) :
 	m_hInstance(hInstance), m_hParent(hParent), m_io(io), m_fs(fs) {
 }

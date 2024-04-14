@@ -63,10 +63,7 @@ INT_PTR DialogCOPY::doModal() {
 		dlg.lpstrDefExt = m_fileExtension.c_str();
 		dlg.lpstrFile = filename;
 		dlg.nMaxFile = MAX_PATH;
-		if (!GetSaveFileName(&dlg)) {
-			DWORD moo = CommDlgExtendedError();
-			return 0;
-		}
+		if (!GetSaveFileName(&dlg))  return 0;
 		m_filename = filename;
 	}
 	else {

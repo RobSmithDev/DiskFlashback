@@ -353,6 +353,7 @@
     <ClCompile Include="ibm_sectors.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ADF_operations.cpp" />
+    <ClCompile Include="menu.cpp" />
     <ClCompile Include="MountedVolume.cpp" />
     <ClCompile Include="MountedVolumes.cpp" />
     <ClCompile Include="readwrite_dms.cpp" />
@@ -386,6 +387,7 @@
     <ClInclude Include="floppybridge_abstract.h" />
     <ClInclude Include="floppybridge_lib.h" />
     <ClInclude Include="ibm_sectors.h" />
+    <ClInclude Include="menu.h" />
     <ClInclude Include="MountedVolume.h" />
     <ClInclude Include="MountedVolumes.h" />
     <ClInclude Include="readwrite_dms.h" />

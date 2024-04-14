@@ -8,12 +8,13 @@
 #include "shellMenus.h"
 #include <Shlobj.h>
 #include "readwrite_floppybridge.h"
+#include "MountedVolumes.h"
 
 #pragma comment(lib,"Shell32.lib")
 
 
 MountedVolume::MountedVolume(VolumeManager* manager, const std::wstring& mainEXE, SectorCacheEngine* io, const WCHAR driveLetter, const bool forceWriteProtect) :
-	DokanFileSystemManager(driveLetter, forceWriteProtect, mainEXE), m_io(io) {
+	DokanFileSystemManager(driveLetter, forceWriteProtect, mainEXE), m_io(io), m_manager(manager) {
     m_registry = new ShellRegistery(mainEXE);
     m_amigaFS = new DokanFileSystemAmigaFS(this);
     m_IBMFS = new DokanFileSystemFATFS(this);
@@ -138,7 +139,7 @@ bool MountedVolume::setLocked(bool enableLock) {
 // Shut down the file system
 void MountedVolume::shutdownFS() {
     unmountFileSystem();
-
+    if (m_manager) m_manager->refreshWindowTitle();
 }
 
 
@@ -193,15 +194,17 @@ void MountedVolume::onUnmounted(PDOKAN_FILE_INFO dokanfileinfo) {
 
 uint32_t MountedVolume::getTotalTracks() {
 
-    if (m_ADFdevice) return m_ADFdevice->cylinders * m_ADFdevice->heads;
+    if (m_ADFdevice) return max(m_ADFdevice->cylinders * m_ADFdevice->heads, 80 * 2);
+    if (m_io) {
+        uint32_t t = m_io->totalNumTracks();
+        if (t) return max(80 * 2, t);
+    }
     if (m_FatFS) {
         uint32_t totalSectorsPerTrack = m_FatFS->fsize * m_FatFS->n_fats;
         if (!totalSectorsPerTrack) return 0;
         uint32_t t = (((m_FatFS->n_fatent+(totalSectorsPerTrack-1)) / totalSectorsPerTrack) + 1) / 2;
-        return t;
+        return max(t, 80 * 2);
     }
-
-    if (m_io) return m_io->totalNumTracks();
 
     return 0;
 }
@@ -258,6 +261,7 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
 }
 
 void MountedVolume::unmountFileSystem() {
+    std::wstring path = getMountPoint();
     if (m_ADFvolume) {
         adfUnMount(m_ADFvolume);
         m_ADFvolume = nullptr;
@@ -267,8 +271,8 @@ void MountedVolume::unmountFileSystem() {
     setActiveFileSystem(nullptr);
     m_ADFdevice = nullptr;
     m_FatFS = nullptr;
-    m_registry->setupDriveIcon(true, getMountPoint()[0], 2, m_io->isPhysicalDisk());
-    m_registry->mountDismount(false, getMountPoint()[0], m_io);
-    SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
+    m_registry->setupDriveIcon(true, path[0], 2, m_io->isPhysicalDisk());
+    m_registry->mountDismount(false, path[0], m_io);
+    SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, path.c_str(), NULL);
 }
 

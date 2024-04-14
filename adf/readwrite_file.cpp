@@ -80,7 +80,7 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
                         m_serialNumber = 0x41444630;
                     }
                     else {
-                        m_totalTracks = (totalSectors / m_sectorsPerTrack) / 2;
+                        m_totalTracks = max(80, (totalSectors / m_sectorsPerTrack) / 2);
                     }
                 }
             }

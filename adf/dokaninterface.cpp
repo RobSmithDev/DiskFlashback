@@ -86,8 +86,9 @@ bool DokanFileSystemManager::start() {
 
 // Close the file system
 void DokanFileSystemManager::stop() {
-    if (m_dokanInstance) {
+    if (m_dokanInstance) {      
         shutdownFS();
+        m_mountPoint[0] = L'?';
         DokanCloseHandle(m_dokanInstance);
         m_dokanInstance = 0;
         m_mountPoint[0] = L'?';

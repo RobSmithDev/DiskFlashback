@@ -32,7 +32,7 @@ INT_PTR DialogFORMAT::doModal() {
 void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	m_dialogBox = hwnd;
 	m_windowCaption = L"Format ";
-	m_windowCaption += (m_io->isPhysicalDisk() ? L"Disk Drive " : L"ADF File ");
+	m_windowCaption += (m_io->isPhysicalDisk() ? L"Disk Drive " : L"Disk Image File ");
 	m_windowCaption += m_fs->getMountPoint().substr(0, 2);
 
 	SetWindowText(hwnd, m_windowCaption.c_str());

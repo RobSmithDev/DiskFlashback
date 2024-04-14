@@ -89,6 +89,7 @@
     <ClCompile Include="fat_operations.cpp">
       <Filter>Interfaces\IBM</Filter>
     </ClCompile>
+    <ClCompile Include="menu.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -190,6 +191,7 @@
     <ClInclude Include="fat_operations.h">
       <Filter>Interfaces\IBM</Filter>
     </ClInclude>
+    <ClInclude Include="menu.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">
@@ -235,8 +237,14 @@
     <Image Include="floppy.ico">
       <Filter>res</Filter>
     </Image>
-    <Image Include="floppy2.ico" />
-    <Image Include="drawer.ico" />
-    <Image Include="ufloppy.ico" />
+    <Image Include="drawer.ico">
+      <Filter>res</Filter>
+    </Image>
+    <Image Include="floppy2.ico">
+      <Filter>res</Filter>
+    </Image>
+    <Image Include="ufloppy.ico">
+      <Filter>res</Filter>
+    </Image>
   </ItemGroup>
 </Project>

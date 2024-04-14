@@ -431,7 +431,7 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
                 m_sectorsPerTrack = sectorsPerTrack;
                 m_bytesPerSector = bytesPerSector;
                 m_serialNumber = serialNumber;
-                m_totalCylinders = (totalSectors / sectorsPerTrack) / 2;
+                m_totalCylinders = max(80, (totalSectors / sectorsPerTrack) / 2);
             }
             else {
                 m_sectorsPerTrack = isHD() ? 18 : 9;

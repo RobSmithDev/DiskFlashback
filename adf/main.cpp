@@ -8,7 +8,7 @@
 #include "SignalWnd.h"
 #include "dlgFormat.h"
 #include "dlgCopy.h"
-
+#include "menu.h"
 
 // Command line is:
 //   COMMANDLINE_ constant
@@ -24,11 +24,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     WCHAR exeName[MAX_PATH];
     GetModuleFileName(NULL, exeName, MAX_PATH);
 
-    LPWSTR* argv = CommandLineToArgvW(pCmdLine, &argc);
+    LPWSTR* argv = nullptr;
+    if (wcslen(pCmdLine)) argv = CommandLineToArgvW(pCmdLine, &argc);
 
+    // BRIDGE L 1 config  FILE L 1 f:\testing.adf FILE L 1 d:\pc.img   BRIDGE L 1 config   FILE L f:\testdisk.adf  FILE L f:\rom\XTHardDiskBackup.hdf  FILE L f:\testdisk.adf  FILE L "D:\Virtual Floppy Drive\dokany-master\xdms\xdms\x64\Debug\moo\amos3d.dms" FILE L 1 "E:\Youtube Backup\PlipBox\amiga\BestWB.1.3.1\DOpus.dms" 
     // See if its just a disk image on the command line
- /*   if (argc == 1) {
-        std::wstring txt = pCmdLine;
+    if (argc == 1) {
+        std::wstring txt = argv[0];
         size_t pos = txt.rfind(L".");
         if (pos != std::wstring::npos) {
             std::wstring ext = txt.substr(pos+1);
@@ -50,9 +52,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                 return 0;
             }
         }
-    }*/
+    }
 
-    if (argc < 3) return RETURNCODE_BADARGS;        
+    if (argc < 3) {
+        if (FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE)) return 0;
+        CTrayMenu menu(hInstance, exeName);
+        menu.run();
+        return 0;
+    }
+
+
     // Check Drive Letter
     const WCHAR driveLetter = argv[1][0];
 

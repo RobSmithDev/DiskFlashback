@@ -83,4 +83,6 @@ public:
 	// Looks to see if the active foreground window is explorer and if so use it as a parent
 	static HWND FindPotentialExplorerParent();
 
+	// Refresh the window title
+	void refreshWindowTitle();
 };

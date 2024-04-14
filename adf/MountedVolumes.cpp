@@ -176,7 +176,7 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
                 if (!fatfsSectorCache->flushWriteCache()) return RES_ERROR;
                 return RES_OK;
                 
-            case GET_SECTOR_COUNT	: // Get media size (needed at FF_USE_MKFS == 1) 
+            case GET_SECTOR_COUNT	: // Get media size (needed at FF_USE_MKFS == 1)
                 *((DWORD*)buff) = fatfsSectorCache->numSectorsPerTrack() * fatfsSectorCache->totalNumTracks();
                 return RES_OK;
 
@@ -330,9 +330,17 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
     startVolumes();
 
     // Update the window title based on what's left
-    std::wstring title = m_mountMode + std::to_wstring(m_io->id()) + L"_";
-    for (MountedVolume* volume : m_volumes) title += volume->getMountPoint().substr(0, 1);
-    m_window.setWindowTitle(title);
+    refreshWindowTitle();
+}
+
+void VolumeManager::refreshWindowTitle() {
+    if (m_io) {
+        std::wstring title = m_mountMode + std::to_wstring(m_io->id()) + L"_";
+        for (MountedVolume* volume : m_volumes) 
+            if (volume->getMountPoint().substr(0, 1) != L"?")
+                title += volume->getMountPoint().substr(0, 1);
+        m_window.setWindowTitle(title);
+    }
 }
 
 // triggers the re-mounting of a disk

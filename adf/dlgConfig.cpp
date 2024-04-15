@@ -9,11 +9,19 @@
 #include "readwrite_dms.h"
 #include "floppybridge_lib.h"
 
-#define REGISTRY_SECTION	L"Software\\RobSmithDev\\DiskFlashback"
-#define KEY_FLOPPY_PROFILE	"floppyprofile"
-#define KEY_FLOPPY_ENABLED  "floppyenabled"
-#define KEY_UPDATE_CHECK    "updatecheck"
-#define KEY_DRIVE_LETTER    "driveletter"
+#define REGISTRY_SECTION			L"Software\\RobSmithDev\\DiskFlashback"
+#define KEY_FLOPPY_PROFILE			"floppyprofile"
+#define KEY_FLOPPY_ENABLED			"floppyenabled"
+#define KEY_UPDATE_CHECK			"updatecheck"
+#define KEY_DRIVE_LETTER			"driveletter"
+#define KEY_LAST_UPDATE_CHECK		"lastcheck"
+
+// A bit hacky but enough for what I need
+uint32_t getStamp() {
+	SYSTEMTIME st, lt;
+	GetLocalTime(&lt);
+	return lt.wDay + (lt.wMonth * 32) + (lt.wYear * 32 * 32);
+}
 
 // Load config from the registry
 bool loadConfiguration(AppConfig& config) {
@@ -21,6 +29,7 @@ bool loadConfiguration(AppConfig& config) {
 	config.enabled = true;
 	config.floppyProfile = "";
 	config.driveLetter = 'A';
+	config.lastCheck = getStamp() - 6;
 
 	HKEY key;
 	DWORD disp = 0;
@@ -51,6 +60,10 @@ bool loadConfiguration(AppConfig& config) {
 	if (RegGetValueA(key, NULL, KEY_UPDATE_CHECK, RRF_RT_REG_DWORD, NULL, &dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
 	if (dataSize == sizeof(dTemp)) config.checkForUpdates = dTemp != 0;
 
+	dataSize = sizeof(dTemp);
+	if (RegGetValueA(key, NULL, KEY_LAST_UPDATE_CHECK, RRF_RT_REG_DWORD, NULL, &dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
+	if (dataSize == sizeof(dTemp)) config.lastCheck = dTemp;
+
 	RegCloseKey(key);
 	return true;
 }
@@ -71,6 +84,8 @@ bool saveConfiguration(const AppConfig& config) {
 
 	dTemp = config.checkForUpdates ? 1 : 0;
 	RegSetValueExA(key, KEY_UPDATE_CHECK, 0, REG_DWORD, (const BYTE*)&dTemp, sizeof(dTemp));
+	RegSetValueExA(key, KEY_UPDATE_CHECK, 0, REG_DWORD, (const BYTE*)&config.lastCheck, sizeof(config.lastCheck));
+
 
 	RegCloseKey(key);
 	return true;
@@ -126,6 +141,11 @@ bool DialogConfig::doModal() {
 // Init dialog
 void DialogConfig::handleInitDialog(HWND hwnd) {
 	m_dialogBox = hwnd;
+
+	HICON icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON1));
+	SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+	SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
+
 	
 	/// DRIVER
 	HWND ctrl = GetDlgItem(hwnd, IDC_DRIVER);

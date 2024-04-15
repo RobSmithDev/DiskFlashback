@@ -26,6 +26,7 @@ private:
     HMENU m_hCreateList = 0;
     HMENU m_hCreateListDD = 0;
     HMENU m_hCreateListHD = 0;
+    HMENU m_hUpdates = 0;
     std::map<std::wstring, DriveInfo> m_drives;
     const std::wstring m_exeName;
 
@@ -56,6 +57,13 @@ private:
     // Create file system on file
     void installAmigaFS(bool isHD, SectorCacheEngine* fle);
     void installIBMPCFS(bool isHD, bool isIBMPC, SectorCacheEngine* fle);
+
+
+    void checkForUpdates(bool force);
+    DWORD getAppVersion();
+
+    // Handle tray contect menu
+    void doContextMenu(POINT pt);
 
 public:
     CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName);

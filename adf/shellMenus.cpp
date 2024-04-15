@@ -46,9 +46,9 @@ void ShellRegistery::populateDiskImageMenu(bool add, const std::wstring& path, W
 		if (key) RegCloseKey(key);
 		RegSetValue(HKEY_CURRENT_USER, clsRoot.c_str(), REG_SZ, L"&Copy to Disk...", 16*2);
 
-		 r = RegSetKeyValue(HKEY_CURRENT_USER, clsRoot.c_str(), L"Icon", REG_SZ, iconNumber.c_str(), iconNumber.length() * 2);
+		 r = RegSetKeyValue(HKEY_CURRENT_USER, clsRoot.c_str(), L"Icon", REG_SZ, iconNumber.c_str(), (DWORD)iconNumber.length() * 2);
 		clsRoot += L"\\command";
-		RegSetValue(HKEY_CURRENT_USER, clsRoot.c_str(), REG_SZ, cmd.c_str(), cmd.length() * 2);
+		RegSetValue(HKEY_CURRENT_USER, clsRoot.c_str(), REG_SZ, cmd.c_str(), (DWORD)cmd.length() * 2);
 	}
 	else {
 		std::wstring clsRoot2 = clsRoot + L"\\CopyToDisk";
@@ -60,9 +60,15 @@ void ShellRegistery::populateDiskImageMenu(bool add, const std::wstring& path, W
 
 // Add data to the context menu for disk images
 void ShellRegistery::setupDiskImageMenu(bool add, WCHAR driveLetter) {
+#ifdef ATARTST_SUPPORTED
 	#define MAX_DISK_IMAGE_FILES 7
 	static const WCHAR* DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"adf",L"dms",L"hda",L"hdf",L"st",L"img",L"ima" };
 	static const bool   DiskImageCopy[MAX_DISK_IMAGE_FILES] = { true, true, false, false, true, true, true };
+#else
+	#define MAX_DISK_IMAGE_FILES 6
+	static const WCHAR* DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"adf",L"dms",L"hda",L"hdf",L"img",L"ima" };
+	static const bool   DiskImageCopy[MAX_DISK_IMAGE_FILES] = { true, true, false, false, true, true };
+#endif
 
 	WCHAR path[128];
 	WCHAR keyname[128];
@@ -74,11 +80,11 @@ void ShellRegistery::setupDiskImageMenu(bool add, WCHAR driveLetter) {
 		if (((RegQueryValue(HKEY_CURRENT_USER, path, keyname, &len) != ERROR_SUCCESS)) || (len<=2)) {
 			std::wstring clsRoot = path + std::wstring(keyname);
 			std::wstring name = std::wstring(DiskImageFiles[fType]) + L" Disk Image File";
-			RegSetValue(HKEY_CURRENT_USER, clsRoot.c_str(), REG_SZ, name.c_str(), name.length() * 2);;
+			RegSetValue(HKEY_CURRENT_USER, clsRoot.c_str(), REG_SZ, name.c_str(), (DWORD)name.length() * 2);;
 		}
 		std::wstring tmp = L"Software\\Classes\\." + std::wstring(DiskImageFiles[fType]) + L"\\OpenWithProgIds";
 		std::wstring tmp2 = L"";
-		RegSetKeyValueW(HKEY_CURRENT_USER, tmp.c_str(), APPLICATION_NAME_L, REG_SZ, tmp2.c_str(), tmp2.length() * 2);
+		RegSetKeyValueW(HKEY_CURRENT_USER, tmp.c_str(), APPLICATION_NAME_L, REG_SZ, tmp2.c_str(), (DWORD)tmp2.length() * 2);
 
 		tmp = L"Software\\Classes\\" + std::wstring(keyname) + L"\\shell";
 
@@ -138,7 +144,9 @@ void ShellRegistery::mountDismount(bool mounted, WCHAR driveLetter, SectorCacheE
 			switch (sectorSource->getSystemType()) {
 			case SectorType::stAmiga: applyRegistryAction(driveLetter, L"ADFMounterSystemCopy", L"&Copy to .ADF...", 0, L"BACKUP"); break;
 			case SectorType::stIBM: applyRegistryAction(driveLetter, L"ADFMounterSystemCopy", L"&Copy to .IMG...", 0, L"BACKUP"); break;
+#ifdef ATARTST_SUPPORTED
 			case SectorType::stAtari: applyRegistryAction(driveLetter, L"ADFMounterSystemCopy", L"&Copy to .ST...", 0, L"BACKUP"); break;
+#endif
 			}
 		}
 

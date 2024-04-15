@@ -11,6 +11,7 @@
 #include "dlgCopy.h"
 #include "fatfs/source/ff.h"
 #include "fatfs/source/diskio.h"
+#include "resource.h"
 
 #define TIMERID_MONITOR_FILESYS 1000
 #define WM_DISKCHANGE (WM_USER + 1)
@@ -208,6 +209,10 @@ VolumeManager::VolumeManager(HINSTANCE hInstance, const std::wstring& mainExe, W
     m_currentSectorFormat(SectorType::stUnknown), m_forceReadOnly(forceReadOnly), m_hInstance(hInstance)  {
     DokanInit();
 
+    HICON icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+    SendMessage(m_window.hwnd(), WM_SETICON, ICON_SMALL, (LPARAM)icon);
+    SendMessage(m_window.hwnd(), WM_SETICON, ICON_BIG, (LPARAM)icon);
+
     // Prepare the ADF library
     adfEnvInitDefault();
     adfSetEnvFct((AdfLogFct)Error, (AdfLogFct)Warning, (AdfLogFct)Verbose, NULL);
@@ -299,6 +304,7 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
                 if (!m_adfDevice) diskFormat = SectorType::stUnknown;                     
                 break;
+#ifdef ATARTST_SUPPORTED
             case SectorType::stHybrid:
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
                 m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
@@ -314,6 +320,7 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
                         if (!m_adfDevice && !m_fatDevice) diskFormat = SectorType::stIBM;
                 break;
             case SectorType::stAtari:
+#endif
             case SectorType::stIBM:
                 m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
                 if (m_fatDevice) {

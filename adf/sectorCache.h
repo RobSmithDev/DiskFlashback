@@ -5,8 +5,15 @@
 #include <unordered_map>
 #include <atomic>
 
+// #define ATARTST_SUPPORTED
+
 // Possible types of sector / file
-enum class SectorType  {stAmiga, stIBM, stAtari, stHybrid, stUnknown};
+enum class SectorType  {stAmiga, stIBM, 
+#ifdef ATARTST_SUPPORTED
+    stAtari, stHybrid, 
+#endif
+    stUnknown
+};
 
 class SectorCacheEngine {
 private:

@@ -63,11 +63,14 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
         if ((ext == L"IMG") || (ext == L"IMA")) {
             m_fileType = SectorType::stIBM;
             m_serialNumber = 0x494D4130;
-        } else
+        } 
+#ifdef ATARTST_SUPPORTED
+        else
         if (ext == L"ST") {
             m_fileType = SectorType::stAtari;
             m_serialNumber = 0x53544630;
         }
+#endif
 
         if (SUCCEEDED(SetFilePointer(m_file, 0, NULL, FILE_BEGIN))) {
             DWORD read;

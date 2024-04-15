@@ -10,6 +10,7 @@ struct AppConfig {
 	char        driveLetter;
 	bool		enabled;
 	bool		checkForUpdates;
+	uint32_t	lastCheck;
 };
 
 
@@ -45,3 +46,6 @@ public:
 extern bool loadConfiguration(AppConfig& config);
 // Save config to the registry
 extern bool saveConfiguration(const AppConfig& config);
+
+// Returns a number representing days
+uint32_t getStamp();

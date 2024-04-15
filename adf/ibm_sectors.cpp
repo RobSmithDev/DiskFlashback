@@ -238,7 +238,8 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 					// See if this already exists 
 					auto it = decodedTrack.sectors.find(sector.header.sector-1);
 					if (it == decodedTrack.sectors.end()) {
-						decodedTrack.sectors.insert(std::make_pair(sector.header.sector-1, sec));
+						if (sector.header.sector <= 22)
+							decodedTrack.sectors.insert(std::make_pair(sector.header.sector-1, sec));
 					}
 					else {
 						// Does exist. Keep the better copy
@@ -268,13 +269,7 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 	// Work out the average gap size
 	if (numGaps) {
 		gapTotal /= numGaps;
-
-		// Should be around 84 for a standard PC disk
-		char buf[100];
-		sprintf_s(buf, "Actual Bytes: %i\n", gapTotal);
-		OutputDebugStringA(buf);
 		nonstandardTimings = gapTotal < 70;  // less than is probably an Atari ST disk
-
 	}
 
 
@@ -347,7 +342,7 @@ uint32_t writeMarkerMFM(uint8_t* mem, const uint64_t value, uint8_t& lastByte, u
 }
 
 // Encode the track supplied into a raw MFM bit-stream
-uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, DecodedTrack* decodedTrack, const uint32_t trackNumber, uint32_t mfmBufferSizeBytes, void* trackData) {
+uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, bool forceAtariTiming, DecodedTrack* decodedTrack, const uint32_t trackNumber, uint32_t mfmBufferSizeBytes, void* trackData) {
 	uint8_t lastByte = 0x55;
 	const uint32_t cylinder = trackNumber / 2;
 	const bool upperSide = trackNumber & 1;
@@ -374,22 +369,27 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 	switch (decodedTrack->sectors.size()) {
 	case 10: // double density atari
 		gap3Size = 40;
+		forceAtariTiming = true;
 		break;
 	case 11: // double density atari
 		gap1Size = 10;
 		gap3Size = 1;
 		gap4bSize = 0;
+		forceAtariTiming = true;
 		break;
 	case 19: 
 		gap3Size = 26;
+		forceAtariTiming = true;
 		break;
 	case 20:
 		gap3Size = 20;
+		forceAtariTiming = true;
 		break;
 	case 21:
 		gap1Size = 10;
 		gap3Size = 1;
 		gap4bSize = 1;
+		forceAtariTiming = true;
 		break;	
 	case 22:
 		gap1Size = 1;   
@@ -397,6 +397,7 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 		gap4aSize = 1;
 		gap4bSize = 1;
 		gap2Size = 4;
+		forceAtariTiming = true;
 		break;
 	}
 
@@ -404,10 +405,11 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 	uint8_t* memOverflow = mem + mfmBufferSizeBytes;
 	
 	mem += gapFillMFM(mem, gap4aSize, 0x4E, lastByte, memOverflow);
-
-	mem += writeRawMFM(mem, 24, 0xAA, lastByte, memOverflow);
-	mem += writeMarkerMFM(mem, MFM_SYNC_TRACK_HEADER, lastByte, memOverflow);
-	mem += gapFillMFM(mem, gap1Size, 0x4E, lastByte, memOverflow);
+	if (!forceAtariTiming) {
+		mem += writeRawMFM(mem, 24, 0xAA, lastByte, memOverflow);
+		mem += writeMarkerMFM(mem, MFM_SYNC_TRACK_HEADER, lastByte, memOverflow);
+		mem += gapFillMFM(mem, gap1Size, 0x4E, lastByte, memOverflow);
+	}
 	for (uint32_t sec = 0; sec < decodedTrack->sectors.size(); sec++) {
 		const DecodedSector& sector = decodedTrack->sectors[sec];
 

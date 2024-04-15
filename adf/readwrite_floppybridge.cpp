@@ -137,7 +137,11 @@ bool SectorRW_FloppyBridge::isDiskPresent() {
 // Return TRUE if the disk is write protected
 bool SectorRW_FloppyBridge::isDiskWriteProtected() {
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
-    return (m_diskType == SectorType::stHybrid) || m_bridge->isWriteProtected();
+    return 
+#ifdef ATARTST_SUPPORTED
+        (m_diskType == SectorType::stHybrid) ||
+#endif
+        m_bridge->isWriteProtected();
 }
 
 // Show disk removed warning - returns TRUE if disk was re-inserted
@@ -423,11 +427,13 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
             m_diskType = SectorType::stIBM;
             uint32_t totalSectors;
             if (getTrackDetails_IBM(&trIBM, serialNumber, totalSectors, sectorsPerTrack, bytesPerSector)) {
+#ifdef ATARTST_SUPPORTED
                 if ((trIBM.sectors.size() >= 5) && (trAmiga.sectors.size() > 1)) {
                     m_diskType = SectorType::stHybrid;
                 }
                 else
                     if (nonStandard) m_diskType = SectorType::stAtari;   
+#endif
                 m_sectorsPerTrack = sectorsPerTrack;
                 m_bytesPerSector = bytesPerSector;
                 m_serialNumber = serialNumber;
@@ -442,11 +448,17 @@ bool SectorRW_FloppyBridge::doTrackReading(const uint32_t track, bool retryMode)
         }
     }
 
+#ifdef ATARTST_SUPPORTED
     if ((m_diskType == SectorType::stAmiga) || (m_diskType == SectorType::stHybrid))
         findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack, m_trackCache[track]);
     if ((m_diskType == SectorType::stAtari) || (m_diskType == SectorType::stIBM) || (m_diskType == SectorType::stHybrid))
         findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack, m_trackCache[track]);
-
+#else
+    if (m_diskType == SectorType::stAmiga) 
+        findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack, m_trackCache[track]);
+    if (m_diskType == SectorType::stIBM) 
+        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack, m_trackCache[track]);
+#endif
     // Switch the buffer so next time we get a different one, maybe with less errors - not atcually used as we're in direct mode
     m_bridge->mfmSwitchBuffer(track & 1);
 
@@ -575,6 +587,7 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
         switch (m_diskType) {
         case SectorType::stAmiga: numBytes = encodeSectorsIntoMFM_AMIGA(isHD(), m_trackCache[track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
         case SectorType::stIBM: numBytes = encodeSectorsIntoMFM_IBM(isHD(), false, &m_trackCache[track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
+#ifdef ATARTST_SUPPORTED
         case SectorType::stAtari: numBytes = encodeSectorsIntoMFM_IBM(isHD(), true, &m_trackCache[track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
         case SectorType::stHybrid: 
             // Need to work out which type of track it is although technically hybrid isnt supported for writing
@@ -582,6 +595,7 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
                 numBytes = encodeSectorsIntoMFM_AMIGA(isHD(), m_trackCache[track], track, MAX_TRACK_SIZE, m_mfmBuffer); 
             else numBytes = encodeSectorsIntoMFM_IBM(isHD(), true, &m_trackCache[track], track, MAX_TRACK_SIZE, m_mfmBuffer); 
             break;
+#endif
         default:
             numBytes = 0;
             break;
@@ -621,7 +635,11 @@ bool SectorRW_FloppyBridge::flushPendingWrites() {
                 }
             }
 
-            if (m_bridge->writeMFMTrackToBuffer(upperSurface, cylinder, (m_diskType == SectorType::stIBM) || (m_diskType == SectorType::stHybrid), numBytes, m_mfmBuffer)) {
+            if (m_bridge->writeMFMTrackToBuffer(upperSurface, cylinder, (m_diskType == SectorType::stIBM) 
+#ifdef ATARTST_SUPPORTED
+                || (m_diskType == SectorType::stHybrid)
+#endif
+                , numBytes, m_mfmBuffer)) {
                 // Now wait until it completes - approx 400-500ms as this will also read it back to verify it
                 ULONGLONG start = GetTickCount64();
                 bool doRetry = false;

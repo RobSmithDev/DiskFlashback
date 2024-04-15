@@ -15,10 +15,15 @@
 #define MENUID_QUIT             10
 #define MENUID_ENABLED          20
 #define MENUID_CONFIGURE        21
+#define MENUID_AUTOUPDATE       22
 #define MENUID_IMAGE_DD         30
 #define MENUID_IMAGE_HD         40
 #define MENUID_EJECTSTART       100
 
+#define TIMERID_UPDATE_CHECK    1000
+
+#pragma comment(lib,"Version.lib")
+#pragma comment(lib,"Ws2_32.lib")
 
 // Search windows for one that uses the drive letter specified
 BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
@@ -60,7 +65,9 @@ void CTrayMenu::setupIcon() {
     m_notify.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON1));
     wcscpy_s(m_notify.szTip, L"DiskFlashback Control");
     m_notify.dwState = 0;
+    m_notify.uVersion = NOTIFYICON_VERSION_4;
     Shell_NotifyIcon(NIM_ADD, &m_notify);
+    Shell_NotifyIcon(NIM_SETVERSION, &m_notify);
 }
 
 // Prepare the menu
@@ -69,17 +76,19 @@ void CTrayMenu::setupMenu() {
     m_hDriveMenu = CreatePopupMenu();
     m_hPhysicalMenu = CreatePopupMenu();
     m_hCreateList = CreatePopupMenu();
-
+    m_hUpdates = CreatePopupMenu();
     m_hCreateListDD = CreatePopupMenu();
     m_hCreateListHD = CreatePopupMenu();
 
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD   , L"Amiga ADF Image...");
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD +1, L"IBM PC Image...");
-    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD +2, L"Atari ST Image...");
-
     AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD,     L"Amiga ADF Image...");
     AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 1, L"IBM PC Image...");
+#ifdef ATARTST_SUPPORTED
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD +2, L"Atari ST Image...");
     AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 2, L"Atari ST Image...");
+#endif
+
 
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListDD, L"Double Density");
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListHD, L"High Density");
@@ -92,10 +101,74 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hDriveMenu,     L"Eject");
     AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hPhysicalMenu,  L"&Physical Drive");
-    AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
+    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hUpdates,      L"Updates");
+    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
+
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE, L"Automatically Check for Updates");
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates...");
+    
     AppendMenu(m_hMenu, MF_STRING,              MENUID_QUIT,                L"&Quit");
 
     CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(m_hUpdates, MENUID_AUTOUPDATE, MF_BYCOMMAND | m_config.checkForUpdates ? MF_CHECKED : MF_UNCHECKED);
+}
+
+// Grab version from exe
+DWORD CTrayMenu::getAppVersion() {
+    DWORD  verHandle = 0;
+    UINT   size = 0;
+    LPBYTE lpBuffer = NULL;
+    DWORD  verSize = GetFileVersionInfoSize((LPCWSTR)m_exeName.c_str(), &verHandle);
+
+    if (verSize != NULL) {
+        LPSTR verData = new char[verSize];
+        if (GetFileVersionInfo((LPCWSTR)m_exeName.c_str(), verHandle, verSize, verData)) {
+            if (VerQueryValue(verData, L"\\", (LPVOID*)&lpBuffer, &size)) {
+                if (size) {
+                    VS_FIXEDFILEINFO* verInfo = (VS_FIXEDFILEINFO*)lpBuffer;
+                    DWORD ver = (HIWORD(verInfo->dwProductVersionMS) << 24) | (LOWORD(verInfo->dwProductVersionMS) << 16) | (HIWORD(verInfo->dwProductVersionLS) << 8) | LOWORD(verInfo->dwProductVersionLS);
+                    delete[] verData;
+                    return ver;
+                }
+            }
+        }
+        delete[] verData;
+    }
+    return 0;
+}
+
+// Check for updates (auto is only every 7 days)
+void CTrayMenu::checkForUpdates(bool force) {
+    if (!force)
+        if (getStamp() - m_config.lastCheck < 7) return;
+
+    m_config.lastCheck = getStamp();
+    saveConfiguration(m_config);
+
+    // Fetch version from 'A' record in the DNS record
+    hostent* address = gethostbyname("diskflashback.robsmithdev.co.uk");
+    if ((address) && (address->h_addrtype == AF_INET)) {
+        if (address->h_addr_list[0] != 0) {
+            in_addr add = *((in_addr*)address->h_addr_list[0]);
+
+            DWORD netVersion = (add.S_un.S_un_b.s_b1 << 24) | (add.S_un.S_un_b.s_b2 << 16) | (add.S_un.S_un_b.s_b3 << 8) | add.S_un.S_un_b.s_b4;
+            DWORD appVersion = getAppVersion();
+         
+            //if (appVersion < netVersion) {
+            {
+                // Do popup for updates available
+                //m_notify.dwInfoFlags 
+                m_notify.uFlags |= NIF_INFO;
+                m_notify.dwInfoFlags = NIIF_INFO;
+                wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
+
+                Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+                m_notify.uFlags &= ~NIF_INFO;
+            }
+        }
+    }   
 }
 
 // Populate the list of drives
@@ -143,11 +216,13 @@ void CTrayMenu::runCreateImage(bool isHD, uint32_t option) {
         ext = L"img";
         sectors = 9;
         break;
+#ifdef ATARTST_SUPPORTED
     case 2:
         dlg.lpstrFilter = L"Atari ST Disk Files (*.st)\0*.st\0All Files(*.*)\0*.*\0\0";
         ext = L"st";
         sectors = 9;
         break;
+#endif
     default:
         return; // not supported
     }
@@ -240,7 +315,11 @@ void CTrayMenu::installIBMPCFS(bool isHD, bool isIBMPC, SectorCacheEngine* fle) 
     if (!m_fatDevice) return;
     memset(m_fatDevice, 0, sizeof(FATFS));
 
+#ifdef ATARTST_SUPPORTED
     getMkFsParams(isHD, isIBMPC ? SectorType::stIBM : SectorType::stAtari, opt);
+#else
+    getMkFsParams(isHD, SectorType::stIBM, opt);
+#endif
     setFatFSSectorCache(fle);
     f_mkfs(L"\\", &opt, work, sizeof(work));
     f_mount(m_fatDevice, L"", 1);
@@ -268,8 +347,18 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     if ((index >= MENUID_IMAGE_HD) && (index < MENUID_IMAGE_HD + 3)) runCreateImage(true, index - MENUID_IMAGE_HD);
 
     switch (index) {
+    
+    case MENUID_AUTOUPDATE:
+        m_config.checkForUpdates = !m_config.checkForUpdates;
+        saveConfiguration(m_config);
+        CheckMenuItem(m_hUpdates, MENUID_AUTOUPDATE, MF_BYCOMMAND | m_config.checkForUpdates ? MF_CHECKED : MF_UNCHECKED);
+        break;
+    case MENUID_AUTOUPDATE+1:
+        checkForUpdates(true);
+        break;
     case MENUID_ENABLED: 
         m_config.enabled = !m_config.enabled;
+        saveConfiguration(m_config);
         CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
         break;
     case MENUID_CREATEDISK: break;
@@ -289,42 +378,57 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     }
 }
 
+// Handle tray contect menu
+void CTrayMenu::doContextMenu(POINT pt) {
+    HMONITOR m = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
+    DWORD flags = TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_RETURNCMD;
+    if (m) {
+        MONITORINFO data;
+        data.cbSize = sizeof(data);
+        GetMonitorInfo(m, &data);
+
+        if (pt.x > data.rcMonitor.left + (data.rcMonitor.right - data.rcMonitor.left) / 2)
+            flags |= TPM_RIGHTALIGN; else flags |= TPM_LEFTALIGN;
+        if (pt.y > data.rcMonitor.top + (data.rcMonitor.bottom - data.rcMonitor.top) / 2)
+            flags |= TPM_BOTTOMALIGN; else flags |= TPM_TOPALIGN;
+    }
+    else flags |= TPM_BOTTOMALIGN | TPM_RIGHTALIGN;
+    populateDrives();
+    SetForegroundWindow(m_window.hwnd());
+    uint32_t index = TrackPopupMenu(m_hMenu, flags, pt.x, pt.y, 0, m_window.hwnd(), NULL);
+    PostMessage(m_window.hwnd(), WM_NULL, 0, 0);
+
+    handleMenuResult(index);
+}
+
 // Handle mouse input
 void CTrayMenu::handleMenuInput(UINT uID, UINT iMouseMsg) {
     switch (iMouseMsg) {
-            case WM_RBUTTONDOWN: {
-                POINT pt;
-                GetCursorPos(&pt);
-                populateDrives();
-                
-                HMONITOR m = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
-                DWORD flags = TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_RETURNCMD;
-                if (m) {
-                    MONITORINFO data;
-                    data.cbSize = sizeof(data);
-                    GetMonitorInfo(m, &data);
-
-                    if (pt.x > data.rcMonitor.left + (data.rcMonitor.right - data.rcMonitor.left) / 2)
-                        flags |= TPM_RIGHTALIGN; else flags |= TPM_LEFTALIGN;
-                    if (pt.y > data.rcMonitor.top + (data.rcMonitor.bottom - data.rcMonitor.top) / 2)
-                        flags |= TPM_BOTTOMALIGN; else flags |= TPM_TOPALIGN;
-                }
-                else flags |= TPM_BOTTOMALIGN | TPM_RIGHTALIGN;
-                
-                SetForegroundWindow(m_window.hwnd());
-                uint32_t index = TrackPopupMenu(m_hMenu,flags, pt.x, pt.y, 0, m_window.hwnd(), NULL);
-                PostMessage(m_window.hwnd(), WM_NULL, 0, 0);
-
-                handleMenuResult(index);
-            }
-            break;
-        case WM_LBUTTONDBLCLK:
-            doConfig();
-            break;
+        case NIN_BALLOONUSERCLICK:
+            ShellExecute(m_window.hwnd(), L"open", L"https://robsmithdev.co.uk/diskflashback", NULL, NULL, SW_SHOW);
+        break;    
+        case WM_CONTEXTMENU: {
+            RECT r;
+            NOTIFYICONIDENTIFIER id;
+            id.cbSize = sizeof(id);
+            id.hWnd = m_window.hwnd();
+            id.uID = 0;
+            id.guidItem = GUID_NULL;
+            Shell_NotifyIconGetRect(&id, &r);
+            doContextMenu({ (r.left + r.right) / 2, (r.top + r.bottom) / 2 });
+        }
+        break;
+        case WM_RBUTTONDOWN: {
+            POINT pt;
+            GetCursorPos(&pt);
+            doContextMenu(pt);
+        }
+        break;
+    case WM_LBUTTONDBLCLK:
+        doConfig();
+        break;
     }
 }
-
-
 
 // Mount a single disk file
 void CTrayMenu::mountDisk() {
@@ -336,7 +440,11 @@ void CTrayMenu::mountDisk() {
     dlg.hwndOwner = m_window.hwnd();
     std::wstring filter;
     std::wstring defaultFormat;
+#ifdef ATARTST_SUPPORTED
     dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st\0All Files(*.*)\0*.*\0\0";
+#else
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima\0All Files(*.*)\0*.*\0\0";
+#endif
     dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
     dlg.lpstrTitle = L"Select disk image to mount";
     dlg.lpstrFile = filename;
@@ -358,17 +466,42 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
     memset(&m_notify, 0, sizeof(m_notify));
     loadConfiguration(m_config);
 
-    setupIcon();
-    setupMenu();
+    // Start winsock
+    WSADATA data;
+    WSAStartup(MAKEWORD(2, 0), &data);
 
+    setupIcon();
+    setupMenu();   
+
+    HICON icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+    SendMessage(m_window.hwnd(), WM_SETICON, ICON_SMALL, (LPARAM)icon);
+    SendMessage(m_window.hwnd(), WM_SETICON, ICON_BIG, (LPARAM)icon);
 
     // Make sure the icon stays even if explorer dies
     m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT { setupIcon(); return 0; });
-    m_window.setMessageHandler(WM_USER, [this](WPARAM wParam, LPARAM lParam)->LRESULT { 
+    m_window.setMessageHandler(WM_USER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         handleMenuInput((UINT)wParam, (UINT)lParam); return 0; });
+    m_window.setMessageHandler(WM_TIMER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        switch (wParam) {
+        case TIMERID_UPDATE_CHECK:
+            KillTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK);
+            if (m_config.checkForUpdates) checkForUpdates(false);
+            SetTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK, 60000 * 60, NULL);
+            break;
+        }
+        return 0;
+        });
+   
+
+#ifdef _DEBUG
+    SetTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK, 1000, NULL);
+#else
+    SetTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK, 60000, NULL);
+#endif
 }
 
 CTrayMenu::~CTrayMenu() {
+    KillTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK);
     Shell_NotifyIcon(NIM_DELETE, &m_notify);
     DestroyMenu(m_hMenu);
     DestroyMenu(m_hDriveMenu);
@@ -376,6 +509,7 @@ CTrayMenu::~CTrayMenu() {
     DestroyMenu(m_hCreateList);
     DestroyMenu(m_hCreateListDD);
     DestroyMenu(m_hCreateListHD);
+    DestroyMenu(m_hUpdates);
 }
 
 // Main loop

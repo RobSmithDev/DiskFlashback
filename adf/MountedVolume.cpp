@@ -261,7 +261,6 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
 
     if (showExplorer && m_ADFvolume) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
 
-
     return m_ADFvolume != nullptr;
 }
 

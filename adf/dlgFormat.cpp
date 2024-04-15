@@ -28,6 +28,12 @@ INT_PTR DialogFORMAT::doModal() {
 // Init dialog
 void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	m_dialogBox = hwnd;
+
+	HICON icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON1));
+	SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+	SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
+
+
 	m_windowCaption = L"Format ";
 	m_windowCaption += (m_io->isPhysicalDisk() ? L"Disk Drive " : L"Disk Image File ");
 	m_windowCaption += m_fs->getMountPoint().substr(0, 2);
@@ -44,7 +50,9 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	SendMessage(ctrl, CB_ADDSTRING, 0, (LPARAM)L"OFS");
 	SendMessage(ctrl, CB_ADDSTRING, 1, (LPARAM)L"FFS");
 	SendMessage(ctrl, CB_ADDSTRING, 2, (LPARAM)L"FAT (IBM PC)");
+#ifdef ATARTST_SUPPORTED
 	SendMessage(ctrl, CB_ADDSTRING, 3, (LPARAM)L"FAT (Atari ST)");
+#endif
 	SendMessage(ctrl, CB_SETCURSEL, (m_io->getSystemType() == SectorType::stAmiga) ? 0 : 2, 0);
 
 	ctrl = GetDlgItem(hwnd, IDC_LABEL);
@@ -135,10 +143,12 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 			numSectors = bridge->isHD() ? 18 : 9;
 			bridge->overwriteSectorSettings(SectorType::stIBM, totalTracks/2, numSectors, 512);
 			break;
+#ifdef ATARTST_SUPPORTED
 		case 3:
 			numSectors = bridge->isHD() ? 18 : 9;
 			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks/2, numSectors, 512);
 			break;
+#endif
 		default:
 			return false;
 		}

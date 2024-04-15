@@ -44,10 +44,12 @@ INT_PTR DialogCOPY::doModal() {
 			dlg.lpstrFilter = L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"img";
 			break;
+#ifdef ATARTST_SUPPORTED
 		case SectorType::stAtari:
 			dlg.lpstrFilter = L"Atari ST Disk Files (*.st)\0*.st\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"st";
 			break;
+#endif
 		default:
 			return 0; // not supported
 		}
@@ -92,6 +94,10 @@ INT_PTR DialogCOPY::doModal() {
 void DialogCOPY::handleInitDialog(HWND hwnd) {	
 	m_dialogBox = hwnd;
 	HWND ctrl = GetDlgItem(hwnd, IDC_CAPTION);
+
+	HICON icon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON1));
+	SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+	SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)icon);
 
 	// Get "just" the filename
 	std::wstring fname = m_filename;

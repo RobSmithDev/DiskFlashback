@@ -192,56 +192,65 @@ public:
 	// Returns a pointer to a string containing the current config.  This can be used with setConfigFromString() or createDriverFromString()
 	bool getConfigAsString(char** config) const;
 	// Applies the config to the currently driver.  Returns TRUE if successful.
-	bool setConfigFromString(char* config) const;
+	bool setConfigFromString(const char* config) const;
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	// This for setting and getting the driver index in use. Shouldnt normally be changed while in use
+	bool getDriverIndex(int& driverIndex) const;
+	// Set it
+	bool setDriverIndex(const int driverIndex);
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Return the current bridge mode selected
 	bool getBridgeMode(FloppyBridge::BridgeMode* mode) const;
 	// Set the currently active bridge mode.  This can be set while the bridge is in use
-	bool setBridgeMode(FloppyBridge::BridgeMode newMode) const;
+	bool setBridgeMode(const FloppyBridge::BridgeMode newMode) const;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// Return the current bridge density mode selected
 	bool getBridgeDensityMode(FloppyBridge::BridgeDensityMode* mode) const;
 	// Set the currently active bridge density mode.  This can be set while the bridge is in use
-	bool setBridgeDensityMode(FloppyBridge::BridgeDensityMode newMode) const;
+	bool setBridgeDensityMode(const FloppyBridge::BridgeDensityMode newMode) const;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// These require ConfigOption_AutoCache bit set in DriverInformation::configOptions
 	// Returns if auto-disk caching (while the drive is idle) mode is enabled
 	bool getAutoCacheMode(bool* autoCacheMode) const;
 	// Sets if auto-disk caching (while the drive is idle) mode is enabled.  This can be set while the bridge is in use
-	bool setAutoCacheMode(bool autoCacheMode) const;
+	bool setAutoCacheMode(const bool autoCacheMode) const;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// These require ConfigOption_ComPort bit set in DriverInformation::configOptions
 	// Returns the currently selected COM port.  This port is only used if auto detect com port is false
 	bool getComPort(TCharString* comPort) const;
 	// Sets the com port to use.  This port is only used if auto detect com port is false.
-	bool setComPort(TCHAR* comPort) const;
+	bool setComPort(const TCHAR* comPort) const;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// These require ConfigOption_AutoDetectComport bit set in DriverInformation::configOptions
 	// Returns if com port auto-detect is enabled
 	bool getComPortAutoDetect(bool* autoDetect) const;
 	// Sets if auto-detect com port should be used
-	bool setComPortAutoDetect(bool autoDetect) const;
+	bool setComPortAutoDetect(const bool autoDetect) const;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	// These require ConfigOption_DriveABCable bit set in DriverInformation::configOptions
+	// DEPRECATED: These require ConfigOption_DriveABCable bit set in DriverInformation::configOptions
 	// Returns if the driver should use a drive connected as Drive B (true) on the cable rather than Drive A (false)
 	bool getDriveCableSelection(bool* connectToDriveB) const;
 	// Sets if the driver should use a drive connected as Drive B (true) on the cable rather than Drive A (false)
-	bool setDriveCableSelection(bool connectToDriveB) const;
+	bool setDriveCableSelection(const bool connectToDriveB) const;
+
+	// New versions! = connectToDrive 
+	bool getDriveCableSelection(FloppyBridge::DriveSelection* connectToDrive) const;
+	// Sets if the driver should use a drive connected as Drive B (true) on the cable rather than Drive A (false)
+	bool setDriveCableSelection(const FloppyBridge::DriveSelection connectToDrive) const;
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// These require ConfigOption_SmartSpeed bit set in DriverInformation::configOptions
 	// Returns if the driver currently has Smart Speed enabled which can dynamically switch between normal and turbo disk speed without breaking copy protection
 	bool getSmartSpeedEnabled(bool* enabled) const;
 	//  Sets if the driver can dynamically switch between normal and turbo disk speed without breaking copy protectionThis can be set while the bridge is in use
-	bool setSmartSpeedEnabled(bool enabled) const;
-
-
+	bool setSmartSpeedEnabled(const bool enabled) const;
 
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

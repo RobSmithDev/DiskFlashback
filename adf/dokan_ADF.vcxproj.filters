@@ -198,6 +198,9 @@
     <ClInclude Include="dlgConfig.h">
       <Filter>Dialogs</Filter>
     </ClInclude>
+    <ClInclude Include="floppybridge_common.h">
+      <Filter>Interfaces\floppybridge</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">

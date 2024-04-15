@@ -15,6 +15,7 @@ private:
 	SectorType m_currentSectorFormat;
 	bool m_forceReadOnly;
 	HINSTANCE m_hInstance;
+	bool m_triggerExplorer = false;
 
 	// If we have an Amiga disk inserted
 	AdfDevice* m_adfDevice = nullptr;
@@ -76,7 +77,7 @@ public:
 	bool mountDrive(const std::wstring& floppyProfile);
 
 	// Main loop
-	bool run();
+	bool run(bool triggerExplorer = false);
 
 	// Search for the control window matching the drive letter supplied
 	static HWND FindControlWindowForDrive(WCHAR driveLetter);
@@ -86,3 +87,16 @@ public:
 	// Refresh the window title
 	void refreshWindowTitle();
 };
+
+
+
+// ADFLib Native Functions
+RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const BOOL ro);
+RETCODE adfReleaseDevice(struct AdfDevice* const dev);
+RETCODE adfNativeReadSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, uint8_t* const buf);
+RETCODE adfNativeWriteSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, const uint8_t* const buf);
+BOOL adfIsDevNative(const char* const devName);
+void Warning(char* msg);
+void Error(char* msg);
+void Verbose(char* msg);
+void setFatFSSectorCache(SectorCacheEngine* _fatfsSectorCache);

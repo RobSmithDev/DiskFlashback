@@ -82,10 +82,10 @@ void MountedVolume::restoreUnmountedDrive() {
         if (m_ADFdevice) {
             if (m_ADFvolume)
                 if (m_io->isPhysicalDisk()) refreshAmigaVolume(m_ADFdevice);
-            mountFileSystem(m_ADFdevice, m_partitionIndex);
+            mountFileSystem(m_ADFdevice, m_partitionIndex, false);
         }
         if (m_FatFS) {
-            mountFileSystem(m_FatFS, m_partitionIndex);
+            mountFileSystem(m_FatFS, m_partitionIndex, false);
         }
         m_tempUnmount = false;
     }
@@ -210,7 +210,7 @@ uint32_t MountedVolume::getTotalTracks() {
 }
 
 // Mount a Fat12 device
-bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex) {
+bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex, bool showExplorer) {
     m_partitionIndex = partitionIndex;
 
     // Hook up FS_operations
@@ -228,10 +228,12 @@ bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex) 
     }
     m_tempUnmount = false;
 
+    if (showExplorer && m_FatFS) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
+
     return m_FatFS != nullptr;
 }
 
-bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex) {
+bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex, bool showExplorer) {
     if (m_ADFvolume) {
         adfUnMount(m_ADFvolume);
         m_ADFvolume = nullptr;
@@ -256,6 +258,9 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
         //SHChangeNotify(SHCNE_MEDIAINSERTED, SHCNF_PATH, m_drive.c_str(), NULL);
     }
     m_tempUnmount = false;
+
+    if (showExplorer && m_ADFvolume) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
+
 
     return m_ADFvolume != nullptr;
 }

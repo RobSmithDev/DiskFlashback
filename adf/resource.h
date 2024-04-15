@@ -17,13 +17,13 @@
 #define IDC_DRIVER                      1005
 #define IDC_BB                          1006
 #define IDC_PROGRESS                    1007
-#define IDC_DISKTYPE                    1007
 #define ID_CLOSE                        1008
 #define ID_START                        1009
 #define IDC_CABLE                       1009
 #define IDC_COMPORT                     1010
 #define IDC_CAPTION                     1011
-#define IDC_URL                         1012
+#define IDC_CABLE2                      1011
+#define IDC_LETTER                      1011
 #define IDC_AUTODETECT                  1013
 
 // Next default values for new objects

@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <unordered_map>
 #include "sectorCommon.h"
+#include "sectorCache.h"
+#include "FatFS/source/ff.h"
 
 // Feed in Track 0, sector 0 and this will try to extract the number of sectors per track, or 0 on error
 bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector);
@@ -18,4 +20,6 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 // Encode the track supplied into a raw MFM bit-stream
 uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, DecodedTrack* decodedTrack, const uint32_t trackNumber, uint32_t mfmBufferSizeBytes, void* trackData);
 
+// Get the parameter settings for creating an IBM style fs
+void getMkFsParams(bool isHD, SectorType format, MKFS_PARM& params);
 

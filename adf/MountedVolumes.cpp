@@ -119,9 +119,13 @@ void Verbose(char* msg) {
 }
 #pragma endregion ADFLIB
 
-#pragma region FATFS
+    #pragma region FATFS
+
 // I hate this being here
 static SectorCacheEngine* fatfsSectorCache = nullptr;
+void setFatFSSectorCache(SectorCacheEngine* _fatfsSectorCache) {
+    fatfsSectorCache = _fatfsSectorCache;
+}
 DSTATUS disk_status(BYTE pdrv) {
     if (fatfsSectorCache && (pdrv == 0)) {
         if (!fatfsSectorCache->isDiskPresent()) return STA_NODISK;
@@ -237,7 +241,7 @@ uint32_t VolumeManager::mountIBMVolumes(uint32_t startPoint) {
         // new volume required
         m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
     }
-    if (m_volumes[startPoint]->mountFileSystem(m_fatDevice, 0)) startPoint++;
+    if (m_volumes[startPoint]->mountFileSystem(m_fatDevice, 0, m_triggerExplorer)) startPoint++;
 
     return startPoint;
 }
@@ -254,7 +258,7 @@ uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
             // new volume required
             m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
         }
-        if (m_volumes[ startPoint]->mountFileSystem(m_adfDevice, volumeNumber)) startPoint++;
+        if (m_volumes[ startPoint]->mountFileSystem(m_adfDevice, volumeNumber, m_triggerExplorer)) startPoint++;
         if (letter != L'?') {
             letter++;
             if (letter > 'Z') letter = 'A';
@@ -324,7 +328,7 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
 
         // Mount all drives using the new file system
         mountIBMVolumes(mountAmigaVolumes(0));
-        
+        m_triggerExplorer = false;
     }
     // Start the physical drive letters
     startVolumes();
@@ -411,7 +415,7 @@ bool VolumeManager::mountDrive(const std::wstring& floppyProfile) {
     }
 
     m_io = b;
-    fatfsSectorCache = m_io;
+    setFatFSSectorCache(m_io);
     m_mountMode = COMMANDLINE_MOUNTDRIVE;
     return true;
 }
@@ -527,7 +531,8 @@ LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM c
 }
 
 // Actually run the drive
-bool VolumeManager::run() {
+bool VolumeManager::run(bool triggerExplorer) {
+    m_triggerExplorer = triggerExplorer;
     if (!m_io) return false;
     if (m_mountMode.empty()) return false;
   

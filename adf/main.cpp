@@ -30,12 +30,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     WCHAR exeName[MAX_PATH];
     GetModuleFileName(NULL, exeName, MAX_PATH);
 
-    {
-        DialogConfig config(hInstance, GetDesktopWindow());
-        config.doModal();
-        return 0;
-    }
-
     LPWSTR* argv = nullptr;
     if (wcslen(pCmdLine)) argv = CommandLineToArgvW(pCmdLine, &argc);
 
@@ -55,7 +49,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                     return RETURNCODE_MOUNTFAIL;
                 }
                 try {
-                    vol->run();
+                    vol->run(true);
                 }
                 catch (const std::exception& ex) {
                     UNREFERENCED_PARAMETER(ex);

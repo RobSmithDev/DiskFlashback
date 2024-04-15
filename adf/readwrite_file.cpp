@@ -87,7 +87,8 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
         }
     }
     if (!m_sectorsPerTrack) m_sectorsPerTrack = SectorRW_File::GuessSectorsPerTrackFromImageSize(GetFileSize(fle, NULL));
-    m_totalTracks = m_sectorsPerTrack ? 0 : (GetFileSize(fle, NULL) / m_sectorsPerTrack);
+
+    m_totalTracks = m_sectorsPerTrack ? (GetFileSize(fle, NULL) / m_sectorsPerTrack) / 512 : 80;
 }
 
 

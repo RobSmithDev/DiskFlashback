@@ -59,6 +59,7 @@ INT_PTR DialogCOPY::doModal() {
 		dlg.Flags = OFN_CREATEPROMPT | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT | OFN_HIDEREADONLY | OFN_NOREADONLYRETURN | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
 		dlg.lpstrDefExt = m_fileExtension.c_str();
 		dlg.lpstrFile = filename;
+		dlg.lpstrTitle = title.c_str();
 		dlg.nMaxFile = MAX_PATH;
 		if (!GetSaveFileName(&dlg))  return 0;
 		m_filename = filename;

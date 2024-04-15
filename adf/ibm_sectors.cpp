@@ -54,6 +54,28 @@ inline uint16_t wordSwap(uint16_t w) {
 	return (w << 8) | (w >> 8);
 }
 
+// Get the parameter settings for creating an IBM style fs
+void getMkFsParams(bool isHD, SectorType format, MKFS_PARM& params) {
+	params.fmt = FM_FAT | FM_SFD;
+	params.align = 0;
+	params.n_fat = 2;
+	params.n_heads = 2;
+	params.d_num = 0;
+
+	if (isHD) {
+		params.au_size = 512;
+		params.n_root = 224;
+		params.mdt = 0xF0;
+		params.sec_per_track = 18;
+	}
+	else {
+		params.au_size = 1024;
+		params.n_root = 112;
+		params.mdt = 0xF9;
+		params.sec_per_track = 9;
+	}
+}
+
 // Very nasty, I'm sure theres a better way than this
 uint32_t encodeMFMdata(const uint8_t* input, uint8_t* output, const uint32_t inputSize, uint8_t& lastByte, uint8_t* memOverflow) {
 

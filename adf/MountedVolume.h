@@ -28,9 +28,9 @@ public:
     virtual ~MountedVolume();
 
     // mount AMIGA file system
-	bool mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex);
+	bool mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex, bool showExplorer);
     // Mount a Fat12 device
-    bool mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex);
+    bool mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex, bool showExplorer);
 
     // Unmount *any* file system 
 	void unmountFileSystem();

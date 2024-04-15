@@ -387,6 +387,7 @@
     <ClInclude Include="drivecontrol.h" />
     <ClInclude Include="fat_operations.h" />
     <ClInclude Include="floppybridge_abstract.h" />
+    <ClInclude Include="floppybridge_common.h" />
     <ClInclude Include="floppybridge_lib.h" />
     <ClInclude Include="ibm_sectors.h" />
     <ClInclude Include="menu.h" />

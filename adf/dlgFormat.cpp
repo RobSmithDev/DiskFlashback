@@ -8,6 +8,7 @@
 #include "fatfs/source/ff.h"
 #include "MountedVolume.h"
 #include "readwrite_floppybridge.h"
+#include "ibm_sectors.h"
 
 DialogFORMAT::DialogFORMAT(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs) :
 	m_hInstance(hInstance), m_hParent(hParent), m_io(io), m_fs(fs) {
@@ -169,25 +170,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	else {
 		BYTE work[FF_MAX_SS];
 		MKFS_PARM opt;
-		opt.fmt = FM_FAT | FM_SFD;
-		opt.align = 0;
-		opt.n_fat = 2;
-		opt.n_heads = 2;
-		opt.d_num = 0;
-
-		if (bridge->isHD()) {
-			opt.au_size = 512;
-			opt.n_root = 224;
-			opt.mdt = 0xF0;
-			opt.sec_per_track = 18;
-		}
-		else {
-			opt.au_size = 1024;
-			opt.n_root = 112;
-			opt.mdt = 0xF9;
-			opt.sec_per_track = 9;
-		}
-
+		getMkFsParams(bridge->isHD(), SectorType::stIBM, opt);
 		if (f_mkfs(L"\\", &opt, work, sizeof(work)) != FR_OK) return false;
 		std::wstring t;
 		ansiToWide(volumeLabel, t);

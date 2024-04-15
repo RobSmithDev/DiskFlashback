@@ -4,7 +4,21 @@
 #include "resource.h"
 #include "drivecontrol.h"
 #include "menu.h"
-#include "dlgConfig.h"
+#include "adflib/src/adflib.h"
+#include "fatfs/source/ff.h"
+#include "readwrite_file.h"
+#include "MountedVolumes.h"
+#include "ibm_sectors.h"
+
+#define MENUID_CREATEDISK       1
+#define MENUID_MOUNTDISK        2
+#define MENUID_QUIT             10
+#define MENUID_ENABLED          20
+#define MENUID_CONFIGURE        21
+#define MENUID_IMAGE_DD         30
+#define MENUID_IMAGE_HD         40
+#define MENUID_EJECTSTART       100
+
 
 // Search windows for one that uses the drive letter specified
 BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
@@ -36,7 +50,6 @@ BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
     return TRUE;
 }
 
-
 // Prepare the icon
 void CTrayMenu::setupIcon() {
     m_notify.cbSize = sizeof(m_notify);
@@ -55,30 +68,224 @@ void CTrayMenu::setupMenu() {
     m_hMenu = CreatePopupMenu();
     m_hDriveMenu = CreatePopupMenu();
     m_hPhysicalMenu = CreatePopupMenu();
+    m_hCreateList = CreatePopupMenu();
 
-    AppendMenu(m_hPhysicalMenu, MF_STRING,      20,                          L"Enabled");
-    AppendMenu(m_hPhysicalMenu, MF_STRING,      21,                          L"Configure...");
+    m_hCreateListDD = CreatePopupMenu();
+    m_hCreateListHD = CreatePopupMenu();
+
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD   , L"Amiga ADF Image...");
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD +1, L"IBM PC Image...");
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD +2, L"Atari ST Image...");
+
+    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD,     L"Amiga ADF Image...");
+    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 1, L"IBM PC Image...");
+    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 2, L"Atari ST Image...");
+
+    AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListDD, L"Double Density");
+    AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListHD, L"High Density");
+
+    AppendMenu(m_hPhysicalMenu, MF_STRING,      MENUID_ENABLED,             L"Enabled");
+    AppendMenu(m_hPhysicalMenu, MF_STRING,      MENUID_CONFIGURE,           L"Configure...");
     
-    AppendMenu(m_hMenu, MF_STRING,              1,                          L"Create Disk Image...");
-    AppendMenu(m_hMenu, MF_STRING,              2,                          L"Mount Disk Image...");
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCreateList,    L"Create Disk Image");
+    AppendMenu(m_hMenu, MF_STRING,              MENUID_MOUNTDISK,           L"Mount Disk Image...");
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hDriveMenu,     L"Eject");
     AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hPhysicalMenu,  L"&Physical Drive");
     AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
-    AppendMenu(m_hMenu, MF_STRING,              10,                         L"&Quit");
+    AppendMenu(m_hMenu, MF_STRING,              MENUID_QUIT,                L"&Quit");
+
+    CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
 }
 
+// Populate the list of drives
 void CTrayMenu::populateDrives() {
     m_drives.clear();
     while (DeleteMenu(m_hDriveMenu, 0, MF_BYPOSITION)) {};
     EnumWindows(windowSearchCallback2, (LPARAM)&m_drives);
-    DWORD pos = 100;
+    DWORD pos = MENUID_EJECTSTART;
     for (const auto& d : m_drives) {
         std::wstring full = d.first + L" " + d.second.volumeName + L" (" + d.second.volumeType + L")";
         AppendMenu(m_hDriveMenu, MF_STRING, pos++, full.c_str());
     }
     if (m_drives.size() < 1) {
         AppendMenu(m_hDriveMenu, MF_STRING | MF_DISABLED,0, L"no drives mounted");
+    }
+}
+
+// Run the config dialog
+void CTrayMenu::doConfig() {
+    DialogConfig config(m_hInstance, m_window.hwnd());
+    if (config.doModal()) {
+        loadConfiguration(m_config);
+    }
+}
+
+// Run the "create new disk image" code
+void CTrayMenu::runCreateImage(bool isHD, uint32_t option) {
+    OPENFILENAME dlg;
+    WCHAR filename[MAX_PATH] = { 0 };
+    memset(&dlg, 0, sizeof(dlg));
+    dlg.lStructSize = sizeof(dlg);
+    dlg.hwndOwner = m_window.hwnd();
+    std::wstring filter;
+    std::wstring defaultFormat;
+    std::wstring ext;
+    uint32_t sectors = 0;
+    switch (option) {
+    case 0:
+        dlg.lpstrFilter = L"Amiga Disk Files (*.adf)\0*.adf\0All Files(*.*)\0*.*\0\0";
+        ext = L"adf";
+        sectors = 11;
+        break;
+    case 1:
+        dlg.lpstrFilter = L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0All Files(*.*)\0*.*\0\0";
+        ext = L"img";
+        sectors = 9;
+        break;
+    case 2:
+        dlg.lpstrFilter = L"Atari ST Disk Files (*.st)\0*.st\0All Files(*.*)\0*.*\0\0";
+        ext = L"st";
+        sectors = 9;
+        break;
+    default:
+        return; // not supported
+    }
+
+    if (isHD) sectors <<= 1;
+    sectors = sectors * 80 * 2;
+
+    std::wstring tmp = ext;
+    for (WCHAR& c : tmp) c = towupper(c);
+    std::wstring title = L"Create New " + tmp + L" Disk File...";
+
+    dlg.Flags = OFN_CREATEPROMPT | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT | OFN_HIDEREADONLY | OFN_NOREADONLYRETURN | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
+    dlg.lpstrDefExt = ext.c_str();
+    dlg.lpstrFile = filename;
+    dlg.lpstrTitle = title.c_str();
+    dlg.nMaxFile = MAX_PATH;
+    if (!GetSaveFileName(&dlg))  return;
+
+    // Create image
+    HANDLE fle = CreateFile(filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    if (fle == INVALID_HANDLE_VALUE) {
+        MessageBox(m_window.hwnd(), L"Unable to create disk image file", L"Error", MB_OK | MB_ICONEXCLAMATION);
+        return;
+    }
+
+    unsigned char blank[512] = { 0 };
+    // Write blank sectors
+    for (uint32_t s = 0; s < sectors; s++) {
+        DWORD written;
+        if (!WriteFile(fle, blank, 512, &written, NULL)) written = 0;
+        if (written != 512) {
+            CloseHandle(fle);
+            MessageBox(m_window.hwnd(), L"An error occured creating the disk image file", L"Error", MB_OK | MB_ICONEXCLAMATION);
+            return;
+        }
+    }
+
+    SectorCacheEngine* engine = new SectorRW_File(filename, fle);
+
+    // Create file system
+    switch (option) {
+    case 0: installAmigaFS(isHD, engine); break;
+    case 1: installIBMPCFS(isHD, true, engine); break;
+    case 2: installIBMPCFS(isHD, false, engine); break;
+    }
+    
+    engine->flushWriteCache();
+    delete engine;
+
+    if (MessageBox(m_window.hwnd(), L"Image file created successfully.\nWould you like to mount the new image?", L"Image Ready", MB_YESNO | MB_ICONEXCLAMATION) != IDYES) return;
+
+    // Trigger mounting
+    std::wstring cmd = L"\"" + m_exeName + L"\" \"" + filename + L"\"";
+    PROCESS_INFORMATION pi;
+    STARTUPINFO si;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+    if (pi.hThread) CloseHandle(pi.hThread);
+    if (pi.hProcess) CloseHandle(pi.hProcess);
+}
+
+void CTrayMenu::installAmigaFS(bool isHD, SectorCacheEngine* fle) {
+    // Prepare the ADF library
+    adfEnvInitDefault();
+    adfSetEnvFct((AdfLogFct)Error, (AdfLogFct)Warning, (AdfLogFct)Verbose, NULL);
+    struct AdfNativeFunctions native;
+    native.adfInitDevice = adfInitDevice;
+    native.adfReleaseDevice = adfReleaseDevice;
+    native.adfNativeReadSector = adfNativeReadSector;
+    native.adfNativeWriteSector = adfNativeWriteSector;
+    native.adfIsDevNative = adfIsDevNative;
+    adfSetNative(&native);
+    AdfDevice* dev = adfOpenDev((char*)fle, false);
+    dev->cylinders = fle->totalNumTracks() / 2;
+    dev->heads = 2;
+    dev->sectors = fle->numSectorsPerTrack();
+    adfCreateFlop(dev, "empty", 0);
+    adfUnMountDev(dev);
+    fle->flushWriteCache();
+    adfEnvCleanUp();
+}
+
+void CTrayMenu::installIBMPCFS(bool isHD, bool isIBMPC, SectorCacheEngine* fle) {
+    BYTE work[FF_MAX_SS];
+    MKFS_PARM opt;
+    
+    FATFS* m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
+    if (!m_fatDevice) return;
+    memset(m_fatDevice, 0, sizeof(FATFS));
+
+    getMkFsParams(isHD, isIBMPC ? SectorType::stIBM : SectorType::stAtari, opt);
+    setFatFSSectorCache(fle);
+    f_mkfs(L"\\", &opt, work, sizeof(work));
+    f_mount(m_fatDevice, L"", 1);
+    f_setlabel(L"empty");
+    free(m_fatDevice);
+
+    fle->flushWriteCache();
+    setFatFSSectorCache(nullptr);
+}
+
+// Handle the menu click result
+void CTrayMenu::handleMenuResult(uint32_t index) {
+    if (index >= MENUID_EJECTSTART) {
+        index -= MENUID_EJECTSTART;
+        if (index < m_drives.size()) {
+            auto it = m_drives.begin();
+            std::advance(it, index);
+            PostMessage(it->second.hWnd, WM_USER, REMOTECTRL_EJECT, (LPARAM)it->first[0]);
+            return;
+        }
+        return;
+    }
+
+    if ((index >= MENUID_IMAGE_DD) && (index < MENUID_IMAGE_DD + 3)) runCreateImage(false, index - MENUID_IMAGE_DD);
+    if ((index >= MENUID_IMAGE_HD) && (index < MENUID_IMAGE_HD + 3)) runCreateImage(true, index - MENUID_IMAGE_HD);
+
+    switch (index) {
+    case MENUID_ENABLED: 
+        m_config.enabled = !m_config.enabled;
+        CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
+        break;
+    case MENUID_CREATEDISK: break;
+    case MENUID_MOUNTDISK: mountDisk(); break;
+    case MENUID_QUIT:
+        populateDrives();
+        if (m_drives.size())
+            if (MessageBox(m_window.hwnd(), L"Are you sure? This will eject all mounted disks", L"Quit DiskFlashback", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
+        for (const auto& it : m_drives)
+            PostMessage(it.second.hWnd, WM_USER, REMOTECTRL_EJECT, (LPARAM)it.first[0]);
+        PostQuitMessage(0);
+        break;
+
+    case MENUID_CONFIGURE:
+        doConfig();
+        break;
     }
 }
 
@@ -108,44 +315,18 @@ void CTrayMenu::handleMenuInput(UINT uID, UINT iMouseMsg) {
                 uint32_t index = TrackPopupMenu(m_hMenu,flags, pt.x, pt.y, 0, m_window.hwnd(), NULL);
                 PostMessage(m_window.hwnd(), WM_NULL, 0, 0);
 
-                if (index >= 100) {
-                    index -= 100;
-                    if (index < m_drives.size()) {
-                        auto it = m_drives.begin();
-                        std::advance(it, index);
-                        PostMessage(it->second.hWnd, WM_USER, REMOTECTRL_EJECT, (LPARAM)it->first[0]);
-                        return;
-                    }
-                    return;
-                }
-
-                switch (index) {
-                
-                case 2: mountDisk(); break;
-                case 10: 
-                    populateDrives();
-                    if (m_drives.size())
-                        if (MessageBox(m_window.hwnd(), L"Are you sure? This will eject all mounted disks", L"Quit DiskFlashback", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return;
-                    for (const auto& it : m_drives) 
-                        PostMessage(it.second.hWnd, WM_USER, REMOTECTRL_EJECT, (LPARAM)it.first[0]);
-                    PostQuitMessage(0);
-                    break;
-
-                case 21: {
-                    DialogConfig config(m_hInstance, m_window.hwnd());
-                    config.doModal();
-                    }
-                       break;
-
-                }
+                handleMenuResult(index);
             }
             break;
         case WM_LBUTTONDBLCLK:
+            doConfig();
             break;
     }
 }
 
 
+
+// Mount a single disk file
 void CTrayMenu::mountDisk() {
     // Request filename
     OPENFILENAME dlg;
@@ -175,8 +356,11 @@ void CTrayMenu::mountDisk() {
 
 CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInstance(hInstance), m_window(hInstance, APP_TITLE), m_exeName(exeName) {
     memset(&m_notify, 0, sizeof(m_notify));
+    loadConfiguration(m_config);
+
     setupIcon();
     setupMenu();
+
 
     // Make sure the icon stays even if explorer dies
     m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT { setupIcon(); return 0; });
@@ -187,6 +371,11 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
 CTrayMenu::~CTrayMenu() {
     Shell_NotifyIcon(NIM_DELETE, &m_notify);
     DestroyMenu(m_hMenu);
+    DestroyMenu(m_hDriveMenu);
+    DestroyMenu(m_hPhysicalMenu);
+    DestroyMenu(m_hCreateList);
+    DestroyMenu(m_hCreateListDD);
+    DestroyMenu(m_hCreateListHD);
 }
 
 // Main loop

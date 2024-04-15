@@ -209,10 +209,6 @@ VolumeManager::VolumeManager(HINSTANCE hInstance, const std::wstring& mainExe, W
     m_currentSectorFormat(SectorType::stUnknown), m_forceReadOnly(forceReadOnly), m_hInstance(hInstance)  {
     DokanInit();
 
-    HICON icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
-    SendMessage(m_window.hwnd(), WM_SETICON, ICON_SMALL, (LPARAM)icon);
-    SendMessage(m_window.hwnd(), WM_SETICON, ICON_BIG, (LPARAM)icon);
-
     // Prepare the ADF library
     adfEnvInitDefault();
     adfSetEnvFct((AdfLogFct)Error, (AdfLogFct)Warning, (AdfLogFct)Verbose, NULL);

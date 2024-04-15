@@ -12,6 +12,7 @@
 
 #define MENUID_CREATEDISK       1
 #define MENUID_MOUNTDISK        2
+#define MENUID_ABOUT            3
 #define MENUID_QUIT             10
 #define MENUID_ENABLED          20
 #define MENUID_CONFIGURE        21
@@ -108,6 +109,8 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE, L"Automatically Check for Updates");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates...");
     
+    AppendMenu(m_hMenu, MF_STRING, MENUID_ABOUT,                            L"&About...");
+    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hMenu, MF_STRING,              MENUID_QUIT,                L"&Quit");
 
     CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
@@ -155,10 +158,8 @@ void CTrayMenu::checkForUpdates(bool force) {
             DWORD netVersion = (add.S_un.S_un_b.s_b1 << 24) | (add.S_un.S_un_b.s_b2 << 16) | (add.S_un.S_un_b.s_b3 << 8) | add.S_un.S_un_b.s_b4;
             DWORD appVersion = getAppVersion();
          
-            //if (appVersion < netVersion) {
-            {
+            if (appVersion < netVersion) {
                 // Do popup for updates available
-                //m_notify.dwInfoFlags 
                 m_notify.uFlags |= NIF_INFO;
                 m_notify.dwInfoFlags = NIIF_INFO;
                 wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
@@ -347,7 +348,14 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     if ((index >= MENUID_IMAGE_HD) && (index < MENUID_IMAGE_HD + 3)) runCreateImage(true, index - MENUID_IMAGE_HD);
 
     switch (index) {
-    
+    case MENUID_ABOUT: {
+        DWORD v = getAppVersion();
+            std::wstring msg = std::wstring(APPLICATION_NAME_L) + L" V" + std::to_wstring(v >> 24) + L"." + std::to_wstring((v >> 16) & 0xFF) + L"." + std::to_wstring((v >> 8) & 0xFF) + L"." + std::to_wstring(v & 0xFF) + L"\r\n";
+            msg += L"Copyright \x00A9 2024 RobSmithDev\r\n\r\n";
+            msg += L"Visit https://robsmithdev.co.uk for more information";
+            MessageBox(m_window.hwnd(), msg.c_str(), L"About DiskFlashback", MB_OK | MB_ICONINFORMATION);
+        }
+        break;
     case MENUID_AUTOUPDATE:
         m_config.checkForUpdates = !m_config.checkForUpdates;
         saveConfiguration(m_config);
@@ -472,10 +480,6 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
 
     setupIcon();
     setupMenu();   
-
-    HICON icon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
-    SendMessage(m_window.hwnd(), WM_SETICON, ICON_SMALL, (LPARAM)icon);
-    SendMessage(m_window.hwnd(), WM_SETICON, ICON_BIG, (LPARAM)icon);
 
     // Make sure the icon stays even if explorer dies
     m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT { setupIcon(); return 0; });

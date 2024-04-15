@@ -1,5 +1,6 @@
 
 #include "SignalWnd.h"
+#include "resource.h"
 
 static bool classCreated = false;
 
@@ -37,6 +38,8 @@ CMessageWindow::CMessageWindow(HINSTANCE hInstance, const std::wstring& windowCa
 		wx.lpfnWndProc = MessageWindowProc;        // function which will handle messages
 		wx.hInstance = hInstance;
 		wx.lpszClassName = MESSAGEWINDOW_CLASS_NAME;
+		wx.hIcon = LoadIcon(NULL, MAKEINTRESOURCE(IDI_ICON1));
+		wx.hIconSm = LoadIcon(NULL, MAKEINTRESOURCE(IDI_ICON1));
 		RegisterClassEx(&wx);
 	}
 	m_hWnd = CreateWindowEx(0, MESSAGEWINDOW_CLASS_NAME, windowCaption.c_str(), WS_OVERLAPPEDWINDOW, 0, 0, 0, 0, NULL, NULL, hInstance, (LPVOID)this);

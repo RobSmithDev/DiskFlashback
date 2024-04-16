@@ -5,15 +5,9 @@
 #include <unordered_map>
 #include <atomic>
 
-// #define ATARTST_SUPPORTED
 
 // Possible types of sector / file
-enum class SectorType  {stAmiga, stIBM, 
-#ifdef ATARTST_SUPPORTED
-    stAtari, stHybrid, 
-#endif
-    stUnknown
-};
+enum class SectorType  {stAmiga, stIBM, stAtari, stHybrid, stUnknown };
 
 class SectorCacheEngine {
 private:
@@ -42,8 +36,8 @@ protected:
 
     // Override.  
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) = 0;
+    virtual bool internalHybridReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) { return internalReadData(sectorNumber, sectorSize, data); };
     virtual bool internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) = 0;
-
 public:
     // Create cache engine, setting maxCacheMem to zero disables the cache
     SectorCacheEngine(const uint32_t maxCacheMem);
@@ -58,6 +52,7 @@ public:
 
     bool readData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
     bool writeData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data);
+    bool hybridReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) { return internalHybridReadData(sectorNumber, sectorSize, data); };
 
     virtual bool isDiskPresent() = 0;
     virtual bool isDiskWriteProtected() = 0;
@@ -67,6 +62,7 @@ public:
 
     // Total number of tracks avalable
     virtual uint32_t totalNumTracks() = 0;
+    virtual uint32_t hybridTotalNumTracks() { return totalNumTracks(); };
 
     // Flush changes to disk
     virtual bool flushWriteCache() { return true; };
@@ -76,12 +72,18 @@ public:
 
     // Fetch the size of the disk file
     virtual uint32_t getDiskDataSize() = 0;
+    virtual uint32_t hybridGetDiskDataSize() { return getDiskDataSize(); };
+
+    // Return the number of heads/sides
+    virtual uint32_t getNumHeads() = 0;
+    virtual uint32_t hybridGetNumHeads() { return getNumHeads(); };
 
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() = 0;
 
     // Fetch the sector size in bytes
     virtual uint32_t sectorSize() { return 512; };
+    virtual uint32_t hybridSectorSize() { return sectorSize(); };
 
     // Return TRUE if this is actually a physical "REAL" drive
     virtual bool isPhysicalDisk() { return false; };
@@ -91,6 +93,7 @@ public:
 
     // Return the current number of sectors per track
     virtual uint32_t numSectorsPerTrack() = 0;
+    virtual uint32_t hybridNumSectorsPerTrack() { return numSectorsPerTrack(); };
 
     // Get the type of file that is loaded
     virtual SectorType getSystemType() = 0;

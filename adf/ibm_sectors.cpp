@@ -189,17 +189,19 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 
 			extractMFMDecodeRaw(track, dataLengthInBits, bit + 1 - 64, sizeof(sector.header), (uint8_t*)&sector.header);
 			uint16_t crc = crc16((char*)&sector.header, sizeof(sector.header) - 2);
-			headerFound = true;
 			sector.headerErrors = 0;
+			headerFound = true;
 			if (sector.header.sector < 1) {
 				sector.header.sector = 1;
 				sector.headerErrors++;
 			}
+
 			if (crc != wordSwap(*(uint16_t*)sector.header.crc)) sector.headerErrors++;
 			if (!sector.headerErrors) sectorSize = sector.header.length;
 			if (sector.header.cylinder != cylinder) sector.headerErrors++;
 			if (sector.header.head != (upperSide ? 1 : 0)) sector.headerErrors++;
-			lastSectorNumber = sector.header.sector;
+
+			lastSectorNumber = sector.header.sector;			
 		}
 		else
 			if (decoded == MFM_SYNC_SECTOR_DATA) {
@@ -212,6 +214,7 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 					sector.header.cylinder = cylinder;
 					sector.header.head = upperSide ? 1 : 0;
 					sector.headerErrors = 0xF0;
+					//headerFound = !beMoreStrict;
 				}
 				if (headerFound) {
 					const uint32_t sectorDataSize = 1 << (7 + sector.header.length);
@@ -359,7 +362,6 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, bool forceAtariTiming, Decode
 
 	// NOTE: ALL OF THE ATARI TIMINGS NEED CHECKING!
 	if (forceAtariTiming) {
-		gap4aSize = 80;   
 		gap1Size = 60;    
 		gap2Size = 22;    
 		gap3Size = 40;    
@@ -394,7 +396,6 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, bool forceAtariTiming, Decode
 	case 22:
 		gap1Size = 1;   
 		gap3Size = 1;
-		gap4aSize = 1;
 		gap4bSize = 1;
 		gap2Size = 4;
 		forceAtariTiming = true;
@@ -404,12 +405,12 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, bool forceAtariTiming, Decode
 	uint8_t* mem = (uint8_t*)trackData;
 	uint8_t* memOverflow = mem + mfmBufferSizeBytes;
 	
-	mem += gapFillMFM(mem, gap4aSize, 0x4E, lastByte, memOverflow);
 	if (!forceAtariTiming) {
+		mem += gapFillMFM(mem, gap4aSize, 0x4E, lastByte, memOverflow);
 		mem += writeRawMFM(mem, 24, 0xAA, lastByte, memOverflow);
 		mem += writeMarkerMFM(mem, MFM_SYNC_TRACK_HEADER, lastByte, memOverflow);
-		mem += gapFillMFM(mem, gap1Size, 0x4E, lastByte, memOverflow);
 	}
+	mem += gapFillMFM(mem, gap1Size, 0x4E, lastByte, memOverflow);
 	for (uint32_t sec = 0; sec < decodedTrack->sectors.size(); sec++) {
 		const DecodedSector& sector = decodedTrack->sectors[sec];
 
@@ -449,20 +450,16 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, bool forceAtariTiming, Decode
 }
 
 // Feed in Track 0, sector 0 and this will try to extract the number of sectors per track, or 0 on error
-bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
+bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t& numHeads, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
 	sectorsPerTrack = 0;
 	serialNumber = 0;
-
-	//HANDLE fle = CreateFile(L"d:\\moo.dat", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-	//DWORD d;
-	//WriteFile(fle, sector, 512, &d, NULL);
-	//CloseHandle(fle);
-		
 
 	if (!sector) return false;	
 	serialNumber = (sector[0x08 + 3] << 24) | (sector[0x08 + 2] << 16) | (sector[0x08 + 1] << 8) | sector[0x08];
 	sectorsPerTrack = (sector[0x18 + 1] << 8) | sector[0x18];
 	totalSectors = (sector[0x13 + 1] << 8) | sector[0x13];
+	numHeads = (sector[0x1A + 1] << 8) | sector[0x1A];
+	if ((numHeads < 1) || (numHeads > 2)) return false;
 
 	if (sectorsPerTrack < 3) return false;
 	if (sectorsPerTrack > 22) return false;
@@ -472,7 +469,7 @@ bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t
 
 
 // Feed in Track 0, sector 0 and this will try to extract the number of sectors per track, or 0 on error
-bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumber, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
+bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumber, uint32_t& numHeads, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
 	sectorsPerTrack = 0;
 	serialNumber = 0;
 
@@ -480,6 +477,6 @@ bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumbe
 	auto it = decodedTrack->sectors.find(0);
 	if (it == decodedTrack->sectors.end()) return false;
 	if (it->second.data.size() < 128) return false;
-	return getTrackDetails_IBM(it->second.data.data(), serialNumber, totalSectors, sectorsPerTrack, bytesPerSector);
+	return getTrackDetails_IBM(it->second.data.data(), serialNumber, numHeads, totalSectors, sectorsPerTrack, bytesPerSector);
 }
 

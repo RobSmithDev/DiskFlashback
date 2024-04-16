@@ -41,6 +41,9 @@ public:
     // Total number of tracks avalable
     virtual uint32_t totalNumTracks() override { return m_totalTracks; };
 
+    // Return the number of heads/sides
+    virtual uint32_t getNumHeads() override { return 2; };
+
     // Fetch the sector size in bytes
     virtual uint32_t sectorSize() override;
 

@@ -34,17 +34,18 @@ private:
     bool m_lockedOut                = false;
     std::function<void(bool diskInserted, SectorType diskFormat)> m_diskChangeCallback;
 
-    uint32_t m_sectorsPerTrack      = 0;
-    uint32_t m_bytesPerSector       = 512;
-    uint32_t m_totalCylinders       = 0;
-    uint32_t m_serialNumber = 0x554E4B4E;    
+    uint32_t m_sectorsPerTrack[2] = { 0,0 };
+    uint32_t m_bytesPerSector[2] = { 512, 512 };
+    uint32_t m_totalCylinders[2] = { 0, 0 };
+    uint32_t m_serialNumber[2] = { 0x554E4B4E, 0 };
+    uint32_t m_numHeads[2] = { 2, 2 };
 
     // Tracks that need committing to disk
     // NOTE: Using MAP not UNORDERED_MAP. This *should* make the disk head stepping fairly sequential and faster
     std::map<uint32_t, uint32_t> m_tracksToFlush; // mapping of track -> number of hits
 
     // Cache for previous tracks read
-    DecodedTrack m_trackCache[MAX_TRACKS];
+    DecodedTrack m_trackCache[2][MAX_TRACKS];
 
     // Flush any writing thats still pending
     bool flushPendingWrites();
@@ -53,7 +54,7 @@ private:
     void checkFlushPendingWrites();
 
     // Actually read the track
-    bool doTrackReading(const uint32_t track, bool retryMode);
+    bool doTrackReading(const uint32_t fileSystem, const uint32_t track, bool retryMode);
 
     // Removes anything that failed from the cache so it has to be re-read from the disk
     void removeFailedWritesFromCache();
@@ -64,9 +65,13 @@ private:
     // Reads some data to see what kind of disk it is
     void identifyFileSystem();
 
+    // Read all sector data regarding of the mode
+    bool readDataAllFS(const uint32_t fileSystem, const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
+
 protected:
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
     virtual bool internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) override;
+    virtual bool internalHybridReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
 
     // Signal the motor is in use
     void motorInUse(bool upperSide);
@@ -94,7 +99,7 @@ public:
     virtual bool isPhysicalDisk() override { return true; };
 
     // Total number of tracks avalable - 0 is not specified
-    virtual uint32_t totalNumTracks() override { return m_totalCylinders * 2; };
+    virtual uint32_t totalNumTracks() override { return m_totalCylinders[0] * m_numHeads[0]; };
 
     // Flush changes to disk
     virtual bool flushWriteCache() override;
@@ -115,6 +120,8 @@ public:
     void releaseDrive();
     bool restoreDrive();
 
+    // Return the number of heads/sides
+    virtual uint32_t getNumHeads() override { return m_numHeads[0]; };
 
     // Returns TRUE if the inserted disk is HD
     bool isHD();
@@ -122,23 +129,26 @@ public:
     // Pre-populate with blank sectors
     void createBlankSectors();
 
-    // Override sector infomration - this also wipes the cache and resets everything
-    void overwriteSectorSettings(const SectorType systemType, const uint32_t totalCylinders, const uint32_t sectorsPerTrack, const uint32_t sectorSize);
+    // trigger new disk detection
+    void triggerNewDiskMount();
 
-    // Return TRUE if you can export this to an ADF
-    virtual bool allowCopyToFile() override { return true; };
+    // Override sector infomration - this also wipes the cache and resets everything
+    void overwriteSectorSettings(const SectorType systemType, const uint32_t totalCylinders, const uint32_t totalHeads, const uint32_t sectorsPerTrack, const uint32_t sectorSize);
+
+    // Return TRUE if you can export this to disk image
+    virtual bool allowCopyToFile() override;
 
     // Get the type of file that is loaded
     virtual SectorType getSystemType() override { return m_diskType; };
 
     // Return the current number of sectors per track
-    virtual uint32_t numSectorsPerTrack() override { return m_sectorsPerTrack; }
+    virtual uint32_t numSectorsPerTrack() override { return m_sectorsPerTrack[0]; }
 
     // Fetch the sector size in bytes
-    virtual uint32_t sectorSize() override { return m_bytesPerSector; };
+    virtual uint32_t sectorSize() override { return m_bytesPerSector[0]; };
 
     // Fetch the serial number of the disk
-    virtual uint32_t serialNumber() override { return m_serialNumber; };
+    virtual uint32_t serialNumber() override { return m_serialNumber[0]; };
 
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() override;

@@ -44,12 +44,10 @@ INT_PTR DialogCOPY::doModal() {
 			dlg.lpstrFilter = L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"img";
 			break;
-#ifdef ATARTST_SUPPORTED
 		case SectorType::stAtari:
 			dlg.lpstrFilter = L"Atari ST Disk Files (*.st)\0*.st\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"st";
 			break;
-#endif
 		default:
 			return 0; // not supported
 		}
@@ -196,8 +194,9 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 		const uint32_t sectorSize = source->sectorSize();
 		const uint32_t totalSectors = source->getDiskDataSize() / source->sectorSize();
 		const uint32_t secPerTrack = source->numSectorsPerTrack();
-		const uint32_t numCyl = totalSectors / (2 * secPerTrack);
-		const uint32_t totalTracks = numCyl * 2;
+		const uint32_t numHeads = source->getNumHeads();
+		const uint32_t totalTracks = source->totalNumTracks();
+		const uint32_t numCyl = totalTracks / numHeads;
 
 		// Double density?
 		bool isHD = secPerTrack > 11;		
@@ -215,7 +214,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 			}
 		}		
 		// Force the target to be the same as the source
-		target->overwriteSectorSettings(source->getSystemType(), numCyl*2, source->numSectorsPerTrack(), source->sectorSize());
+		target->overwriteSectorSettings(source->getSystemType(), numCyl, numHeads, source->numSectorsPerTrack(), source->sectorSize());
 
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
@@ -254,7 +253,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 		}
 
 		free(sectorData);
-
+		target->triggerNewDiskMount();
 		target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
 
 		return true;

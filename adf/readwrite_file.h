@@ -14,6 +14,7 @@ private:
     uint32_t m_serialNumber;
     uint32_t m_bytesPerSector;
     uint32_t m_totalTracks;
+    uint32_t m_numHeads;
 protected:
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
     virtual bool internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) override;
@@ -36,6 +37,9 @@ public:
 
     // Total number of tracks avalable
     virtual uint32_t totalNumTracks() override { return m_totalTracks; };
+
+    // Return the number of heads/sides
+    virtual uint32_t getNumHeads() override { return m_numHeads; };
 
     // Fetch the size of the disk file
     virtual uint32_t getDiskDataSize() override;

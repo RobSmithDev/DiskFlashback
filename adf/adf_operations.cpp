@@ -132,9 +132,9 @@ void DokanFileSystemAmigaFS::setCurrentVolume(AdfVolume* volume) {
 }
 
 // Convert Amiga file attributes to Windows file attributes - only a few actually match
-DWORD DokanFileSystemAmigaFS::amigaToWindowsAttributes(const int32_t access, int32_t type, bool disableCustomIcons) {
+DWORD DokanFileSystemAmigaFS::amigaToWindowsAttributes(const int32_t access, int32_t type) {
     DWORD result = 0;
-    if (type == ST_DIR) result |= FILE_ATTRIBUTE_DIRECTORY | ((m_useCustomFolderIcons && !disableCustomIcons) ? FILE_ATTRIBUTE_READONLY : 0);
+    if (type == ST_DIR) result |= FILE_ATTRIBUTE_DIRECTORY;
     if (type == ST_ROOT) result |= FILE_ATTRIBUTE_DIRECTORY;
     if (hasA(access)) result |= FILE_ATTRIBUTE_ARCHIVE;
     if (hasW(access)) result |= FILE_ATTRIBUTE_READONLY;  // no write, its read only    
@@ -191,19 +191,6 @@ NTSTATUS DokanFileSystemAmigaFS::fs_createfile(const std::wstring& filename, con
     dokanfileinfo->Context = 0;
     uint32_t file_attributes_and_flags = file_attributes;
 
-    if (m_useCustomFolderIcons) {
-        // check for desktop ini file
-        size_t pos = filename.find(L"\\desktop.ini");
-        if (pos != std::wstring::npos) {
-            // Is this the desktop.ini file, and NOT the first one!
-            if (pos) {
-                if (generic_desiredaccess & GENERIC_WRITE) return STATUS_ACCESS_DENIED;
-                if ((creation_disposition == CREATE_NEW || (creation_disposition == CREATE_ALWAYS && !fileSupersede) || creation_disposition == TRUNCATE_EXISTING)) return STATUS_ACCESS_DENIED;
-                return STATUS_SUCCESS;                
-            }
-            return STATUS_NO_SUCH_FILE;
-        } 
-    }
     std::wstring windowsPath = filename;
 
     int32_t search = locatePath(windowsPath, dokanfileinfo);
@@ -443,24 +430,6 @@ NTSTATUS DokanFileSystemAmigaFS::fs_readfile(const std::wstring& filename, void*
     }
     else {
         actualReadLength = 0;
-        if (m_useCustomFolderIcons) {
-            std::wstring windowsPath = filename;
-            // check for desktop ini file
-            size_t pos = windowsPath.find(L"\\desktop.ini");
-            if (pos != std::wstring::npos) {
-                // Is this the desktop.ini file, and NOT the first one!
-                if (pos) {
-                    const DWORD maxBytes = (DWORD)(m_desktopIniFileResource.length() * 2);
-                    if (offset > maxBytes) actualReadLength = 0; else {
-                        actualReadLength = bufferlength;
-                        DWORD allowed = (DWORD)offset + bufferlength;
-                        if (allowed > maxBytes) actualReadLength = maxBytes - (DWORD)offset;
-                        const char* start = (char*)m_desktopIniFileResource.c_str();
-                        memcpy_s(buffer, bufferlength, start + offset, actualReadLength);
-                    }
-                }
-            }
-        }
     }
 
     return STATUS_SUCCESS;
@@ -579,32 +548,6 @@ NTSTATUS DokanFileSystemAmigaFS::fs_setallocationsize(const std::wstring& filena
 }
 
 NTSTATUS DokanFileSystemAmigaFS::fs_getfileInformation(const std::wstring& filename, LPBY_HANDLE_FILE_INFORMATION buffer, PDOKAN_FILE_INFO dokanfileinfo) {
-
-    if (m_useCustomFolderIcons) {
-        std::wstring windowsPath = filename;
-        // check for desktop ini file
-        size_t pos = windowsPath.find(L"\\desktop.ini");
-        if (pos != std::wstring::npos) {
-            // Is this the desktop.ini file, and NOT the first one!
-            if (pos) {
-                buffer->dwFileAttributes = FILE_ATTRIBUTE_HIDDEN;
-                buffer->nNumberOfLinks = 1;
-                buffer->nFileIndexHigh = 0;
-                buffer->nFileIndexLow = 0;
-                buffer->nFileSizeHigh = 0;
-                buffer->nFileSizeLow = (DWORD)(m_desktopIniFileResource.length() * 2);
-                buffer->dwVolumeSerialNumber = volumeSerialNumber();
-                SYSTEMTIME tm;
-                GetSystemTime(&tm);
-                SystemTimeToFileTime(&tm, &buffer->ftLastWriteTime);
-                SystemTimeToFileTime(&tm, &buffer->ftCreationTime);
-                SystemTimeToFileTime(&tm, &buffer->ftLastAccessTime);
-                return STATUS_SUCCESS;
-            }
-            return STATUS_OBJECT_NAME_NOT_FOUND;
-        }
-    }
-
     // This is queried for folders and volume id
     int32_t search = locatePath(filename, dokanfileinfo);
     if (search == 0) return STATUS_OBJECT_NAME_NOT_FOUND;
@@ -619,7 +562,7 @@ NTSTATUS DokanFileSystemAmigaFS::fs_getfileInformation(const std::wstring& filen
  
     e.access = parent.access;
     e.type = parent.secType;
-    buffer->dwFileAttributes = amigaToWindowsAttributes(parent.access, search, true);
+    buffer->dwFileAttributes = amigaToWindowsAttributes(parent.access, search);
     buffer->nNumberOfLinks = 1;
     buffer->nFileIndexHigh = 0;
     buffer->nFileIndexLow = 0;
@@ -741,17 +684,6 @@ NTSTATUS DokanFileSystemAmigaFS::fs_setfiletime(const std::wstring& filename, CO
 }
 
 NTSTATUS DokanFileSystemAmigaFS::fs_deletefile(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) {   
-    if (m_useCustomFolderIcons) {
-        std::wstring windowsPath = filename;
-        // check for desktop ini file
-        size_t pos = windowsPath.find(L"\\desktop.ini");
-        if (pos != std::wstring::npos) {
-            // Is this the desktop.ini file, and NOT the first one!
-            if (pos) return STATUS_SUCCESS;
-            return STATUS_OBJECT_NAME_NOT_FOUND;
-        }
-    }
-
     std::string amigaName;
     int32_t search = locatePath(filename, dokanfileinfo, amigaName);
     if (search == 0) return STATUS_OBJECT_NAME_NOT_FOUND;

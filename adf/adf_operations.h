@@ -26,7 +26,6 @@ private:
     };
     friend class ActiveFileIO;
 
-    bool m_useCustomFolderIcons = false;
     bool m_autoRemapFileExtensions = false;  // remap mod.* to *.mod for example
 
     struct AdfVolume* m_volume;             // The volume
@@ -39,7 +38,7 @@ private:
     std::unordered_map<struct AdfFile*, int> m_inUse;
 
     // Convert Amiga file attributes to Windows file attributes - only a few actually match
-    DWORD amigaToWindowsAttributes(const int32_t access, int32_t type, bool disableCustomIcons = false);
+    DWORD amigaToWindowsAttributes(const int32_t access, int32_t type);
     // Search for a file or folder, returns 0 if not found or the type of item (eg: ST_FILE)
     int32_t locatePath(const std::wstring& path, PDOKAN_FILE_INFO dokanfileinfo, std::string& filename);
     // Stub version of the above

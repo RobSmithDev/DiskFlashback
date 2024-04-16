@@ -52,6 +52,7 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
     m_serialNumber = 0x41444630;    // Default AMIGA serial number (ADF0)
     m_bytesPerSector = 512;
     m_sectorsPerTrack = 0;
+    m_numHeads = 2;
 
     // See what type of file it is
     size_t i = filename.rfind(L".");
@@ -64,13 +65,11 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
             m_fileType = SectorType::stIBM;
             m_serialNumber = 0x494D4130;
         } 
-#ifdef ATARTST_SUPPORTED
         else
         if (ext == L"ST") {
             m_fileType = SectorType::stAtari;
             m_serialNumber = 0x53544630;
         }
-#endif
 
         if (SUCCEEDED(SetFilePointer(m_file, 0, NULL, FILE_BEGIN))) {
             DWORD read;
@@ -78,12 +77,12 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
             if (ReadFile(m_file, data, 128, &read, NULL)) {
                 if (read == 128) {
                     uint32_t totalSectors;
-                    if (!getTrackDetails_IBM(data, m_serialNumber, totalSectors, m_sectorsPerTrack, m_bytesPerSector)) {
+                    if (!getTrackDetails_IBM(data, m_serialNumber, m_numHeads, totalSectors, m_sectorsPerTrack, m_bytesPerSector)) {
                         m_bytesPerSector = 512;
                         m_serialNumber = 0x41444630;
                     }
                     else {
-                        m_totalTracks = max(80, (totalSectors / m_sectorsPerTrack) / 2);
+                        m_totalTracks = max(80, (totalSectors / m_sectorsPerTrack) / m_numHeads);
                     }
                 }
             }

@@ -246,14 +246,12 @@
     <Image Include="floppy.ico">
       <Filter>res</Filter>
     </Image>
-    <Image Include="drawer.ico">
-      <Filter>res</Filter>
-    </Image>
     <Image Include="floppy2.ico">
       <Filter>res</Filter>
     </Image>
     <Image Include="ufloppy.ico">
       <Filter>res</Filter>
     </Image>
+    <Image Include="floppy3.ico" />
   </ItemGroup>
 </Project>

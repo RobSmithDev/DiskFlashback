@@ -85,11 +85,6 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD +1, L"IBM PC Image...");
     AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD,     L"Amiga ADF Image...");
     AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 1, L"IBM PC Image...");
-#ifdef ATARTST_SUPPORTED
-    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD +2, L"Atari ST Image...");
-    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 2, L"Atari ST Image...");
-#endif
-
 
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListDD, L"Double Density");
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListHD, L"High Density");
@@ -217,13 +212,6 @@ void CTrayMenu::runCreateImage(bool isHD, uint32_t option) {
         ext = L"img";
         sectors = 9;
         break;
-#ifdef ATARTST_SUPPORTED
-    case 2:
-        dlg.lpstrFilter = L"Atari ST Disk Files (*.st)\0*.st\0All Files(*.*)\0*.*\0\0";
-        ext = L"st";
-        sectors = 9;
-        break;
-#endif
     default:
         return; // not supported
     }
@@ -316,11 +304,7 @@ void CTrayMenu::installIBMPCFS(bool isHD, bool isIBMPC, SectorCacheEngine* fle) 
     if (!m_fatDevice) return;
     memset(m_fatDevice, 0, sizeof(FATFS));
 
-#ifdef ATARTST_SUPPORTED
-    getMkFsParams(isHD, isIBMPC ? SectorType::stIBM : SectorType::stAtari, opt);
-#else
-    getMkFsParams(isHD, SectorType::stIBM, opt);
-#endif
+    getMkFsParams(isHD, SectorType::stIBM , opt);
     setFatFSSectorCache(fle);
     f_mkfs(L"\\", &opt, work, sizeof(work));
     f_mount(m_fatDevice, L"", 1);
@@ -448,11 +432,7 @@ void CTrayMenu::mountDisk() {
     dlg.hwndOwner = m_window.hwnd();
     std::wstring filter;
     std::wstring defaultFormat;
-#ifdef ATARTST_SUPPORTED
     dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st\0All Files(*.*)\0*.*\0\0";
-#else
-    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima\0All Files(*.*)\0*.*\0\0";
-#endif
     dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
     dlg.lpstrTitle = L"Select disk image to mount";
     dlg.lpstrFile = filename;

@@ -184,8 +184,8 @@ AdfDevice* MountedVolume::getADFDevice() {
 
 // Notifications of the file system being mounted
 void MountedVolume::onMounted(const std::wstring& mountPoint, PDOKAN_FILE_INFO dokanfileinfo) {
-    DokanFileSystemManager::onMounted(mountPoint, dokanfileinfo);
     m_registry->setupDriveIcon(true, mountPoint[0], 2, m_io->isPhysicalDisk());
+    DokanFileSystemManager::onMounted(mountPoint, dokanfileinfo);
 }
 void MountedVolume::onUnmounted(PDOKAN_FILE_INFO dokanfileinfo) {
     DokanFileSystemManager::onUnmounted(dokanfileinfo);
@@ -218,7 +218,16 @@ bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex, 
     setActiveFileSystem(m_IBMFS);
     m_FatFS = ftFSDevice;
 
-    m_registry->setupDriveIcon(true, getMountPoint()[0], 0, m_io->isPhysicalDisk());
+    switch (m_io->getSystemType()) {
+    case SectorType::stAtari:
+    case SectorType::stHybrid:
+        m_registry->setupDriveIcon(true, getMountPoint()[0], 3, m_io->isPhysicalDisk());
+        break;
+
+    default:
+        m_registry->setupDriveIcon(true, getMountPoint()[0], 0, m_io->isPhysicalDisk());
+        break;
+    }
     m_registry->mountDismount(ftFSDevice != nullptr, getMountPoint()[0], m_io);
     if (m_FatFS) {
         //SHChangeNotify(SHCNE_MEDIAREMOVED, SHCNF_PATH, m_drive.c_str(), NULL);

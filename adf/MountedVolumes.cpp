@@ -146,12 +146,13 @@ DSTATUS disk_initialize(BYTE pdrv) {
 DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (fatfsSectorCache && (pdrv == 0)) {
         if (!fatfsSectorCache->isDiskPresent()) return RES_NOTRDY;
+
         while (count) {
-            if (!fatfsSectorCache->readData(sector, fatfsSectorCache->sectorSize(), buff))
+            if (!fatfsSectorCache->hybridReadData(sector, fatfsSectorCache->sectorSize(), buff))
                 return RES_ERROR;
             count--;
             sector++;
-            buff += fatfsSectorCache->sectorSize();
+            buff += fatfsSectorCache->hybridSectorSize();
         }
         return RES_OK;
     }
@@ -176,22 +177,23 @@ DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
     if (fatfsSectorCache && (pdrv == 0)) {
         if (!fatfsSectorCache->isDiskPresent()) return RES_NOTRDY;
+       
         switch (cmd) {
-            case CTRL_SYNC			: // Complete pending write process (needed at FF_FS_READONLY == 0) 
-                if (!fatfsSectorCache->flushWriteCache()) return RES_ERROR;
-                return RES_OK;
-                
-            case GET_SECTOR_COUNT	: // Get media size (needed at FF_USE_MKFS == 1)
-                *((DWORD*)buff) = fatfsSectorCache->numSectorsPerTrack() * fatfsSectorCache->totalNumTracks();
-                return RES_OK;
+        case CTRL_SYNC: // Complete pending write process (needed at FF_FS_READONLY == 0) 
+            if (!fatfsSectorCache->flushWriteCache()) return RES_ERROR;
+            return RES_OK;
 
-            case GET_SECTOR_SIZE	: // Get sector size (needed at FF_MAX_SS != FF_MIN_SS) 
-                *((DWORD*)buff) = fatfsSectorCache->sectorSize();
-                return RES_OK;
+        case GET_SECTOR_COUNT: // Get media size (needed at FF_USE_MKFS == 1)
+            *((DWORD*)buff) = fatfsSectorCache->hybridNumSectorsPerTrack() * fatfsSectorCache->hybridTotalNumTracks();
+            return RES_OK;
 
-            case GET_BLOCK_SIZE		: // Get erase block size (needed at FF_USE_MKFS == 1) 
-                *((DWORD*)buff) = 1; 
-                return RES_OK;
+        case GET_SECTOR_SIZE: // Get sector size (needed at FF_MAX_SS != FF_MIN_SS) 
+            *((DWORD*)buff) = fatfsSectorCache->hybridSectorSize();
+            return RES_OK;
+
+        case GET_BLOCK_SIZE: // Get erase block size (needed at FF_USE_MKFS == 1) 
+            *((DWORD*)buff) = 1;
+            return RES_OK;
         }
     }
     return RES_PARERR;
@@ -241,6 +243,7 @@ uint32_t VolumeManager::mountIBMVolumes(uint32_t startPoint) {
     if (startPoint >= m_volumes.size()) {
         // new volume required
         m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
+        m_volumes.back()->start();
     }
     if (m_volumes[startPoint]->mountFileSystem(m_fatDevice, 0, m_triggerExplorer)) startPoint++;
 
@@ -258,6 +261,7 @@ uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
         if (startPoint >= m_volumes.size()) {
             // new volume required
             m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
+            m_volumes.back()->start();
         }
         if (m_volumes[ startPoint]->mountFileSystem(m_adfDevice, volumeNumber, m_triggerExplorer)) startPoint++;
         if (letter != L'?') {
@@ -291,6 +295,17 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
             free(m_fatDevice);
             m_fatDevice = nullptr;
         }
+
+        while (m_volumes.size() > 1) {            
+            MountedVolume* v = m_volumes[m_volumes.size() - 1];
+            m_volumes.erase(m_volumes.begin() + m_volumes.size() - 1);
+            v->shutdownFS();
+
+            m_threads.emplace_back(std::thread([v]() {               
+                v->stop();
+                delete v;
+            }));
+        }
     }
     else {
         
@@ -300,7 +315,6 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
                 if (!m_adfDevice) diskFormat = SectorType::stUnknown;                     
                 break;
-#ifdef ATARTST_SUPPORTED
             case SectorType::stHybrid:
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
                 m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
@@ -316,7 +330,6 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
                         if (!m_adfDevice && !m_fatDevice) diskFormat = SectorType::stIBM;
                 break;
             case SectorType::stAtari:
-#endif
             case SectorType::stIBM:
                 m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
                 if (m_fatDevice) {
@@ -514,8 +527,22 @@ LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM c
         return MESSAGE_RESPONSE_OK;
 
     case REMOTECTRL_EJECT: {
-        bool filesOpen = volume->isDriveInUse();
-        bool locked = volume->isDriveLocked();
+        bool filesOpen = false;
+        bool locked = false;
+        filesOpen = volume->isDriveInUse();
+        locked = volume->isDriveLocked();
+
+        if (!(filesOpen||locked)) {
+            for (auto& f : m_volumes) {
+                filesOpen |= f->isDriveInUse();
+                locked |= f->isDriveLocked();
+                if (filesOpen || locked) {
+                    volume = f;
+                    break;
+                }
+            }
+        }
+
         if (filesOpen || locked) {
             m_threads.emplace_back(std::thread([this, volume, parentWindow, filesOpen, locked]() {
                 std::wstring msg = L"Cannot eject drive " + volume->getMountPoint().substr(0, 2) + L" - " + (locked ? L"the drive is busy" : L"files are currently open");
@@ -523,7 +550,7 @@ LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM c
                 }));
         }
         else {
-            volume->stop();
+            for (auto& f : m_volumes) f->stop();
         }
         return MESSAGE_RESPONSE_OK;
     }

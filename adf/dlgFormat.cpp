@@ -50,9 +50,6 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	SendMessage(ctrl, CB_ADDSTRING, 0, (LPARAM)L"OFS");
 	SendMessage(ctrl, CB_ADDSTRING, 1, (LPARAM)L"FFS");
 	SendMessage(ctrl, CB_ADDSTRING, 2, (LPARAM)L"FAT (IBM PC)");
-#ifdef ATARTST_SUPPORTED
-	SendMessage(ctrl, CB_ADDSTRING, 3, (LPARAM)L"FAT (Atari ST)");
-#endif
 	SendMessage(ctrl, CB_SETCURSEL, (m_io->getSystemType() == SectorType::stAmiga) ? 0 : 2, 0);
 
 	ctrl = GetDlgItem(hwnd, IDC_LABEL);
@@ -124,8 +121,8 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	if (intMode) mode |= FSMASK_INTL;
 	if (dirCache) mode |= FSMASK_DIRCACHE;
 
-	uint32_t totalTracks = m_fs->getTotalTracks();
-	if (totalTracks == 0) totalTracks = 80 * 2;
+	uint32_t totalTracks = 80 * 2;// m_fs->getTotalTracks();
+	//if (totalTracks == 0) totalTracks = 80 * 2;
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks + 4));
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 
@@ -137,18 +134,12 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		case 0:
 		case 1:
 			numSectors = bridge->isHD() ? 22 : 11;
-			bridge->overwriteSectorSettings(SectorType::stAmiga, totalTracks/2, numSectors, 512);
+			bridge->overwriteSectorSettings(SectorType::stAmiga, totalTracks/2,2,  numSectors, 512);
 			break;
 		case 2:
 			numSectors = bridge->isHD() ? 18 : 9;
-			bridge->overwriteSectorSettings(SectorType::stIBM, totalTracks/2, numSectors, 512);
+			bridge->overwriteSectorSettings(SectorType::stIBM, totalTracks/2,2,  numSectors, 512);
 			break;
-#ifdef ATARTST_SUPPORTED
-		case 3:
-			numSectors = bridge->isHD() ? 18 : 9;
-			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks/2, numSectors, 512);
-			break;
-#endif
 		default:
 			return false;
 		}

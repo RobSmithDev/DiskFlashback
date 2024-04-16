@@ -138,16 +138,12 @@ void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber,
 	if (header.trackFormat != 0xFF) return;  // this also blocks IBM sectors from being detected incorrectly
 	// Can't use this sector anyway
 	if (header.sectorNumber > (expectedNumSectors - 1)) return;
-	if (header.trackNumber > 166) 
-		sector.numErrors++;
-	if (header.sectorsRemaining > expectedNumSectors)
-		sector.numErrors++;
-	if (header.sectorsRemaining < 1) 
-		sector.numErrors++;
+	if (header.trackNumber > 166) sector.numErrors++;
+	if (header.sectorsRemaining > expectedNumSectors) sector.numErrors++;
+	if (header.sectorsRemaining < 1) sector.numErrors++;
 
 	// And is it from the track we expected?
-	if (header.trackNumber != trackNumber) 
-		sector.numErrors++;
+	if (header.trackNumber != trackNumber) sector.numErrors++;
 
 	// Get the checksum for the data
 	uint32_t dataChecksum;

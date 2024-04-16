@@ -18,7 +18,7 @@
 
 // A bit hacky but enough for what I need
 uint32_t getStamp() {
-	SYSTEMTIME st, lt;
+	SYSTEMTIME lt;
 	GetLocalTime(&lt);
 	return lt.wDay + (lt.wMonth * 32) + (lt.wYear * 32 * 32);
 }

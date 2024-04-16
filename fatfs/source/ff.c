@@ -20,6 +20,8 @@
 
 // Uses modified version of f_mkfs() from 
 // https://github.com/maksgraczyk/Flopgen/blob/main/fatfs/ff.c
+// Also added small segment in check_fs to allow some atari st disk images to be detected properly
+
 #define mem_set memset
 #define mem_cpy memcpy
 
@@ -3325,6 +3327,20 @@ static UINT check_fs (	/* 0:FAT/FAT32 VBR, 1:exFAT VBR, 2:Not FAT and valid BS, 
 				return 0;	/* It can be presumed an FAT VBR */
 		}
 	}
+
+	/* This helps catch Atari ST disk images */
+	w = ld_word(fs->win + BPB_BytsPerSec);
+	b = fs->win[BPB_SecPerClus];
+	if ((w & (w - 1)) == 0 && w >= FF_MIN_SS && w <= FF_MAX_SS	/* Properness of sector size (512-4096 and 2^n) */
+		&& b != 0 && (b & (b - 1)) == 0				/* Properness of cluster size (2^n) */
+		&& ld_word(fs->win + BPB_RsvdSecCnt) != 0	/* Properness of reserved sectors (MNBZ) */
+		&& (UINT)fs->win[BPB_NumFATs] - 1 <= 1		/* Properness of FATs (1 or 2) */
+		&& ld_word(fs->win + BPB_RootEntCnt) != 0	/* Properness of root dir entries (MNBZ) */
+		&& (ld_word(fs->win + BPB_TotSec16) >= 128 || ld_dword(fs->win + BPB_TotSec32) >= 0x10000)	/* Properness of volume sectors (>=128) */
+		&& ld_word(fs->win + BPB_FATSz16) != 0) {	/* Properness of FAT size (MNBZ) */
+		return 0;	/* It can be presumed an FAT VBR */
+	}
+
 	return sign == 0xAA55 ? 2 : 3;	/* Not an FAT VBR (valid or invalid BS) */
 }
 
@@ -3342,6 +3358,7 @@ static UINT find_volume (	/* Returns BS status found in the hosting drive */
 
 
 	fmt = check_fs(fs, 0);				/* Load sector 0 and check if it is an FAT VBR as SFD format */
+
 	if (fmt != 2 && (fmt >= 3 || part == 0)) return fmt;	/* Returns if it is an FAT VBR as auto scan, not a BS or disk error */
 
 	/* Sector 0 is not an FAT VBR or forced partition number wants a partition */
@@ -3443,8 +3460,8 @@ static FRESULT mount_volume (	/* FR_OK(0): successful, !=0: an error occurred */
 
 	/* Find an FAT volume on the hosting drive */
 	fmt = find_volume(fs, LD2PT(vol));
-	if (fmt == 4) return FR_DISK_ERR;		/* An error occurred in the disk I/O layer */
-	if (fmt >= 2) return FR_NO_FILESYSTEM;	/* No FAT volume is found */
+//	if (fmt == 4) return FR_DISK_ERR;		/* An error occurred in the disk I/O layer */
+//	if (fmt >= 2) return FR_NO_FILESYSTEM;	/* No FAT volume is found */
 	bsect = fs->winsect;					/* Volume offset in the hosting physical drive */
 
 	/* An FAT volume is found (bsect). Following code initializes the filesystem object */

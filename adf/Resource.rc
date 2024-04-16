@@ -179,7 +179,7 @@ IDI_ICON2               ICON                    "floppy.ico"
 
 IDI_ICON3               ICON                    "ufloppy.ico"
 
-IDI_ICON4               ICON                    "drawer.ico"
+IDI_ICON4               ICON                    "floppy3.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////

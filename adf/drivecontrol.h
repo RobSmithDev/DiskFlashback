@@ -9,6 +9,7 @@
 #define REMOTECTRL_COPYTODISK       5
 #define REMOTECTRL_COPYTOADF        6
 #define REMOTECTRL_EJECT            7
+#define REMOTECTRL_EJECT_SILENT     8
 
 // These get turned into the above
 #define CTRL_PARAM_FORMAT			L"FORMAT"
@@ -21,6 +22,7 @@
 #define RETURNCODE_BADARGS      1
 #define RETURNCODE_BADLETTER    2
 #define RETURNCODE_MOUNTFAIL    3
+#define RETURNCODE_MOUNTFAILDRIVE 4
 
 // Responses from drive copy request
 #define MESSAGE_RESPONSE_OK					3

@@ -12,6 +12,7 @@
 #include "fatfs/source/ff.h"
 #include "fatfs/source/diskio.h"
 #include "resource.h"
+#include "menu.h"
 
 #define TIMERID_MONITOR_FILESYS 1000
 #define WM_DISKCHANGE (WM_USER + 1)
@@ -354,8 +355,15 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
 }
 
 void VolumeManager::refreshWindowTitle() {
+    if (m_ejecting) return;
+
     if (m_io) {
-        std::wstring title = m_mountMode + std::to_wstring(m_io->id()) + L"_";
+        std::wstring title = m_mountMode;
+        if (m_io->isPhysicalDisk()) {
+            title += L"."+std::to_wstring(m_io->id());
+        }
+        title += L"_";
+
         for (MountedVolume* volume : m_volumes) 
             if (volume->getMountPoint().substr(0, 1) != L"?")
                 title += volume->getMountPoint().substr(0, 1);
@@ -418,7 +426,7 @@ bool VolumeManager::mountFile(const std::wstring& filename) {
 // Start a drive mount
 bool VolumeManager::mountDrive(const std::wstring& floppyProfile) {
     std::string profile;
-    wideToAnsi(floppyProfile, profile);
+    wideToAnsi(floppyProfile, profile);   
 
     SectorRW_FloppyBridge* b = new SectorRW_FloppyBridge(profile, [this](bool diskInserted, SectorType diskFormat) {
         // push this in the main thread incase its not!
@@ -526,11 +534,13 @@ LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM c
             }));
         return MESSAGE_RESPONSE_OK;
 
+    case REMOTECTRL_EJECT_SILENT: 
     case REMOTECTRL_EJECT: {
         bool filesOpen = false;
         bool locked = false;
         filesOpen = volume->isDriveInUse();
         locked = volume->isDriveLocked();
+
 
         if (!(filesOpen||locked)) {
             for (auto& f : m_volumes) {
@@ -550,7 +560,23 @@ LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM c
                 }));
         }
         else {
+            m_ejecting = true;
+            // Prevent it being auto-started next time
+            if (commandID != REMOTECTRL_EJECT_SILENT)
+                if (volume->isPhysicalDevice()) 
+                    SendMessage(FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE), WM_PHYSICAL_EJECT, 0, 0);
+            m_window.setWindowTitle(L"");
+
+            std::wstring title = m_mountMode;
+            if (m_io->isPhysicalDisk()) title += L"." + std::to_wstring(m_io->id());
+            title += L"_";
+            for (auto& f : m_volumes) f->unmountFileSystem();
+            if (m_io->isPhysicalDisk()) {
+                SectorRW_FloppyBridge* drive = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
+                if (drive) drive->quickClose();
+            }
             for (auto& f : m_volumes) f->stop();
+            TerminateProcess(GetCurrentProcess(), 0);  // dirty but fast
         }
         return MESSAGE_RESPONSE_OK;
     }

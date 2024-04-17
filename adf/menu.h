@@ -5,11 +5,18 @@
 #include "dlgConfig.h"
 
 #define APP_TITLE L"DiskFlashback Tray Control"
+#define WM_PHYSICAL_EJECT     (WM_USER+1)
+
+// Sent by other programs to "dismount" any real drives while they operate
+// WPARAM = 0 to switch drive OFF, and 1 to switch back ON again
+// LPARAM is the process ID making the request.  The application will monitor and auto restore if the process exits
+#define WM_REMOTEUSAGE        (WM_USER+2)
 
 struct DriveInfo {
     HWND hWnd;
     std::wstring volumeName;
     std::wstring volumeType;
+    bool isPhysicalDrive;
 };
 
 class SectorCacheEngine;
@@ -27,6 +34,11 @@ private:
     HMENU m_hCreateListDD = 0;
     HMENU m_hCreateListHD = 0;
     HMENU m_hUpdates = 0;
+    PROCESS_INFORMATION m_floppyPi;
+    bool m_lastBalloonIsUpdate = false;
+    bool m_didNotifyFail = false;
+    HANDLE m_processUsingDrive = 0;
+
     std::map<std::wstring, DriveInfo> m_drives;
     const std::wstring m_exeName;
 
@@ -64,6 +76,13 @@ private:
 
     // Handle tray contect menu
     void doContextMenu(POINT pt);
+
+    // Monitor the physical drive and enable/close as required
+    void monitorPhysicalDrive();
+
+    // Eject/close physical drives running
+    bool closePhysicalDrive(bool dontNotify = false);
+
 
 public:
     CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName);

@@ -23,3 +23,7 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, 
 // Get the parameter settings for creating an IBM style fs
 void getMkFsParams(bool isHD, SectorType format, MKFS_PARM& params);
 
+// Creates a basic disk image with a number of *strange* values suitable for Atari ST
+bool createBasicDisk(const std::wstring filename, const std::string& label, const uint32_t numTracks, const uint32_t numSectors, const uint32_t numHeads);
+// Create the disk and return its memory. memSize is poulated with it's size. call free() on it when done
+uint8_t* createBasicDisk(const std::string& label, const uint32_t numTracks, const uint32_t numSectors, const uint32_t numHeads, uint32_t* memSize);

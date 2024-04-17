@@ -16,6 +16,7 @@ private:
 	bool m_forceReadOnly;
 	HINSTANCE m_hInstance;
 	bool m_triggerExplorer = false;
+	bool m_ejecting = false;
 
 	// If we have an Amiga disk inserted
 	AdfDevice* m_adfDevice = nullptr;

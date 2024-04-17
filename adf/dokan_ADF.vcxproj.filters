@@ -93,6 +93,9 @@
     <ClCompile Include="dlgConfig.cpp">
       <Filter>Dialogs</Filter>
     </ClCompile>
+    <ClCompile Include="mfminterface.cpp">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -200,6 +203,9 @@
     </ClInclude>
     <ClInclude Include="floppybridge_common.h">
       <Filter>Interfaces\floppybridge</Filter>
+    </ClInclude>
+    <ClInclude Include="mfminterface.h">
+      <Filter>Interfaces\Sector Interface</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

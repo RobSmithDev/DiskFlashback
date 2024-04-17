@@ -9,6 +9,7 @@
 #include "dlgFormat.h"
 #include "dlgCopy.h"
 #include "menu.h"
+#include "shellMenus.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -23,7 +24,6 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 //          one of the CTRL_PARAM_ values
 //   Mount File/Drive Params (if mount)
 
-#include "dlgConfig.h"
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     int argc = 0;
@@ -119,7 +119,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             if (std::wstring(argv[0]) == COMMANDLINE_MOUNTDRIVE) {
                 if (!vol->mountDrive(argv[3])) {
                     delete vol;
-                    return RETURNCODE_MOUNTFAIL;
+                    return RETURNCODE_MOUNTFAILDRIVE;
                 }
             }
             else return RETURNCODE_BADARGS;

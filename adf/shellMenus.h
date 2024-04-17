@@ -4,24 +4,32 @@
 #include <string>
 
 class SectorCacheEngine;
+
+#define ICON_BLANK   
+#define ICON_AMIGA
+#define ICON_PC
+#define ICON_ST      
  
 class ShellRegistery {
 private:
+	#define MAX_DISK_IMAGE_FILES 3
+	static const WCHAR* DiskImageFiles[MAX_DISK_IMAGE_FILES];
+	static const int    DiskImageIcon[MAX_DISK_IMAGE_FILES];
+
 	std::wstring m_mainEXE;
 
 	// Add some hacks to the registery to make the drive context menu work
-	void applyRegistryAction(WCHAR driveLetter, const std::wstring registeryKeyName, const std::wstring menuLabel, const int iconIndex, const std::wstring& commandParams);
+	void addDriveAction(WCHAR driveLetter, const std::wstring& section, const std::wstring menuLabel, const int iconIndex, const std::wstring& commandParams);
 	// Remove those hacks
-	void removeRegisteryAction(WCHAR driveLetter, const std::wstring registeryKeyName);
-	// Add data to the context menu for disk images
-	void setupDiskImageMenu(bool add, WCHAR driveLetter);
+	void removeDriveAction(WCHAR driveLetter, const std::wstring& section);
 
-	void populateDiskImageMenu(bool add, const std::wstring& path, WCHAR driveLetter);
+	// Add data to the context menu for disk images
+	void setupContextForFileType(bool add, const std::wstring& path, uint32_t icon, WCHAR driveLetter);
+	void setupFiletypeContextMenu(bool add, WCHAR driveLetter);
 public:
 	ShellRegistery(const std::wstring& mainEXE) : m_mainEXE(mainEXE) {};
 
 	void mountDismount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource);
 
 	void setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t iconIndex, bool isPhysicalDisk);
-
 };

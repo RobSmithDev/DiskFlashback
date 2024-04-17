@@ -60,6 +60,7 @@ typedef unsigned int 	 (CALLING_CONVENSION* _BRIDGE_NumDrivers)(void);
 typedef bool 			 (CALLING_CONVENSION* _BRIDGE_GetDriverInfo)(unsigned int driverIndex, FloppyDiskBridge::BridgeDriver** driverInformation);
 #ifdef _WIN32
 typedef bool			 (CALLING_CONVENSION* _BRIDGE_ShowConfigDialog)(HWND hwndParent, unsigned int* profileID);
+typedef bool			 (CALLING_CONVENSION* _BRIDGE_EnableUsageNotifications)(bool enabled);
 #endif
 typedef bool			 (CALLING_CONVENSION* _BRIDGE_GetAllProfiles)(FloppyBridge::FloppyBridgeProfileInformationDLL** profiles, unsigned int* numProfiles);
 typedef bool			 (CALLING_CONVENSION* _BRIDGE_ImportProfilesFromString)(char* profilesConfigString);
@@ -149,6 +150,7 @@ _BRIDGE_CreateNewProfile BRIDGE_CreateNewProfile = nullptr;
 _BRIDGE_DeleteProfile BRIDGE_DeleteProfile = nullptr;
 #ifdef _WIN32
 _BRIDGE_ShowConfigDialog BRIDGE_ShowConfigDialog = nullptr;
+_BRIDGE_EnableUsageNotifications BRIDGE_EnableUsageNotifications = nullptr;
 #endif
 _BRIDGE_GetDriverIndex BRIDGE_GetDriverIndex = nullptr;
 _BRIDGE_SetDriverIndex BRIDGE_SetDriverIndex = nullptr;
@@ -235,6 +237,7 @@ void prepareBridge() {
 	BRIDGE_SetDriverIndex = (_BRIDGE_SetDriverIndex)GETFUNC(hBridgeDLLHandle, "BRIDGE_SetDriverIndex");
 #ifdef _WIN32
 	BRIDGE_ShowConfigDialog = (_BRIDGE_ShowConfigDialog)GETFUNC(hBridgeDLLHandle, "BRIDGE_ShowConfigDialog");
+	BRIDGE_EnableUsageNotifications = (_BRIDGE_EnableUsageNotifications)GETFUNC(hBridgeDLLHandle, "BRIDGE_EnableUsageNotifications");
 #endif
 	BRIDGE_Close = (_BRIDGE_Close)GETFUNC(hBridgeDLLHandle, "BRIDGE_Close");
 	BRIDGE_Open = (_BRIDGE_Open)GETFUNC(hBridgeDLLHandle, "BRIDGE_Open");
@@ -590,7 +593,16 @@ bool FloppyBridgeAPI::deleteProfile(unsigned int profileID) {
 	return BRIDGE_DeleteProfile(profileID);
 }
 
+
 #ifdef _WIN32
+// By default FloppyBridge will inform DiskFlashback when it wants the drive. Use this to turn that feature off
+void FloppyBridgeAPI::enableUsageNotifications(bool enable) {
+	if (!isAvailable()) return;
+
+	BRIDGE_EnableUsageNotifications(enable);
+}
+
+
 // Displays the config dialog (modal) for Floppy Bridge profiles.  
 // *If* you pass a profile ID, the dialog will jump to editing that profile, or return FALSE if it was not found.
 // Returns FALSE if cancel was pressed
@@ -754,7 +766,6 @@ bool FloppyBridgeAPI::setSmartSpeedEnabled(const bool enabled) const
 {
 	return BRIDGE_DriverSetSmartSpeedEnabled(m_handle, enabled);
 }
-
 
 /******************* BRIDGE Functions for UAE **********************************/
 

@@ -9,6 +9,7 @@
 #include "readwrite_dms.h"
 #include "floppybridge_lib.h"
 
+#define REGISTRY_SECTIONA			"Software\\RobSmithDev\\DiskFlashback"
 #define REGISTRY_SECTION			L"Software\\RobSmithDev\\DiskFlashback"
 #define KEY_FLOPPY_PROFILE			"floppyprofile"
 #define KEY_FLOPPY_ENABLED			"floppyenabled"
@@ -29,39 +30,36 @@ bool loadConfiguration(AppConfig& config) {
 	config.enabled = true;
 	config.floppyProfile = "";
 	config.driveLetter = 'A';
-	config.lastCheck = getStamp() - 6;
+	config.lastCheck = getStamp() - 5;
 
 	HKEY key;
 	DWORD disp = 0;
 	if (RegCreateKeyEx(HKEY_CURRENT_USER, REGISTRY_SECTION, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS | KEY_WOW64_64KEY, NULL, &key, &disp) != ERROR_SUCCESS) key = 0;
 	if (!key) return false;
 
-	DWORD dataSize = 0;
-	if (RegGetValueA(key, NULL, KEY_FLOPPY_PROFILE, RRF_RT_REG_SZ, NULL, NULL, &dataSize) == ERROR_SUCCESS) {
-		config.floppyProfile.resize(dataSize);
-		RegGetValueA(key, NULL, KEY_FLOPPY_PROFILE, RRF_RT_REG_SZ, NULL, &config.floppyProfile[0], &dataSize);
-		if (dataSize) config.floppyProfile.resize(dataSize-1);
+	DWORD dataSize = 256;
+	char buffer[256];
+	if (RegGetValueA(HKEY_CURRENT_USER, REGISTRY_SECTIONA, KEY_FLOPPY_PROFILE, RRF_RT_ANY, NULL, (LPBYTE)buffer, &dataSize) == ERROR_SUCCESS) {
+		buffer[dataSize] = '\0';
+		config.floppyProfile = buffer;
 	}
-	dataSize = 0;
-	if (RegGetValueA(key, NULL, KEY_DRIVE_LETTER, RRF_RT_REG_SZ, NULL, NULL, &dataSize) == ERROR_SUCCESS) {
-		std::string tmp;
-		tmp.resize(dataSize);
-		RegGetValueA(key, NULL, KEY_DRIVE_LETTER, RRF_RT_REG_SZ, NULL, &tmp[0], &dataSize);
-		if (dataSize) tmp.resize(dataSize - 1);
-		if (tmp.size()) config.driveLetter = tmp[0];
+	dataSize = 256;
+	if (RegGetValueA(HKEY_CURRENT_USER, REGISTRY_SECTIONA, KEY_DRIVE_LETTER, RRF_RT_ANY, NULL, (LPBYTE)buffer, &dataSize) == ERROR_SUCCESS) {
+		buffer[dataSize] = '\0';
+		config.driveLetter = buffer[0];
 	}
 
 	DWORD dTemp;
 	dataSize = sizeof(dTemp);
-	if (RegGetValueA(key, NULL, KEY_FLOPPY_ENABLED, RRF_RT_REG_DWORD, NULL, &dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
+	if (RegQueryValueExA(key, KEY_FLOPPY_ENABLED, NULL, NULL, (LPBYTE)&dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
 	if (dataSize == sizeof(dTemp)) config.enabled = dTemp != 0;
 
 	dataSize = sizeof(dTemp);
-	if (RegGetValueA(key, NULL, KEY_UPDATE_CHECK, RRF_RT_REG_DWORD, NULL, &dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
+	if (RegQueryValueExA(key, KEY_UPDATE_CHECK , NULL, NULL, (LPBYTE)&dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
 	if (dataSize == sizeof(dTemp)) config.checkForUpdates = dTemp != 0;
 
 	dataSize = sizeof(dTemp);
-	if (RegGetValueA(key, NULL, KEY_LAST_UPDATE_CHECK, RRF_RT_REG_DWORD, NULL, &dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
+	if (RegQueryValueExA(key, KEY_LAST_UPDATE_CHECK, NULL, NULL, (LPBYTE)&dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
 	if (dataSize == sizeof(dTemp)) config.lastCheck = dTemp;
 
 	RegCloseKey(key);
@@ -84,7 +82,7 @@ bool saveConfiguration(const AppConfig& config) {
 
 	dTemp = config.checkForUpdates ? 1 : 0;
 	RegSetValueExA(key, KEY_UPDATE_CHECK, 0, REG_DWORD, (const BYTE*)&dTemp, sizeof(dTemp));
-	RegSetValueExA(key, KEY_UPDATE_CHECK, 0, REG_DWORD, (const BYTE*)&config.lastCheck, sizeof(config.lastCheck));
+	RegSetValueExA(key, KEY_LAST_UPDATE_CHECK, 0, REG_DWORD, (const BYTE*)&config.lastCheck, sizeof(config.lastCheck));
 
 
 	RegCloseKey(key);
@@ -129,13 +127,7 @@ INT_PTR CALLBACK configCallback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 }
 
 bool DialogConfig::doModal() {
-	if (DialogBoxParam(m_hInstance, MAKEINTRESOURCE(IDD_CONFIG), m_hParent, configCallback, (LPARAM)this)) {
-		char* str;
-		if (FloppyBridgeAPI::exportProfilesToString(&str)) m_config.floppyProfile = str;
-		saveConfiguration(m_config);
-		return true;
-	}
-	return false;
+	return DialogBoxParam(m_hInstance, MAKEINTRESOURCE(IDD_CONFIG), m_hParent, configCallback, (LPARAM)this);
 }
 
 // Init dialog
@@ -287,6 +279,7 @@ INT_PTR DialogConfig::handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 			grabConfig();
 			m_api->getConfigAsString(&profile);
 			m_config.floppyProfile = profile;
+			saveConfiguration(m_config);
 			EndDialog(hwnd, TRUE);
 			}
 			return TRUE;

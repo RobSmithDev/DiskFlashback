@@ -151,9 +151,12 @@ int adfDevType ( struct AdfDevice * dev )
         (dev->size==512*11*2*82) || 	/* BV */
         (dev->size==512*11*2*83) )		/* BV */
         return(DEVTYPE_FLOPDD);
-    else if (dev->size==512*22*2*80)
+    else if ((dev->size==512*22*2*80) || 
+        (dev->size == 512 * 22 * 2 * 81) ||
+        (dev->size == 512 * 22 * 2 * 82) || 
+        (dev->size == 512 * 22 * 2 * 83))
         return(DEVTYPE_FLOPHD);
-    else if (dev->size>512*22*2*80)
+    else if (dev->size>512*22*2*83)
         return(DEVTYPE_HARDDISK);
     else {
         (*adfEnv.eFct)("adfDevType : unknown device type");

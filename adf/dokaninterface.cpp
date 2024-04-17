@@ -88,10 +88,9 @@ bool DokanFileSystemManager::start() {
 void DokanFileSystemManager::stop() {
     if (m_dokanInstance) {      
         shutdownFS();
-        m_mountPoint[0] = L'?';
         DokanCloseHandle(m_dokanInstance);
         m_dokanInstance = 0;
-        m_mountPoint[0] = L'?';
+        //m_mountPoint[0] = L'?';
     }
 }
 
@@ -116,7 +115,7 @@ void DokanFileSystemManager::onMounted(const std::wstring& mountPoint, PDOKAN_FI
 
 // Unmount notification
 void DokanFileSystemManager::onUnmounted(PDOKAN_FILE_INFO dokanfileinfo) {
-    m_mountPoint[0] = m_initialLetter;
+    //m_mountPoint[0] = m_initialLetter;
 }
 #pragma endregion DokanFileSystemManager
 
@@ -132,10 +131,10 @@ void wideToAnsi(const std::wstring& wstr, std::string& str) {
 }
 
 void ansiToWide(const std::string& wstr, std::wstring& str) {
-    int size = MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), -1, NULL, 0);
+    int size = MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), wstr.length(), NULL, 0);
     if (size) {
-        str.resize(size * 2);
-        MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), -1, &str[0], size * 2);
+        str.resize(size);
+        str.resize(MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), wstr.length(), &str[0], size));
     }
 }
 #pragma endregion MiscFuncs

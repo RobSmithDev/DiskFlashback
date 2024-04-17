@@ -18,6 +18,36 @@
 // DDAM A1A1A1F8 (deleted data address mark)
 #define MFM_SYNC_DELETED_SECTOR_DATA        0x448944894489554AULL
 
+#pragma pack(push, 1)
+typedef struct {
+	uint16_t	BRA;			// Boot Strap
+	uint16_t    OEM[3];			// OEM Bytes
+	uint8_t		SerialNumber[3];
+	uint16_t	SectorSize;
+	uint8_t		SectorsPerCluster;
+	uint16_t	ReservedSectors;
+	uint8_t		NumFats;
+	uint16_t	NumDirEntries;
+	uint16_t	TotalSectors;
+	uint8_t		MediaDescriptor;
+	uint16_t	SectorsPerFat;
+	uint16_t	SectorsPerTrack;
+	uint16_t	NumHeads;
+	uint16_t	NumHiddenSectors;
+} BootSectorHeader;
+
+typedef struct {
+	char	fileName[11];
+	uint8_t fileAttr;
+	uint8_t reserved[10];
+	uint16_t fileTime;
+	uint16_t fileDate;
+	uint16_t startCluster;
+	uint32_t fileSize;
+} RootDirectoryEntry;
+#pragma pack(pop)
+
+
 // IAM Header data structore
 typedef struct alignas(1)  {
 	unsigned char addressMark[4]; // should be 0xA1A1A1FE
@@ -453,17 +483,18 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, bool forceAtariTiming, Decode
 bool getTrackDetails_IBM(const uint8_t* sector, uint32_t& serialNumber, uint32_t& numHeads, uint32_t& totalSectors, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector) {
 	sectorsPerTrack = 0;
 	serialNumber = 0;
+	if (!sector) return false;
 
-	if (!sector) return false;	
-	serialNumber = (sector[0x08 + 3] << 24) | (sector[0x08 + 2] << 16) | (sector[0x08 + 1] << 8) | sector[0x08];
-	sectorsPerTrack = (sector[0x18 + 1] << 8) | sector[0x18];
-	totalSectors = (sector[0x13 + 1] << 8) | sector[0x13];
-	numHeads = (sector[0x1A + 1] << 8) | sector[0x1A];
+	const BootSectorHeader* header = (BootSectorHeader*)sector;
+	serialNumber = (header->SerialNumber[2] << 16) | (header->SerialNumber[1] << 8) | header->SerialNumber[0];
+	sectorsPerTrack = header->SectorsPerTrack;
+	totalSectors = header->TotalSectors;
+	numHeads = header->NumHeads;
+	bytesPerSector = header->SectorSize;
+
 	if ((numHeads < 1) || (numHeads > 2)) return false;
-
 	if (sectorsPerTrack < 3) return false;
 	if (sectorsPerTrack > 22) return false;
-	bytesPerSector = (sector[0x0B + 1] << 8) | sector[0x0B];
 	return ((bytesPerSector == 128) || (bytesPerSector == 256) || (bytesPerSector == 512) || (bytesPerSector == 1024) || (bytesPerSector == 2048) || (bytesPerSector == 4096));
 }
 
@@ -480,3 +511,76 @@ bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumbe
 	return getTrackDetails_IBM(it->second.data.data(), serialNumber, numHeads, totalSectors, sectorsPerTrack, bytesPerSector);
 }
 
+// Creates a basic disk image with a number of *strange* values suitable for Atari ST
+bool createBasicDisk(const std::wstring filename, const std::string& label, const uint32_t numTracks, const uint32_t numSectors, const uint32_t numHeads) {
+	uint32_t memSize;
+	uint8_t* mem = createBasicDisk(label, numTracks, numSectors, numHeads, &memSize);
+	if (!mem) return false;
+
+	HANDLE fle = CreateFile(filename.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (fle == INVALID_HANDLE_VALUE) {
+		free(mem);
+		return false;
+	}
+	DWORD written = 0;
+	if (!WriteFile(fle, mem, memSize, &written, NULL)) written = 0;
+	CloseHandle(fle);
+	free(mem);
+
+	return memSize == written;
+}
+
+// Create the disk and return its memory. memSize is poulated with it's size. call free() on it when done
+uint8_t* createBasicDisk(const std::string& label, const uint32_t numTracks, const uint32_t numSectors, const uint32_t numHeads, uint32_t* memSize) {
+	if (!memSize) return nullptr;
+	// Size required
+	*memSize = numTracks * numSectors * numHeads * DEFAULT_SECTOR_BYTES;
+
+	uint8_t* mem = (uint8_t * )malloc(*memSize);
+	if (!mem) return nullptr;
+	memset(mem, 0, *memSize);
+
+	// Populate the boot sector area
+	BootSectorHeader* boot = (BootSectorHeader*)mem;
+	boot->BRA = 0xE9;
+	boot->OEM[0] = 0x4E4E;
+	boot->OEM[1] = 0x4E4E;
+	boot->OEM[2] = 0x4E4E;
+	boot->SerialNumber[0] = rand();
+	boot->SerialNumber[1] = rand();
+	boot->SerialNumber[2] = rand();
+	boot->SectorSize = DEFAULT_SECTOR_BYTES;
+	boot->SectorsPerCluster = (numTracks == 40) && (numHeads == 1) ? 1 : 2;
+	boot->ReservedSectors = 1;
+	boot->NumFats = 2;
+	boot->NumDirEntries = (boot->SectorsPerCluster == 1) ? 64 : (numSectors < 18 ? 112 : 224);
+	boot->TotalSectors = numTracks * numSectors * numHeads;
+	if (numSectors >= 18)
+		boot->MediaDescriptor = 0xF0;
+	else {
+		if (numTracks <= 42) boot->MediaDescriptor = 0xFC; else boot->MediaDescriptor = 0xF8;
+		if (numHeads == 2) boot->MediaDescriptor |= 1;
+	}
+	boot->SectorsPerFat = numSectors >= 18 ? 9 : (numTracks >= 80 ? 5 : 2);
+	boot->SectorsPerTrack = numSectors;
+	boot->NumHeads = numHeads;
+	boot->NumHiddenSectors = 0;
+
+	// Reset the FATs
+	for (uint32_t fat = 0; fat < boot->NumFats; fat++) {
+		uint32_t memStart = boot->SectorSize * (1 + (fat * boot->SectorsPerFat));
+		mem[memStart] = boot->MediaDescriptor;
+		mem[memStart + 1] = 0xFF;
+		mem[memStart + 2] = 0xFF;
+	}
+
+	// pDirStart = pDiskFile + ( 1 + SPF * 2 ) * 512;
+
+	// 10th sector
+	// Create the first FAT entry (file) with Volume ID attribute for the disk label
+	RootDirectoryEntry* ent = (RootDirectoryEntry*)(mem + (uint32_t)boot->SectorSize * (1+(boot->NumFats * (uint32_t)boot->SectorsPerFat)));
+	memset(ent->fileName, ' ', 11);
+	memcpy_s(ent->fileName, 11, label.c_str(), min(label.length(), 11));
+	ent->fileAttr = 8; // VolumeID attribute
+	return mem;
+}

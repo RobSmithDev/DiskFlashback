@@ -180,6 +180,10 @@ public:
 	// Deletes a profile by ID.
 	static bool deleteProfile(unsigned int profileID);
 
+#ifdef _WIN32
+	// By default FloppyBridge will inform DiskFlashback when it wants the drive. Use this to turn that feature off
+	static void enableUsageNotifications(bool enable);
+#endif
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -251,6 +255,7 @@ public:
 	bool getSmartSpeedEnabled(bool* enabled) const;
 	//  Sets if the driver can dynamically switch between normal and turbo disk speed without breaking copy protectionThis can be set while the bridge is in use
 	bool setSmartSpeedEnabled(const bool enabled) const;
+
 
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

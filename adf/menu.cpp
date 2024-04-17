@@ -9,6 +9,9 @@
 #include "readwrite_file.h"
 #include "MountedVolumes.h"
 #include "ibm_sectors.h"
+#include "drivecontrol.h"
+#include "floppybridge_lib.h"
+#include "psapi.h"
 
 #define MENUID_CREATEDISK       1
 #define MENUID_MOUNTDISK        2
@@ -21,7 +24,8 @@
 #define MENUID_IMAGE_HD         40
 #define MENUID_EJECTSTART       100
 
-#define TIMERID_UPDATE_CHECK    1000
+#define TIMERID_UPDATE_CHECK      1000
+#define TIMERID_TRIGGER_REALDRIVE 1001
 
 #pragma comment(lib,"Version.lib")
 #pragma comment(lib,"Ws2_32.lib")
@@ -40,7 +44,11 @@ BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
             pos++;
             DriveInfo info;
             info.hWnd = hwnd;
+            info.isPhysicalDrive = wcsstr(tmpText, L"BRIDGE.") != nullptr;
+            uint32_t counter = 0;
+
             while (*pos) {
+                counter++;
                 swprintf_s(path, L"\\\\.\\%c:\\", pos[0]);
                 buffer2[0] = L'\0';
                 buffer3[0] = L'\0';
@@ -50,6 +58,9 @@ BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
                 swprintf_s(path, L"%c:", pos[0]);
                 mapping->insert(std::make_pair(path, info));
                 pos++;
+            }
+            if ((counter < 1) && (info.isPhysicalDrive)) {
+                mapping->insert(std::make_pair(L"", info));
             }
         }
     }
@@ -81,10 +92,15 @@ void CTrayMenu::setupMenu() {
     m_hCreateListDD = CreatePopupMenu();
     m_hCreateListHD = CreatePopupMenu();
 
-    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD   , L"Amiga ADF Image...");
-    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD +1, L"IBM PC Image...");
-    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD,     L"Amiga ADF Image...");
-    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 1, L"IBM PC Image...");
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD    , L"Amiga ADF...");
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD + 1, L"IBM PC...");    
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD + 2, L"Atari ST (Single Sided)...");
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD + 3, L"Atari ST (Double Sided)...");
+    AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD + 4, L"Atari ST (Extended)...");
+
+    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD,     L"Amiga ADF...");
+    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 1, L"IBM PC...");
+    AppendMenu(m_hCreateListHD, MF_STRING, MENUID_IMAGE_HD + 2, L"Atari ST...");
 
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListDD, L"Double Density");
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListHD, L"High Density");
@@ -157,6 +173,7 @@ void CTrayMenu::checkForUpdates(bool force) {
                 // Do popup for updates available
                 m_notify.uFlags |= NIF_INFO;
                 m_notify.dwInfoFlags = NIIF_INFO;
+                m_lastBalloonIsUpdate = true;
                 wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
                 wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
 
@@ -187,6 +204,7 @@ void CTrayMenu::doConfig() {
     DialogConfig config(m_hInstance, m_window.hwnd());
     if (config.doModal()) {
         loadConfiguration(m_config);
+        m_didNotifyFail = false;
     }
 }
 
@@ -212,6 +230,12 @@ void CTrayMenu::runCreateImage(bool isHD, uint32_t option) {
         ext = L"img";
         sectors = 9;
         break;
+    case 2:
+    case 3:
+    case 4:
+        dlg.lpstrFilter = L"Atart ST Disk Files (*.st)\0*.st\0All Files(*.*)\0*.*\0\0";
+        ext = L"st";
+        break;
     default:
         return; // not supported
     }
@@ -230,36 +254,48 @@ void CTrayMenu::runCreateImage(bool isHD, uint32_t option) {
     dlg.nMaxFile = MAX_PATH;
     if (!GetSaveFileName(&dlg))  return;
 
-    // Create image
-    HANDLE fle = CreateFile(filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-    if (fle == INVALID_HANDLE_VALUE) {
-        MessageBox(m_window.hwnd(), L"Unable to create disk image file", L"Error", MB_OK | MB_ICONEXCLAMATION);
-        return;
-    }
-
-    unsigned char blank[512] = { 0 };
-    // Write blank sectors
-    for (uint32_t s = 0; s < sectors; s++) {
-        DWORD written;
-        if (!WriteFile(fle, blank, 512, &written, NULL)) written = 0;
-        if (written != 512) {
-            CloseHandle(fle);
-            MessageBox(m_window.hwnd(), L"An error occured creating the disk image file", L"Error", MB_OK | MB_ICONEXCLAMATION);
-            return;
+    
+    if (option >= 2) {
+        if (isHD) {
+            createBasicDisk(filename, "empty", 80, 18, 2);
+        } else
+        switch (option) {
+            case 2:createBasicDisk(filename, "empty", 80, 9, 1); break;
+            case 3:createBasicDisk(filename, "empty", 80, 9, 2); break;
+            case 4:createBasicDisk(filename, "empty", 83, 11, 2); break;
         }
     }
+    else {
+        // Create image
+        HANDLE fle = CreateFile(filename, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+        if (fle == INVALID_HANDLE_VALUE) {
+            MessageBox(m_window.hwnd(), L"Unable to create disk image file", L"Error", MB_OK | MB_ICONEXCLAMATION);
+            return;
+        }
 
-    SectorCacheEngine* engine = new SectorRW_File(filename, fle);
+        unsigned char blank[512] = { 0 };
+        // Write blank sectors
+        for (uint32_t s = 0; s < sectors; s++) {
+            DWORD written;
+            if (!WriteFile(fle, blank, 512, &written, NULL)) written = 0;
+            if (written != 512) {
+                CloseHandle(fle);
+                MessageBox(m_window.hwnd(), L"An error occured creating the disk image file", L"Error", MB_OK | MB_ICONEXCLAMATION);
+                return;
+            }
+        }
 
-    // Create file system
-    switch (option) {
-    case 0: installAmigaFS(isHD, engine); break;
-    case 1: installIBMPCFS(isHD, true, engine); break;
-    case 2: installIBMPCFS(isHD, false, engine); break;
+        SectorCacheEngine* engine = new SectorRW_File(filename, fle);
+
+        // Create file system
+        switch (option) {
+        case 0: installAmigaFS(isHD, engine); break;
+        case 1: installIBMPCFS(isHD, true, engine); break;
+        }
+
+        engine->flushWriteCache();
+        delete engine;
     }
-    
-    engine->flushWriteCache();
-    delete engine;
 
     if (MessageBox(m_window.hwnd(), L"Image file created successfully.\nWould you like to mount the new image?", L"Image Ready", MB_YESNO | MB_ICONEXCLAMATION) != IDYES) return;
 
@@ -309,6 +345,7 @@ void CTrayMenu::installIBMPCFS(bool isHD, bool isIBMPC, SectorCacheEngine* fle) 
     f_mkfs(L"\\", &opt, work, sizeof(work));
     f_mount(m_fatDevice, L"", 1);
     f_setlabel(L"empty");
+    f_unmount(L"\\");
     free(m_fatDevice);
 
     fle->flushWriteCache();
@@ -328,7 +365,7 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
         return;
     }
 
-    if ((index >= MENUID_IMAGE_DD) && (index < MENUID_IMAGE_DD + 3)) runCreateImage(false, index - MENUID_IMAGE_DD);
+    if ((index >= MENUID_IMAGE_DD) && (index < MENUID_IMAGE_DD + 5)) runCreateImage(false, index - MENUID_IMAGE_DD);
     if ((index >= MENUID_IMAGE_HD) && (index < MENUID_IMAGE_HD + 3)) runCreateImage(true, index - MENUID_IMAGE_HD);
 
     switch (index) {
@@ -336,7 +373,7 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
         DWORD v = getAppVersion();
             std::wstring msg = std::wstring(APPLICATION_NAME_L) + L" V" + std::to_wstring(v >> 24) + L"." + std::to_wstring((v >> 16) & 0xFF) + L"." + std::to_wstring((v >> 8) & 0xFF) + L"." + std::to_wstring(v & 0xFF) + L"\r\n";
             msg += L"Copyright \x00A9 2024 RobSmithDev\r\n\r\n";
-            msg += L"Visit https://robsmithdev.co.uk for more information";
+            msg += L"Visit https://robsmithdev.co.uk/diskflashback for more information";
             MessageBox(m_window.hwnd(), msg.c_str(), L"About DiskFlashback", MB_OK | MB_ICONINFORMATION);
         }
         break;
@@ -396,26 +433,28 @@ void CTrayMenu::doContextMenu(POINT pt) {
 // Handle mouse input
 void CTrayMenu::handleMenuInput(UINT uID, UINT iMouseMsg) {
     switch (iMouseMsg) {
-        case NIN_BALLOONUSERCLICK:
+    case NIN_BALLOONUSERCLICK:
+        if (m_lastBalloonIsUpdate)
             ShellExecute(m_window.hwnd(), L"open", L"https://robsmithdev.co.uk/diskflashback", NULL, NULL, SW_SHOW);
-        break;    
-        case WM_CONTEXTMENU: {
-            RECT r;
-            NOTIFYICONIDENTIFIER id;
-            id.cbSize = sizeof(id);
-            id.hWnd = m_window.hwnd();
-            id.uID = 0;
-            id.guidItem = GUID_NULL;
-            Shell_NotifyIconGetRect(&id, &r);
-            doContextMenu({ (r.left + r.right) / 2, (r.top + r.bottom) / 2 });
-        }
+        else doConfig();
         break;
-        case WM_RBUTTONDOWN: {
-            POINT pt;
-            GetCursorPos(&pt);
-            doContextMenu(pt);
-        }
-        break;
+    case WM_CONTEXTMENU: {
+        RECT r;
+        NOTIFYICONIDENTIFIER id;
+        id.cbSize = sizeof(id);
+        id.hWnd = m_window.hwnd();
+        id.uID = 0;
+        id.guidItem = GUID_NULL;
+        Shell_NotifyIconGetRect(&id, &r);
+        doContextMenu({ (r.left + r.right) / 2, (r.top + r.bottom) / 2 });
+    }
+                       break;
+    case WM_RBUTTONDOWN: {
+        POINT pt;
+        GetCursorPos(&pt);
+        doContextMenu(pt);
+    }
+                       break;
     case WM_LBUTTONDBLCLK:
         doConfig();
         break;
@@ -450,9 +489,89 @@ void CTrayMenu::mountDisk() {
     }
 }
 
+// Eject/close physical drives running
+bool CTrayMenu::closePhysicalDrive(bool dontNotify) {
+    bool ret = false;
+    for (auto& drive : m_drives)
+        if (drive.second.isPhysicalDrive) {
+            PostMessage(drive.second.hWnd, WM_USER, dontNotify? REMOTECTRL_EJECT_SILENT: REMOTECTRL_EJECT, (LPARAM)drive.first[0]);
+            ret = true;
+        }
+    return ret;
+}
+
+// Monitor the physical drive and enable/close as required
+void CTrayMenu::monitorPhysicalDrive() {
+
+    if (m_processUsingDrive) {
+        if (WaitForSingleObject(m_processUsingDrive, 0) == WAIT_OBJECT_0) {
+            CloseHandle(m_processUsingDrive);
+            m_processUsingDrive = 0;
+            m_didNotifyFail = false;
+        }        
+    }
+
+    if (m_floppyPi.hProcess) {
+        // Check if it terminated
+        if (WaitForSingleObject(m_floppyPi.hProcess, 0) == WAIT_OBJECT_0) {
+            DWORD code = 0;
+            GetExitCodeProcess(m_floppyPi.hProcess, &code);
+            if (code == RETURNCODE_MOUNTFAILDRIVE) {
+                if (!m_didNotifyFail) {
+                    m_didNotifyFail = true;
+                    // Notify it failed to mount
+                    std::vector<const TCHAR*> ports;
+                    FloppyBridgeAPI::enumCOMPorts(ports);
+                    if (ports.size()) {
+                        wcscpy_s(m_notify.szInfo, L"Unable to start physical drive.\r\nEither it was not detected, or it is in use.");
+                    }
+                    else {
+                        wcscpy_s(m_notify.szInfo, L"Unable to start physical drive.\r\nThe device COM port could not be found.");
+                    }
+                    m_lastBalloonIsUpdate = false;
+                    // Do popup for updates available
+                    m_notify.uFlags |= NIF_INFO;
+                    m_notify.dwInfoFlags = NIIF_ERROR;
+                    wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                    Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+                    m_notify.uFlags &= ~NIF_INFO;
+                }
+            } else m_didNotifyFail = false;
+            CloseHandle(m_floppyPi.hProcess);
+            memset(&m_floppyPi, 0, sizeof(m_floppyPi));
+        }
+    }
+
+    if (m_config.enabled) {
+        if ((m_processUsingDrive == 0) && (m_floppyPi.hProcess == 0) && (!m_config.floppyProfile.empty())) {
+            std::string driveLetter; driveLetter.resize(1); driveLetter[0] = m_config.driveLetter;
+            std::wstring driveLetterW; ansiToWide(driveLetter, driveLetterW);
+            std::wstring profileW; ansiToWide(m_config.floppyProfile, profileW);
+
+            std::wstring cmd = L"\"" + m_exeName + L"\" BRIDGE " +driveLetterW + L" 1 \"" + profileW + L"\"";
+            STARTUPINFO si; ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
+
+            CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &m_floppyPi);
+            if (m_floppyPi.hThread) CloseHandle(m_floppyPi.hThread);
+            m_floppyPi.hThread = 0;
+        }
+    }
+    else {
+        // It's running, so lets shut it down
+        if (m_floppyPi.hProcess) {
+            populateDrives();
+            closePhysicalDrive();
+            CloseHandle(m_floppyPi.hProcess);
+            memset(&m_floppyPi, 0, sizeof(m_floppyPi));
+        }
+    }
+}
+
 CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInstance(hInstance), m_window(hInstance, APP_TITLE), m_exeName(exeName) {
     memset(&m_notify, 0, sizeof(m_notify));
     loadConfiguration(m_config);
+
+    memset(&m_floppyPi, 0, sizeof(m_floppyPi));
 
     // Start winsock
     WSADATA data;
@@ -465,6 +584,63 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
     m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT { setupIcon(); return 0; });
     m_window.setMessageHandler(WM_USER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         handleMenuInput((UINT)wParam, (UINT)lParam); return 0; });
+    m_window.setMessageHandler(WM_PHYSICAL_EJECT, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        if (m_processUsingDrive) return 0;
+        // Turn off the "enabled" option
+        m_config.enabled = false;
+        saveConfiguration(m_config);
+        CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | MF_UNCHECKED);
+        return 0;
+        });
+    m_window.setMessageHandler(WM_REMOTEUSAGE, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        // Turn off the "enabled" option
+        if (m_processUsingDrive) CloseHandle(m_processUsingDrive);
+        m_processUsingDrive = 0;
+
+        if (wParam == 0) 
+            if (lParam) m_processUsingDrive = OpenProcess(SYNCHRONIZE, FALSE, (DWORD)lParam);
+
+
+        if (m_processUsingDrive) {
+            populateDrives();
+            if (closePhysicalDrive(true)) {
+                m_didNotifyFail = true;
+                WCHAR name[1024];
+                m_lastBalloonIsUpdate = false;
+
+                HANDLE tmp = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, (DWORD)lParam);
+                if (tmp) {
+                    wcscpy_s(m_notify.szInfo, L"Suspending real floppy drive while ");
+                    name[GetProcessImageFileName(tmp, name, 1024)] = L'\0';
+                    std::wstring n = name;
+                    size_t i = n.rfind(L"\\");
+                    if (i != std::wstring::npos) n = n.substr(i + 1);
+                    wcscat_s(m_notify.szInfo, n.c_str());
+                    wcscat_s(m_notify.szInfo, L" requires it.");
+                    CloseHandle(tmp);
+                }
+                else {
+                    wcscpy_s(m_notify.szInfo, L"Suspending real floppy drive while it is in use");
+                }
+                // Do popup for updates available
+                m_notify.uFlags |= NIF_INFO;
+                m_notify.dwInfoFlags = NIIF_INFO;
+                wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+                m_notify.uFlags &= ~NIF_INFO;
+
+                // Wait a short time for it to *actually* disappear
+                for (uint32_t t = 0; t < 10; t++) {
+                    Sleep(200);
+                    populateDrives();
+                    if (!closePhysicalDrive(true)) return 0;
+                }
+            }
+        }
+        return 0;
+    });
+    
+
     m_window.setMessageHandler(WM_TIMER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         switch (wParam) {
         case TIMERID_UPDATE_CHECK:
@@ -472,9 +648,17 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
             if (m_config.checkForUpdates) checkForUpdates(false);
             SetTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK, 60000 * 60, NULL);
             break;
+
+        case TIMERID_TRIGGER_REALDRIVE:
+            KillTimer(m_window.hwnd(), TIMERID_TRIGGER_REALDRIVE);
+            monitorPhysicalDrive();
+            SetTimer(m_window.hwnd(), TIMERID_TRIGGER_REALDRIVE, 2000, NULL);
+            break;
+        default:
+            break;
         }
         return 0;
-        });
+     });
    
 
 #ifdef _DEBUG
@@ -482,6 +666,8 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
 #else
     SetTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK, 60000, NULL);
 #endif
+    // Start 5 seconds after running
+    SetTimer(m_window.hwnd(), TIMERID_TRIGGER_REALDRIVE, 5000, NULL);
 }
 
 CTrayMenu::~CTrayMenu() {
@@ -494,6 +680,7 @@ CTrayMenu::~CTrayMenu() {
     DestroyMenu(m_hCreateListDD);
     DestroyMenu(m_hCreateListHD);
     DestroyMenu(m_hUpdates);
+    if (m_floppyPi.hProcess) CloseHandle(m_floppyPi.hProcess);
 }
 
 // Main loop

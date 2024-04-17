@@ -47,9 +47,12 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 
 	// Populate controls
 	HWND ctrl = GetDlgItem(hwnd, IDC_FILESYSTEM);
-	SendMessage(ctrl, CB_ADDSTRING, 0, (LPARAM)L"OFS");
-	SendMessage(ctrl, CB_ADDSTRING, 1, (LPARAM)L"FFS");
+	SendMessage(ctrl, CB_ADDSTRING, 0, (LPARAM)L"Amiga OFS");
+	SendMessage(ctrl, CB_ADDSTRING, 1, (LPARAM)L"Amiga FFS");
 	SendMessage(ctrl, CB_ADDSTRING, 2, (LPARAM)L"FAT (IBM PC)");
+	SendMessage(ctrl, CB_ADDSTRING, 3, (LPARAM)L"Atari (Single Sided)");
+	SendMessage(ctrl, CB_ADDSTRING, 4, (LPARAM)L"Atari (Double Sided)");
+	SendMessage(ctrl, CB_ADDSTRING, 5, (LPARAM)L"Atari (Extended)");
 	SendMessage(ctrl, CB_SETCURSEL, (m_io->getSystemType() == SectorType::stAmiga) ? 0 : 2, 0);
 
 	ctrl = GetDlgItem(hwnd, IDC_LABEL);
@@ -105,6 +108,16 @@ bool DialogFORMAT::shouldClose() {
 	return true;
 }
 
+// see if the block if memory is all zeros
+bool isBlank(uint8_t* mem, uint32_t size) {
+	uint32_t* m = (uint32_t*)mem;
+	while (size >= 4) {
+		if (*m++) return false;
+		size -= 4;
+	}
+	return true;
+}
+
 // Actually do the format
 bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, uint32_t formatMode, const std::string& volumeLabel) {
 	if (!m_io->isDiskPresent()) {
@@ -121,7 +134,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	if (intMode) mode |= FSMASK_INTL;
 	if (dirCache) mode |= FSMASK_DIRCACHE;
 
-	uint32_t totalTracks = 80 * 2;// m_fs->getTotalTracks();
+	uint32_t totalTracks = 80 * 2;
 	//if (totalTracks == 0) totalTracks = 80 * 2;
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks + 4));
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
@@ -129,6 +142,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	m_io->resetCache();
 	SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
 	uint32_t numSectors = 0;
+	uint32_t numHeads = 2;
 	if (bridge) {
 		switch (formatMode) {
 		case 0:
@@ -140,6 +154,23 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 			numSectors = bridge->isHD() ? 18 : 9;
 			bridge->overwriteSectorSettings(SectorType::stIBM, totalTracks/2,2,  numSectors, 512);
 			break;
+		case 3:
+			numSectors = bridge->isHD() ? 18 : 9;
+			totalTracks = 80;
+			numHeads = 1;
+			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks, 1, numSectors, 512);
+			break;
+		case 4:
+			numSectors = bridge->isHD() ? 18 : 9;
+			totalTracks = 80 * 2;
+			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks / 2, 2, numSectors, 512);
+			break;
+		case 5:
+			numSectors = bridge->isHD() ? 22 : 11;
+			totalTracks = 83 * 2;
+			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks / 2, 2, numSectors, 512);
+			break;
+
 		default:
 			return false;
 		}
@@ -153,7 +184,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < numSectors; sec++) {
 				if (m_abortFormat) return false;
-				if (!m_io->writeData(sectorNumber, 512, sector)) 
+				if (!m_io->writeData(sectorNumber, DEFAULT_SECTOR_BYTES, sector))
 					return false;
 				sectorNumber++;
 			}
@@ -165,21 +196,79 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	else bridge->createBlankSectors();
 
 	if (m_abortFormat) return false;
-	if (formatMode < 2) {
-		if (adfCreateFlop(m_fs->getADFDevice(), volumeLabel.c_str(), mode) != RC_OK) return false;
+	switch (formatMode) {
+	case 0:  // AMIGAAAA
+	case 1:
+	{
+		AdfDevice* dev = adfOpenDev((char*)m_io, false);
+		if (!dev) return false;
+		dev->heads = 2;
+		dev->sectors = numSectors;
+		dev->cylinders = totalTracks / 2;
+		if (adfCreateFlop(dev, volumeLabel.c_str(), mode) != RC_OK) {
+			adfUnMountDev(dev);
+			return false;
+		}
+		adfUnMountDev(dev);
 	}
-	else {
+		break;
+	case 2:  // PC
+	{
 		BYTE work[FF_MAX_SS];
 		MKFS_PARM opt;
 		getMkFsParams(bridge->isHD(), SectorType::stIBM, opt);
 		if (f_mkfs(L"\\", &opt, work, sizeof(work)) != FR_OK) return false;
 		std::wstring t;
 		ansiToWide(volumeLabel, t);
-		if (f_setlabel(t.c_str()) != FR_OK) return false;
+		FATFS* m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
+		if (m_fatDevice) {
+			memset(m_fatDevice, 0, sizeof(FATFS));
+			f_mount(m_fatDevice, L"", 1);
+			f_setlabel(t.c_str());
+			f_unmount(L"\\");
+			free(m_fatDevice);
+		}
 	}
+	break;
+	case 3: // Atari ST
+	case 4: // Atari ST
+	case 5: // Atari ST
+		// This is real hacky.  We get a copy of what the blank disk should look like and then just write the non-zero tracks
+	{
+		uint32_t memSize = 0;
+		uint8_t* mem = createBasicDisk(volumeLabel, totalTracks / numHeads, numSectors, numHeads, &memSize);
+		if (!mem) return false;
+		uint8_t* trackStart = mem;
+		uint32_t dataPerTrack = DEFAULT_SECTOR_BYTES * numSectors;
+		for (uint32_t track = 0; track < totalTracks; track++) {
+			// See if theres anything here
+			if (!isBlank(trackStart, dataPerTrack)) {
+				uint8_t* sector = trackStart;
+				for (uint32_t sec = 0; sec < numSectors; sec++) {
+					if (!m_io->writeData((track * numSectors) + sec, DEFAULT_SECTOR_BYTES, sector)) {
+						free(mem);
+						return false;
+					}
+					sector += DEFAULT_SECTOR_BYTES;
+				}
+				// Need to write this track
+				if (!m_io->flushWriteCache()) {
+					free(mem);
+					return false;
+				}
+			}
+			trackStart += dataPerTrack;
+		}
+		free(mem);
+	}
+	break;
+	}
+
 	if (!m_io->flushWriteCache()) return false;
 
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, progress + 2, 0);
+
+	bridge->triggerNewDiskMount();
 
 	if (installBB && formatMode<2) {
 		if (m_abortFormat) return false;

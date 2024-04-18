@@ -16,7 +16,7 @@
 MountedVolume::MountedVolume(VolumeManager* manager, const std::wstring& mainEXE, SectorCacheEngine* io, const WCHAR driveLetter, const bool forceWriteProtect) :
 	DokanFileSystemManager(driveLetter, forceWriteProtect, mainEXE), m_io(io), m_manager(manager) {
     m_registry = new ShellRegistery(mainEXE);
-    m_amigaFS = new DokanFileSystemAmigaFS(this);
+    m_amigaFS = new DokanFileSystemAmigaFS(this, manager->autoRename());
     m_IBMFS = new DokanFileSystemFATFS(this);
 }
 
@@ -77,15 +77,24 @@ RETCODE refreshAmigaVolume(struct AdfDevice* const dev) {
 }
 
 
-void MountedVolume::restoreUnmountedDrive() {
+void MountedVolume::restoreUnmountedDrive(bool restorePreviousSystem) {
     if (m_tempUnmount) {
-        if (m_ADFdevice) {
-            if (m_ADFvolume)
-                if (m_io->isPhysicalDisk()) refreshAmigaVolume(m_ADFdevice);
-            mountFileSystem(m_ADFdevice, m_partitionIndex, false);
+        if (restorePreviousSystem) {
+            if (m_ADFdevice) {
+                if (m_ADFvolume)
+                    if (m_io->isPhysicalDisk()) refreshAmigaVolume(m_ADFdevice);
+                mountFileSystem(m_ADFdevice, m_partitionIndex, false);
+            }
+            if (m_FatFS) {
+                mountFileSystem(m_FatFS, m_partitionIndex, false);
+            }
         }
-        if (m_FatFS) {
-            mountFileSystem(m_FatFS, m_partitionIndex, false);
+        else {
+            // Start from fresh
+            m_manager->unmountPhysicalFileSystems();
+            m_ADFdevice = nullptr;
+            m_ADFvolume = nullptr;
+            m_FatFS = nullptr;
         }
         m_tempUnmount = false;
     }
@@ -111,6 +120,11 @@ bool MountedVolume::isDriveLocked() {
 // Returns TRUE if write protected
 bool MountedVolume::isWriteProtected() {
     return isForcedWriteProtect() || m_io->isDiskWriteProtected();
+}
+
+// Used to block writing to hybrid filesystem
+bool MountedVolume::isForcedWriteProtect() {
+    return DokanFileSystemManager::isForcedWriteProtect() || ((m_io) && (m_io->getSystemType() == SectorType::stHybrid));
 }
 
 // Returns TRUE if theres a disk in the drive
@@ -255,6 +269,7 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     // Hook up ADF_operations
     if (m_ADFvolume) {
         m_amigaFS->setCurrentVolume(m_ADFvolume);
+        m_amigaFS->resetFileSystem();
         setActiveFileSystem(m_amigaFS);
     }
     else setActiveFileSystem(nullptr);
@@ -273,6 +288,12 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     return m_ADFvolume != nullptr;
 }
 
+// Refresh the auto rename
+void MountedVolume::refreshRenameSettings() {
+    if (m_amigaFS) m_amigaFS->changeAutoRename(m_manager->autoRename());
+}
+
+
 void MountedVolume::unmountFileSystem() {
     std::wstring path = getMountPoint();
     if (m_ADFvolume) {
@@ -280,6 +301,7 @@ void MountedVolume::unmountFileSystem() {
         m_ADFvolume = nullptr;
     }
     m_amigaFS->setCurrentVolume(nullptr);
+    m_amigaFS->resetFileSystem();
     m_IBMFS->setCurrentVolume(nullptr);
     setActiveFileSystem(nullptr);
     m_ADFdevice = nullptr;

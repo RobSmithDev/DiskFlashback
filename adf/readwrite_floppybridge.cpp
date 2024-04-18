@@ -31,7 +31,7 @@ bool SectorRW_FloppyBridge::mfmWrite(uint32_t cylinder, bool upperSide, bool fro
     if (!m_bridge) return false;
     return m_bridge->writeMFMTrackToBuffer(upperSide, cylinder, fromIndex, maxLength, data);
 }
-
+ 
 void SectorRW_FloppyBridge::releaseDrive() {
     if (m_bridge) m_bridge->shutdown();
     SectorCacheMFM::releaseDrive();

@@ -269,13 +269,7 @@ void DokanFileSystemFATFS::fs_cleanup(const std::wstring& filename, PDOKAN_FILE_
         FIL* fle = (FIL*)dokanfileinfo->Context;
         f_close(fle);
         free(fle);
-#ifdef _DEBUG
-        if (filename != L"\\") {
-            WCHAR buffer[1024];
-            swprintf_s(buffer, L"########## fs_cleanup %s\n", filename.c_str());
-            OutputDebugString(buffer);
-        }
-#endif    
+ 
         releaseFileInUse(filename);
         dokanfileinfo->Context = 0;
     }
@@ -513,10 +507,18 @@ NTSTATUS DokanFileSystemFATFS::fs_findfiles(const std::wstring& filename, PFillF
 
 NTSTATUS DokanFileSystemFATFS::fs_setfileattributes(const std::wstring& filename, const uint32_t fileattributes, PDOKAN_FILE_INFO dokanfileinfo) {
     BYTE newAttr = 0;
+
+    FILINFO info;
+    FRESULT res = f_stat(filename.c_str(), &info);
+    if (res != FR_OK) return makeFileOpenStatus(res);
+
     if (fileattributes& FILE_ATTRIBUTE_READONLY   ) newAttr |= AM_RDO;
     if (fileattributes& FILE_ATTRIBUTE_HIDDEN     ) newAttr |= AM_HID;
     if (fileattributes& FILE_ATTRIBUTE_SYSTEM     ) newAttr |= AM_SYS;
     if (fileattributes& FILE_ATTRIBUTE_ARCHIVE    ) newAttr |= AM_ARC;
+
+    // Nothing changed?
+    if (newAttr == info.fattrib) return STATUS_SUCCESS;
 
     return makeFileOpenStatus(f_chmod(filename.c_str(), newAttr, AM_RDO | AM_HID | AM_SYS | AM_ARC));
 }
@@ -524,11 +526,18 @@ NTSTATUS DokanFileSystemFATFS::fs_setfileattributes(const std::wstring& filename
 NTSTATUS DokanFileSystemFATFS::fs_setfiletime(const std::wstring& filename, CONST FILETIME* creationtime, CONST FILETIME* lastaccesstime, CONST FILETIME* lastwritetime, PDOKAN_FILE_INFO dokanfileinfo) {
     if (!lastwritetime) return STATUS_SUCCESS;
 
+    FILINFO info;
+    FRESULT res = f_stat(filename.c_str(), &info);
+    if (res != FR_OK) return makeFileOpenStatus(res);
+
     FILINFO inf;
     SYSTEMTIME sys;
     FileTimeToSystemTime(lastwritetime, &sys);
     inf.fdate = ((sys.wYear - 1980) << 9) | (sys.wMonth << 5) | (sys.wDay);
     inf.ftime = (sys.wHour << 11) | (sys.wMinute << 5) | (sys.wSecond >> 1);
+
+    // Nothing changed!?
+    if ((inf.fdate == info.fdate) && (inf.ftime == info.ftime)) return STATUS_SUCCESS;
 
     return makeFileOpenStatus(f_utime(filename.c_str(), &inf));
 }

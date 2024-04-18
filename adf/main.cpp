@@ -24,6 +24,20 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 //          one of the CTRL_PARAM_ values
 //   Mount File/Drive Params (if mount)
 
+// Trigger the applet loading if this is called for some other reason
+void startTrayIcon(const std::wstring& exe) {
+    if (FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE));
+
+    std::wstring cmd = L"\"" + exe + L"\"";
+    PROCESS_INFORMATION pi;
+    STARTUPINFO si;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+    if (pi.hThread) CloseHandle(pi.hThread);
+    if (pi.hProcess) CloseHandle(pi.hProcess);
+}
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     int argc = 0;
@@ -48,6 +62,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                     delete vol;
                     return RETURNCODE_MOUNTFAIL;
                 }
+                startTrayIcon(exeName);
                 try {
                     vol->run(true);
                 }
@@ -66,7 +81,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         menu.run();
         return 0;
     }
-
+    startTrayIcon(exeName);
 
     // Check Drive Letter
     const WCHAR driveLetter = argv[1][0];

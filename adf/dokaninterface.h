@@ -59,14 +59,14 @@ private:
     DOKAN_OPTIONS dokan_options;   // stupidly these are always needed in scope!
 protected:
     void setActiveFileSystem(DokanFileSystemBase* fileSystem) { m_activeFileSystem = fileSystem; };
-    bool isForcedWriteProtect() const { return m_forceWriteProtect; };
+    virtual bool isForcedWriteProtect() { return m_forceWriteProtect; };
 public:
     DokanFileSystemManager(WCHAR initialLetter, bool forceWriteProtect, const std::wstring &mainExe);
 
     // Fetch the active dokan file system
     DokanFileSystemBase* getActiveSystem() { return m_activeFileSystem; };
     virtual bool isDriveLocked() { return m_driveLocked; };
-
+    DOKAN_HANDLE getDonakInstance() { return m_dokanInstance; };
     virtual bool isDiskInDrive() = 0;
     virtual bool isDriveRecognised();
     virtual bool isWriteProtected() = 0;
@@ -79,9 +79,6 @@ public:
 
     virtual bool start();
     virtual void stop();
-
-    virtual void temporaryUnmountDrive() = 0;
-    virtual void restoreUnmountedDrive() = 0;
 
     virtual bool setLocked(bool enableLock) = 0;
 

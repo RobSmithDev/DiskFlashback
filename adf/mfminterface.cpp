@@ -23,10 +23,11 @@ bool SectorCacheMFM::initDrive() {
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
     m_diskType = SectorType::stUnknown;
     m_motorTurnOnTime = 0;
-
-    if (!restoreDrive()) return false;
-
     m_diskInDrive = false;
+
+    if (!restoreDrive()) 
+        return false;
+
     return true;
 }
 
@@ -56,12 +57,14 @@ SectorCacheMFM::SectorCacheMFM(std::function<void(bool diskInserted, SectorType 
 }
 
 void SectorCacheMFM::setReady() {
-    restoreDrive();
+    initDrive();
+
+    if (isDiskInDrive()) identifyFileSystem();
 
     // Force m_sectorsPerTrack to be populated
     {
         std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
-        CreateTimerQueueTimer(&m_timer, m_timerQueue, MotorMonitor, this, 500, 200, WT_EXECUTEDEFAULT | WT_EXECUTELONGFUNCTION);
+        CreateTimerQueueTimer(&m_timer, m_timerQueue, MotorMonitor, this, 1000, 200, WT_EXECUTEDEFAULT | WT_EXECUTELONGFUNCTION);
     }
 
 }
@@ -100,7 +103,7 @@ bool SectorCacheMFM::isDiskPresent() {
 // Return TRUE if the disk is write protected
 bool SectorCacheMFM::isDiskWriteProtected() {
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
-    return (m_diskType == SectorType::stHybrid) || isDriveWriteProtected();
+    return isDriveWriteProtected();
 }
 
 // Show disk removed warning - returns TRUE if disk was re-inserted
@@ -459,14 +462,12 @@ bool SectorCacheMFM::internalWriteData(const uint32_t sectorNumber, const uint32
 
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
 
-    motorInUse(upperSurface);
-
     // Now replace the sector we're overwriting, just in memory at this point
     auto it = m_trackCache[0][track].sectors.find(trackBlock);
     if (it != m_trackCache[0][track].sectors.end()) {
         if (memcmp(it->second.data.data(), data, min(sectorSize, it->second.data.size())) == 0) {
-            it->second.numErrors = 0;
-            return true;
+            if (it->second.numErrors == 0) return true;
+            it->second.numErrors = 0;                
         }
         else {
             // No errors? (or are we skipping them?)
@@ -488,6 +489,7 @@ bool SectorCacheMFM::internalWriteData(const uint32_t sectorNumber, const uint32
         m_tracksToFlush.insert(std::make_pair(track, 1));
     else i->second++;
 
+    motorInUse(upperSurface);
     checkFlushPendingWrites();
 
     return true;
@@ -614,7 +616,7 @@ bool SectorCacheMFM::flushPendingWrites() {
                 }
             }
 
-            if (mfmWrite(cylinder, upperSurface, (m_diskType == SectorType::stIBM) || (m_diskType == SectorType::stHybrid), m_mfmBuffer, numBytes )) {
+            if (mfmWrite(cylinder, upperSurface, (m_diskType == SectorType::stIBM) || (m_diskType == SectorType::stAtari), m_mfmBuffer, numBytes )) {
                 // Now wait until it completes - approx 400-500ms as this will also read it back to verify it
                 ULONGLONG start = GetTickCount64();
                 bool doRetry = false;

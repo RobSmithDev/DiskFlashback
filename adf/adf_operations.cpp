@@ -1,8 +1,13 @@
+#include <dokan/dokan.h>
 #include "adf_operations.h"
 #include "adflib/src/adflib.h"
+#include <algorithm>
+#include <Shlobj.h>
 
-DokanFileSystemAmigaFS::DokanFileSystemAmigaFS(DokanFileSystemManager* owner) : DokanFileSystemBase(owner) {
-    m_desktopIniFileResource = L"\xFEFF[.ShellClassInfo]\r\nIconResource=" + owner->getMainEXEName() + L",3\r\n";
+static const std::string CommonAmigaFileExtensions = ".DMS.PP.LHZ.LHA.LZX.IFF.GUIDE.ADF.8SVX.MOD.C.ASM.PP.";
+
+
+DokanFileSystemAmigaFS::DokanFileSystemAmigaFS(DokanFileSystemManager* owner, bool autoRename) : DokanFileSystemBase(owner), m_autoRemapFileExtensions(autoRename) {    
 }
 DokanFileSystemAmigaFS::ActiveFileIO::ActiveFileIO(DokanFileSystemAmigaFS* owner) : m_owner(owner) {};
 // Add Move constructor
@@ -24,6 +29,59 @@ DokanFileSystemAmigaFS::ActiveFileIO DokanFileSystemAmigaFS::notifyIOInUse(PDOKA
     setActiveFileIO(dokanfileinfo);
     return ActiveFileIO(this);
 }
+
+
+// Handle a note about the remap of file extension
+void DokanFileSystemAmigaFS::handleRemap(const std::wstring& windowsPath, const std::string& amigaFilename, std::wstring& windowsFilename) {
+    std::wstring path = windowsPath;
+    auto i = path.find(L":\\");
+    if (i != std::wstring::npos) path = path.substr(i + 2);
+    i = path.find(L":");
+    if (i != std::wstring::npos) path = path.substr(i + 1);
+
+    auto f = m_specialRenameMap.find(path + windowsFilename);
+    if (f == m_specialRenameMap.end()) 
+        m_specialRenameMap.insert(std::pair(path + windowsFilename, amigaFilename));
+}
+
+// Auto rename change
+void DokanFileSystemAmigaFS::changeAutoRename(bool autoRename) {
+    if (m_autoRemapFileExtensions == autoRename) return;
+
+    std::map<std::wstring, std::string> originalMap = m_specialRenameMap;
+
+    m_autoRemapFileExtensions = autoRename;
+
+    resetFileSystem();
+
+    DOKAN_HANDLE handle = owner()->getDonakInstance();
+
+    for (const auto& amigaFilename : originalMap) {
+        // Get windows path
+        std::wstring winName, winPath, newWinName;
+        auto f = amigaFilename.first.rfind(L'\\');
+        if (f != std::wstring::npos) {
+            winPath = amigaFilename.first.substr(0, f);
+            winName = amigaFilename.first.substr(f + 1);
+        }
+        else winName = amigaFilename.first;
+        winPath = owner()->getMountPoint() + winPath;
+
+        amigaFilenameToWindowsFilename(winPath, amigaFilename.second, newWinName);
+
+        if (newWinName != winName) {
+            newWinName = winPath + newWinName;
+            winName = winPath + winName;
+            SHChangeNotify(SHCNE_RENAMEITEM, SHCNF_PATH | SHCNF_FLUSHNOWAIT, winName.c_str(), newWinName.c_str());
+        }
+    }
+}
+
+void DokanFileSystemAmigaFS::resetFileSystem() {
+    m_safeFilenameMap.clear();
+    m_specialRenameMap.clear();
+}
+
 
 void DokanFileSystemAmigaFS::clearFileIO() {
     setActiveFileIO(nullptr);
@@ -65,12 +123,12 @@ void DokanFileSystemAmigaFS::releaseFileInUse(AdfFile* handle) {
     if (f != m_inUse.end()) m_inUse.erase(f);
 }
 
-
 // Handles fixing filenames so they're amiga compatable
-void DokanFileSystemAmigaFS::amigaFilenameToWindowsFilename(const std::string& amigaFilename, std::wstring& windowsFilename) {
+void DokanFileSystemAmigaFS::amigaFilenameToWindowsFilename(const std::wstring& windowsPath, const std::string& amigaFilename, std::wstring& windowsFilename) {
     auto fle = m_safeFilenameMap.find(amigaFilename);
     if (fle != m_safeFilenameMap.end()) {
         windowsFilename = fle->second;
+        if (m_autoRemapFileExtensions) handleRemap(windowsPath, amigaFilename, windowsFilename);
         return;
     }
 
@@ -100,14 +158,27 @@ void DokanFileSystemAmigaFS::amigaFilenameToWindowsFilename(const std::string& a
 
     ansiToWide(name, windowsFilename);
 
-    // Filename remapping
-    if (m_autoRemapFileExtensions) {
-        // get where the file extension might be
-        size_t fileExt1 = windowsFilename.find(L".");
-        size_t fileExt2 = windowsFilename.rfind(L".");
-        if (fileExt1 != std::wstring::npos) {
-            if ((fileExt1 < 4) && (fileExt1) && (fileExt2 < windowsFilename.length() - 4)) {
-                windowsFilename = windowsFilename.substr(fileExt1 + 1) + L"." + windowsFilename.substr(0, fileExt1);
+    bool ret = false;
+    // get where the file extension might be
+    size_t fileExt1 = windowsFilename.find(L".");
+    size_t fileExt2 = windowsFilename.rfind(L".");
+    if (fileExt1 != std::wstring::npos) {
+        if ((fileExt1 < 4) && (fileExt1) && (fileExt2 < windowsFilename.length() - 4)) {
+            if (m_autoRemapFileExtensions) windowsFilename = windowsFilename.substr(fileExt1 + 1) + L"." + windowsFilename.substr(0, fileExt1);
+            handleRemap(windowsPath, amigaFilename, windowsFilename);
+        }
+        else 
+        if (fileExt1) {
+            // Check if its one of the common amiga file extensions
+            std::wstring ext = windowsFilename.substr(0, fileExt1);
+            for (WCHAR& c : ext) c = towupper(c);
+            std::string ex;
+            wideToAnsi(ext, ex);
+            // Handle any formats that we know about that got missed 
+            if (CommonAmigaFileExtensions.find("." + ex + ".") != std::string::npos) {
+                if (m_autoRemapFileExtensions) windowsFilename = windowsFilename.substr(fileExt1 + 1) + L"." + windowsFilename.substr(0, fileExt1);
+                handleRemap(windowsPath, amigaFilename, windowsFilename);
+
             }
         }
     }
@@ -119,12 +190,15 @@ void DokanFileSystemAmigaFS::amigaFilenameToWindowsFilename(const std::string& a
 void DokanFileSystemAmigaFS::windowsFilenameToAmigaFilename(const std::wstring& windowsFilename, std::string& amigaFilename) {
     auto it = std::find_if(std::begin(m_safeFilenameMap), std::end(m_safeFilenameMap),
         [&windowsFilename](auto&& p) { return p.second == windowsFilename; });
+
     if (it != m_safeFilenameMap.end())
         amigaFilename = it->first;
     else {
         wideToAnsi(windowsFilename, amigaFilename);
     }
 }
+
+
 
 void DokanFileSystemAmigaFS::setCurrentVolume(AdfVolume* volume) { 
     m_inUse.clear();
@@ -138,7 +212,6 @@ DWORD DokanFileSystemAmigaFS::amigaToWindowsAttributes(const int32_t access, int
     if (type == ST_ROOT) result |= FILE_ATTRIBUTE_DIRECTORY;
     if (hasA(access)) result |= FILE_ATTRIBUTE_ARCHIVE;
     if (hasW(access)) result |= FILE_ATTRIBUTE_READONLY;  // no write, its read only    
-    if (result == 0) result = FILE_ATTRIBUTE_NORMAL;
     return result;
 }
 
@@ -606,7 +679,7 @@ NTSTATUS DokanFileSystemAmigaFS::fs_findfiles(const std::wstring& filename, PFil
         if (e->type != ST_FILE && e->type != ST_DIR) continue;
 
         std::wstring winFilename;
-        amigaFilenameToWindowsFilename(e->name, winFilename);
+        amigaFilenameToWindowsFilename(filename, e->name, winFilename);
 
         wcscpy_s(findData.cFileName, winFilename.c_str());
         findData.dwFileAttributes = amigaToWindowsAttributes(e->access, e->type);
@@ -640,16 +713,19 @@ NTSTATUS DokanFileSystemAmigaFS::fs_setfileattributes(const std::wstring& filena
     if (rc != RC_OK) return false;
     
     if (parent.secType != ST_FILE) return STATUS_OBJECT_NAME_NOT_FOUND;
-    int32_t access = parent.access | ACCMASK_R | ACCMASK_D;   // force it to be readible and deletible
+    int32_t access = parent.access;   // force it to be readible and deletible
    
     if (fileattributes & FILE_ATTRIBUTE_ARCHIVE)
         access |= ACCMASK_A; else access &= ~ACCMASK_A;
     if (fileattributes & FILE_ATTRIBUTE_READONLY)
         access |= ACCMASK_W; else  access &= ~ACCMASK_W; 
 
+    // Nothing changed? 
+    if (access == parent.access) return STATUS_SUCCESS;
+
     adfParentDir(m_volume);
 
-    if (adfSetEntryAccess(m_volume, m_volume->curDirPtr, amigafilename.c_str(), access) == RC_OK) return STATUS_SUCCESS;
+    if (adfSetEntryAccess(m_volume, m_volume->curDirPtr, amigafilename.c_str(), access | ACCMASK_R | ACCMASK_D) == RC_OK) return STATUS_SUCCESS;
     return STATUS_DATA_ERROR;
 }
 
@@ -677,7 +753,17 @@ NTSTATUS DokanFileSystemAmigaFS::fs_setfiletime(const std::wstring& filename, CO
     tm.year = max(0, sys.wYear - 1900);
     tm.mon = sys.wMonth;    
 
-    adfTime2AmigaTime(tm, &parent.days, &parent.mins, &parent.ticks);
+    int32_t days;
+    int32_t mins;
+    int32_t ticks;
+
+    adfTime2AmigaTime(tm, &days, &mins, &ticks);
+
+    // Block changes if nothing happened
+    if ((days == parent.days) && (mins == parent.mins) && (ticks == parent.ticks)) return STATUS_SUCCESS;
+    parent.days = days;
+    parent.mins = mins;
+    parent.ticks = ticks;
 
     if (adfWriteEntryBlock(m_volume, m_volume->curDirPtr, &parent) == RC_OK) return STATUS_SUCCESS;
     return STATUS_DATA_ERROR;

@@ -86,7 +86,7 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 void DialogFORMAT::enableControls(bool enable) {
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), enable);
 
-	uint32_t sel = SendMessage(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), CB_GETCURSEL, 0, 0);
+	uint32_t sel = (uint32_t)SendMessage(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), CB_GETCURSEL, 0, 0);
 
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_LABEL), enable);
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_QUICK), enable);
@@ -274,7 +274,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		if (m_abortFormat) return false;
 		m_io->setWritingOnlyMode(false);
 		m_fs->setLocked(false);
-		m_fs->restoreUnmountedDrive();
+		m_fs->restoreUnmountedDrive(false);
 		if (!m_fs->installAmigaBootBlock()) return false;
 		if (!m_io->flushWriteCache()) return false;
 	} 
@@ -295,7 +295,7 @@ void DialogFORMAT::doFormat() {
 		bool dirCache = SendMessage(GetDlgItem(m_dialogBox, IDC_CACHE), BM_GETCHECK, 0, 0) == BST_CHECKED;
 		bool intMode = SendMessage(GetDlgItem(m_dialogBox, IDC_INT), BM_GETCHECK, 0, 0) == BST_CHECKED;
 		bool installBB = SendMessage(GetDlgItem(m_dialogBox, IDC_BB), BM_GETCHECK, 0, 0) == BST_CHECKED;
-		uint32_t formatMode = SendMessage(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), CB_GETCURSEL, 0, 0);
+		uint32_t formatMode = (uint32_t)SendMessage(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), CB_GETCURSEL, 0, 0);
 		std::string volumeLabel;
 		WCHAR name[64];
 		GetWindowText(GetDlgItem(m_dialogBox, IDC_LABEL), name, 64);
@@ -306,7 +306,7 @@ void DialogFORMAT::doFormat() {
 			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, formatMode, volumeLabel);
 			m_io->setWritingOnlyMode(false);
 			m_fs->setLocked(false);
-			m_fs->restoreUnmountedDrive();
+			m_fs->restoreUnmountedDrive(false);
 			enableControls(true);
 			if (ret) {
 				MessageBox(m_dialogBox, L"Format complete.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);

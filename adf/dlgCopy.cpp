@@ -298,7 +298,7 @@ void DialogCOPY::doCopy() {
 
 			m_io->setWritingOnlyMode(false);
 			m_fs->setLocked(false);
-			m_fs->restoreUnmountedDrive();
+			m_fs->restoreUnmountedDrive(m_backup);
 			if (source) delete source;
 			if (ret) {
 				MessageBox(m_dialogBox, L"Copy completed.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);

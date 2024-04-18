@@ -6,6 +6,7 @@
 #include "MountedVolume.h"
 #include "sectorCache.h"
 #include "fatfs/source/ff.h"
+#include "dlgConfig.h"
 
 class VolumeManager {
 private:
@@ -17,6 +18,7 @@ private:
 	HINSTANCE m_hInstance;
 	bool m_triggerExplorer = false;
 	bool m_ejecting = false;
+	bool m_autoRename;
 
 	// If we have an Amiga disk inserted
 	AdfDevice* m_adfDevice = nullptr;
@@ -87,6 +89,13 @@ public:
 
 	// Refresh the window title
 	void refreshWindowTitle();
+
+	// Actually unmount anything mounted
+	void unmountPhysicalFileSystems();
+
+	// Return TRUE if auto renaming is enabled
+	bool autoRename() { return m_autoRename; };
+
 };
 
 

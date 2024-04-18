@@ -29,7 +29,6 @@ private:
     NOTIFYICONDATA m_notify;
     HMENU m_hMenu = 0;
     HMENU m_hDriveMenu = 0;
-    HMENU m_hPhysicalMenu = 0;
     HMENU m_hCreateList = 0;
     HMENU m_hCreateListDD = 0;
     HMENU m_hCreateListHD = 0;

@@ -23,6 +23,8 @@ private:
     bool m_tempUnmount = false;
     ShellRegistery* m_registry;
     FATFS* m_FatFS = nullptr;
+protected:
+    virtual bool isForcedWriteProtect() override;
 public:
 	MountedVolume(VolumeManager* manager, const std::wstring& mainEXE, SectorCacheEngine* io, const WCHAR driveLetter, const bool forceWriteProtect);
     virtual ~MountedVolume();
@@ -42,8 +44,8 @@ public:
     virtual const std::wstring getDriverName() override;
     virtual SectorCacheEngine* getBlockDevice() override;
     virtual bool isPhysicalDevice() override;
-    virtual void temporaryUnmountDrive() override;
-    virtual void restoreUnmountedDrive() override;
+    virtual void temporaryUnmountDrive();
+    virtual void restoreUnmountedDrive(bool restorePreviousSystem);
     virtual uint32_t getTotalTracks() override;
 
     // Returns FALSE if files are open
@@ -51,6 +53,9 @@ public:
 
     // Install bootblock for Amiga drives
     bool installAmigaBootBlock();
+
+    // Refresh the auto rename
+    void refreshRenameSettings();
 
     // Notifications of the file system being mounted
     virtual void onMounted(const std::wstring& mountPoint, PDOKAN_FILE_INFO dokanfileinfo) override;

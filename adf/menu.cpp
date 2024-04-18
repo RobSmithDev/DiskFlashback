@@ -20,6 +20,7 @@
 #define MENUID_ENABLED          20
 #define MENUID_CONFIGURE        21
 #define MENUID_AUTOUPDATE       22
+#define MENUID_RENAMEEXT        29
 #define MENUID_IMAGE_DD         30
 #define MENUID_IMAGE_HD         40
 #define MENUID_EJECTSTART       100
@@ -86,7 +87,6 @@ void CTrayMenu::setupIcon() {
 void CTrayMenu::setupMenu() {
     m_hMenu = CreatePopupMenu();
     m_hDriveMenu = CreatePopupMenu();
-    m_hPhysicalMenu = CreatePopupMenu();
     m_hCreateList = CreatePopupMenu();
     m_hUpdates = CreatePopupMenu();
     m_hCreateListDD = CreatePopupMenu();
@@ -105,27 +105,28 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListDD, L"Double Density");
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListHD, L"High Density");
 
-    AppendMenu(m_hPhysicalMenu, MF_STRING,      MENUID_ENABLED,             L"Enabled");
-    AppendMenu(m_hPhysicalMenu, MF_STRING,      MENUID_CONFIGURE,           L"Configure...");
     
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCreateList,    L"Create Disk Image");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_MOUNTDISK,           L"Mount Disk Image...");
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hDriveMenu,     L"Eject");
     AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
-    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hPhysicalMenu,  L"&Physical Drive");
-    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
-    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hUpdates,      L"Updates");
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hUpdates,      L"Settings");
     AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
 
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_RENAMEEXT, L"Automatically Swap File Extensions (Amiga)");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE, L"Automatically Check for Updates");
-    AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates...");
-    
-    AppendMenu(m_hMenu, MF_STRING, MENUID_ABOUT,                            L"&About...");
-    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_ENABLED, L"Mount Physical Drive");
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_CONFIGURE, L"Configure Physical Drive...");
+    AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates Now");
+    AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_ABOUT,                            L"&About...");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_QUIT,                L"&Quit");
 
-    CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
     CheckMenuItem(m_hUpdates, MENUID_AUTOUPDATE, MF_BYCOMMAND | m_config.checkForUpdates ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(m_hUpdates, MENUID_RENAMEEXT, MF_BYCOMMAND | m_config.autoRename ? MF_CHECKED : MF_UNCHECKED);    
 }
 
 // Grab version from exe
@@ -385,10 +386,18 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     case MENUID_AUTOUPDATE+1:
         checkForUpdates(true);
         break;
+    case MENUID_RENAMEEXT:
+        m_config.autoRename = !m_config.autoRename;
+        saveConfiguration(m_config);
+        CheckMenuItem(m_hUpdates, MENUID_RENAMEEXT, MF_BYCOMMAND | m_config.autoRename ? MF_CHECKED : MF_UNCHECKED);
+        populateDrives();
+        for (const auto& w : m_drives)
+            PostMessage(w.second.hWnd, WM_AUTORENAME, 0, m_config.autoRename ? 1 : 0);
+        break;
     case MENUID_ENABLED: 
         m_config.enabled = !m_config.enabled;
         saveConfiguration(m_config);
-        CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
         break;
     case MENUID_CREATEDISK: break;
     case MENUID_MOUNTDISK: mountDisk(); break;
@@ -589,7 +598,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
         // Turn off the "enabled" option
         m_config.enabled = false;
         saveConfiguration(m_config);
-        CheckMenuItem(m_hPhysicalMenu, MENUID_ENABLED, MF_BYCOMMAND | MF_UNCHECKED);
+        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | MF_UNCHECKED);
         return 0;
         });
     m_window.setMessageHandler(WM_REMOTEUSAGE, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
@@ -675,7 +684,6 @@ CTrayMenu::~CTrayMenu() {
     Shell_NotifyIcon(NIM_DELETE, &m_notify);
     DestroyMenu(m_hMenu);
     DestroyMenu(m_hDriveMenu);
-    DestroyMenu(m_hPhysicalMenu);
     DestroyMenu(m_hCreateList);
     DestroyMenu(m_hCreateListDD);
     DestroyMenu(m_hCreateListHD);

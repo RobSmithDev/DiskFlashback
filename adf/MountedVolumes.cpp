@@ -212,6 +212,10 @@ VolumeManager::VolumeManager(HINSTANCE hInstance, const std::wstring& mainExe, W
     m_currentSectorFormat(SectorType::stUnknown), m_forceReadOnly(forceReadOnly), m_hInstance(hInstance)  {
     DokanInit();
 
+    AppConfig cfg;
+    loadConfiguration(cfg);
+    m_autoRename = cfg.autoRename;
+
     // Prepare the ADF library
     adfEnvInitDefault();
     adfSetEnvFct((AdfLogFct)Error, (AdfLogFct)Warning, (AdfLogFct)Verbose, NULL);
@@ -280,22 +284,28 @@ void VolumeManager::startVolumes() {
         vol->start();
 }
 
+// Actually unmount anything mounted
+void VolumeManager::unmountPhysicalFileSystems() {
+    for (MountedVolume* volume : m_volumes)
+        volume->unmountFileSystem();
+
+    if (m_adfDevice) {
+        adfUnMountDev(m_adfDevice);
+        m_adfDevice = nullptr;
+    }
+
+    if (m_fatDevice) {
+        f_unmount(L"");
+        free(m_fatDevice);
+        m_fatDevice = nullptr;
+    }
+}
+
 // Notification received that the current disk changed
 void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {    
-    if (!diskInserted) {
-        for (MountedVolume* volume : m_volumes)
-            volume->unmountFileSystem();
+    unmountPhysicalFileSystems();
 
-        if (m_adfDevice) {
-            adfUnMountDev(m_adfDevice);
-            m_adfDevice = nullptr;
-        }
-
-        if (m_fatDevice) {
-            f_unmount(L"");
-            free(m_fatDevice);
-            m_fatDevice = nullptr;
-        }
+    if (!diskInserted) {        
 
         while (m_volumes.size() > 1) {            
             MountedVolume* v = m_volumes[m_volumes.size() - 1];
@@ -309,10 +319,10 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
         }
     }
     else {
-        
+        uint32_t volumesNeeded = 1;
         // Create device based on what system was detected
         switch (diskFormat) {
-            case SectorType::stAmiga:
+            case SectorType::stAmiga:                
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
                 if (!m_adfDevice) diskFormat = SectorType::stUnknown;                     
                 break;
@@ -328,7 +338,8 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
                 }
                 if (m_adfDevice && !m_fatDevice) diskFormat = SectorType::stAmiga; else
                     if (!m_adfDevice && m_fatDevice) diskFormat = SectorType::stIBM; else
-                        if (!m_adfDevice && !m_fatDevice) diskFormat = SectorType::stIBM;
+                        if (!m_adfDevice && !m_fatDevice) diskFormat = SectorType::stIBM; else
+                            volumesNeeded = 2;
                 break;
             case SectorType::stAtari:
             case SectorType::stIBM:
@@ -341,6 +352,16 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
                     }
                 }
                 break;
+        }
+        // Remove non-needed file systems
+        while (m_volumes.size() > volumesNeeded) {
+            MountedVolume* v = m_volumes[m_volumes.size() - 1];
+            m_volumes.erase(m_volumes.begin() + m_volumes.size() - 1);
+            v->shutdownFS();
+            m_threads.emplace_back(std::thread([v]() {
+                v->stop();
+                delete v;
+                }));
         }
 
         // Mount all drives using the new file system
@@ -490,7 +511,7 @@ LRESULT VolumeManager::handleCopyToDiskRequest(const std::wstring message) {
     MountedVolume* volumeFound = findVolumeFromDriveLetter(driveLetter);
     if (!volumeFound) return MESSAGE_RESPONSE_DRIVENOTFOUND;
 
-    m_threads.emplace_back(std::thread([this, filename, potentialParent, volumeFound]() {
+    m_threads.emplace_back(std::thread([this, filename, potentialParent, volumeFound]() {        
         DialogCOPY dlg(m_hInstance, potentialParent, m_io, volumeFound, filename);
         return dlg.doModal();
     }));
@@ -501,14 +522,6 @@ LRESULT VolumeManager::handleCopyToDiskRequest(const std::wstring message) {
 // Handle other remote requests
 LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM commandID, HWND parentWindow) {
     switch (commandID) {
-
-    case REMOTECTRL_RELEASE:
-        //fs->releaseDrive();
-        return 0;
-
-    case REMOTECTRL_RESTORE:
-        //fs->restoreDrive();
-        return 0;
 
     case REMOTECTRL_FORMAT:
         m_threads.emplace_back(std::thread([this, parentWindow, volume]() {
@@ -621,6 +634,13 @@ bool VolumeManager::run(bool triggerExplorer) {
         return MESSAGE_RESPONSE_FAILED;
     });
 
+    m_window.setMessageHandler(WM_AUTORENAME, [this](WPARAM commandID, LPARAM param) -> LRESULT {
+        m_autoRename = param == 1;
+        for (MountedVolume* vol : m_volumes)
+            vol->refreshRenameSettings();
+        return 0;
+    });
+
     // Handle remote control messages
     m_window.setMessageHandler(WM_USER, [this](WPARAM commandID, LPARAM param) -> LRESULT {
         MountedVolume* volume = findVolumeFromDriveLetter((WCHAR)param);
@@ -655,6 +675,7 @@ bool VolumeManager::run(bool triggerExplorer) {
 
     // Stop everything
     m_io->flushWriteCache();
+    unmountPhysicalFileSystems();
     KillTimer(m_window.hwnd(), TIMERID_MONITOR_FILESYS);
     for (MountedVolume* volume : m_volumes) volume->stop();
 

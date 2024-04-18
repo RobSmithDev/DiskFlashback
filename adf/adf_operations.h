@@ -29,10 +29,10 @@ private:
     bool m_autoRemapFileExtensions = false;  // remap mod.* to *.mod for example
 
     struct AdfVolume* m_volume;             // The volume
-    std::wstring m_desktopIniFileResource;
 
     // Reverse mapping for badly (non-windows) named files
     std::map<std::string, std::wstring> m_safeFilenameMap;
+    std::map<std::wstring, std::string> m_specialRenameMap;
 
     // Files in use
     std::unordered_map<struct AdfFile*, int> m_inUse;
@@ -57,11 +57,17 @@ private:
     void addTrackFileInUse(struct AdfFile* handle);
     void releaseFileInUse(struct AdfFile* handle);
 
-    // Handles fixing filenames so they're amiga compatable
-    void amigaFilenameToWindowsFilename(const std::string& amigaFilename, std::wstring& windowsFilename);
+    // Handles fixing filenames so they're amiga compatable - returns TRUE if the name changed
+    void amigaFilenameToWindowsFilename(const std::wstring& windowsPath, const std::string& amigaFilename, std::wstring& windowsFilename);
     void windowsFilenameToAmigaFilename(const std::wstring& windowsFilename, std::string& amigaFilename);
+
+    // Handle a note about the remap of file extension
+    void handleRemap(const std::wstring& windowsPath, const std::string& amigaFilename, std::wstring& windowsFilename);
+
 public:
-    DokanFileSystemAmigaFS(DokanFileSystemManager* owner);
+    DokanFileSystemAmigaFS(DokanFileSystemManager* owner, bool autoRename);
+    void changeAutoRename(bool autoRename);
+    void resetFileSystem();
     virtual NTSTATUS fs_createfile(const std::wstring& filename, const PDOKAN_IO_SECURITY_CONTEXT security_context, const ACCESS_MASK generic_desiredaccess, const uint32_t file_attributes, const uint32_t shareaccess, const uint32_t creation_disposition, const bool fileSupersede, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual void fs_cleanup(const std::wstring& filename, PDOKAN_FILE_INFO dokanfileinfo) override;
     virtual NTSTATUS fs_readfile(const std::wstring& filename, void* buffer, const uint32_t bufferlength, uint32_t& actualReadLength, const int64_t offset, PDOKAN_FILE_INFO dokanfileinfo) override;

@@ -16,6 +16,7 @@
 #define KEY_UPDATE_CHECK			"updatecheck"
 #define KEY_DRIVE_LETTER			"driveletter"
 #define KEY_LAST_UPDATE_CHECK		"lastcheck"
+#define KEY_AUTO_RENAME				"autorename"
 
 // A bit hacky but enough for what I need
 uint32_t getStamp() {
@@ -31,6 +32,7 @@ bool loadConfiguration(AppConfig& config) {
 	config.floppyProfile = "";
 	config.driveLetter = 'A';
 	config.lastCheck = getStamp() - 5;
+	config.autoRename = false;
 
 	HKEY key;
 	DWORD disp = 0;
@@ -62,6 +64,10 @@ bool loadConfiguration(AppConfig& config) {
 	if (RegQueryValueExA(key, KEY_LAST_UPDATE_CHECK, NULL, NULL, (LPBYTE)&dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
 	if (dataSize == sizeof(dTemp)) config.lastCheck = dTemp;
 
+	dataSize = sizeof(dTemp);
+	if (RegQueryValueExA(key, KEY_AUTO_RENAME, NULL, NULL, (LPBYTE)&dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
+	if (dataSize == sizeof(dTemp)) config.autoRename = dTemp != 0;
+
 	RegCloseKey(key);
 	return true;
 }
@@ -82,8 +88,9 @@ bool saveConfiguration(const AppConfig& config) {
 
 	dTemp = config.checkForUpdates ? 1 : 0;
 	RegSetValueExA(key, KEY_UPDATE_CHECK, 0, REG_DWORD, (const BYTE*)&dTemp, sizeof(dTemp));
+	dTemp = config.autoRename ? 1 : 0;
+	RegSetValueExA(key, KEY_AUTO_RENAME, 0, REG_DWORD, (const BYTE*)&dTemp, sizeof(dTemp));
 	RegSetValueExA(key, KEY_LAST_UPDATE_CHECK, 0, REG_DWORD, (const BYTE*)&config.lastCheck, sizeof(config.lastCheck));
-
 
 	RegCloseKey(key);
 	return true;

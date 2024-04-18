@@ -11,6 +11,7 @@ struct AppConfig {
 	bool		enabled;
 	bool		checkForUpdates;
 	uint32_t	lastCheck;
+	bool		autoRename;
 };
 
 

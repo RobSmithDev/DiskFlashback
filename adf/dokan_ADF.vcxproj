@@ -358,9 +358,11 @@
     <ClCompile Include="mfminterface.cpp" />
     <ClCompile Include="MountedVolume.cpp" />
     <ClCompile Include="MountedVolumes.cpp" />
+    <ClCompile Include="pll.cpp" />
     <ClCompile Include="readwrite_dms.cpp" />
     <ClCompile Include="readwrite_file.cpp" />
     <ClCompile Include="readwrite_floppybridge.cpp" />
+    <ClCompile Include="SCPFile.cpp" />
     <ClCompile Include="sectorCache.cpp" />
     <ClCompile Include="shellMenus.cpp" />
     <ClCompile Include="SignalWnd.cpp" />
@@ -395,10 +397,12 @@
     <ClInclude Include="mfminterface.h" />
     <ClInclude Include="MountedVolume.h" />
     <ClInclude Include="MountedVolumes.h" />
+    <ClInclude Include="pll.h" />
     <ClInclude Include="readwrite_dms.h" />
     <ClInclude Include="readwrite_file.h" />
     <ClInclude Include="readwrite_floppybridge.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="SCPFile.h" />
     <ClInclude Include="sectorCache.h" />
     <ClInclude Include="shellMenus.h" />
     <ClInclude Include="SignalWnd.h" />

@@ -58,6 +58,7 @@ Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedType
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".img"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".ima"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".st"; ValueData: "";
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".scp"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\mount\icon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1"
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
@@ -71,6 +72,7 @@ Root: HKCU; Subkey: "Software\Classes\.hdf"; ValueType: string; ValueName: ""; V
 Root: HKCU; Subkey: "Software\Classes\.img"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.ibmpc"; Flags: uninsdeletevalue createvalueifdoesntexist
 Root: HKCU; Subkey: "Software\Classes\.ima"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.ibmpc"; Flags: uninsdeletevalue createvalueifdoesntexist
 Root: HKCU; Subkey: "Software\Classes\.st"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.atarist"; Flags: uninsdeletevalue createvalueifdoesntexist
+Root: HKCU; Subkey: "Software\Classes\.scp"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.flux"; Flags: uninsdeletevalue createvalueifdoesntexist
 
 ; Setup the Open With Prog ID
 Root: HKCU; Subkey: "Software\Classes\.adf\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.amiga.fd"; ValueData: ""; Flags: uninsdeletevalue
@@ -80,18 +82,21 @@ Root: HKCU; Subkey: "Software\Classes\.hdf\OpenWithProgids"; ValueType: string; 
 Root: HKCU; Subkey: "Software\Classes\.img\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.ibmpc"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.ima\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.ibmpc"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.st\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.atarist"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.scp\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.flux"; ValueData: ""; Flags: uninsdeletevalue
 
 ; Setup their default description
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.fd"; ValueType: string; ValueName: ""; ValueData: "Amiga Floppy Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.hd"; ValueType: string; ValueName: ""; ValueData: "Amiga Hard Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc"; ValueType: string; ValueName: ""; ValueData: "IBM PC Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist"; ValueType: string; ValueName: ""; ValueData: "ST Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux"; ValueType: string; ValueName: ""; ValueData: "Flux Level Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
 
 ; And default icon
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.fd\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1" 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.hd\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1" 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0" 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},3"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},4"
 
 ; And add the "Mount" action
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.fd\shell"; ValueType: string; ValueName: ""; ValueData: "mount"
@@ -113,6 +118,10 @@ Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell\mount"; Val
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},1"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell"; ValueType: string; ValueName: ""; ValueData: "mount"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},1"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 
 

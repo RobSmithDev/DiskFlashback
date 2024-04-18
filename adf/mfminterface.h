@@ -90,7 +90,7 @@ protected:
     virtual bool cylinderSeek(uint32_t cylinder, bool upperSide) = 0;
     virtual uint32_t mfmRead(uint32_t cylinder, bool upperSide, bool retryMode, void* data, uint32_t maxLength) = 0;
     virtual bool mfmWrite(uint32_t cylinder, bool upperSide, bool fromIndex, void* data, uint32_t maxLength) = 0;
-
+    virtual bool shouldPrompt() { return true; };
     void setReady();
 
 public:

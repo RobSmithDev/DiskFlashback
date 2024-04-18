@@ -113,6 +113,7 @@ bool SectorCacheMFM::diskRemovedWarning() {
     ULONGLONG t = GetTickCount64() - 1000;
     while (!isDiskInDrive()) {
         if (GetTickCount64() - t > 1000) {
+            if (!shouldPrompt()) return false;
             if (MessageBox(GetDesktopWindow(), L"WARNING: Not all data has been written to disk!\nYou MUST re-insert the disk into drive and press retry.", L"FLOPPY DISK REMOVED", MB_ICONSTOP | MB_RETRYCANCEL) != IDRETRY)
                 return false;
             t = GetTickCount64();
@@ -300,6 +301,8 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
             retries = 0;
 
             if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
+            if (!shouldPrompt()) return false;
+
             switch (MessageBox(GetDesktopWindow(), L"There have been some errors reading data from the disk.\nWhat would you like to do?", L"Disk Errors Detected", MB_SETFOREGROUND | MB_SYSTEMMODAL | MB_ICONQUESTION | MB_ABORTRETRYIGNORE)) {
             case IDRETRY:
             case IDTRYAGAIN: break;
@@ -638,6 +641,7 @@ bool SectorCacheMFM::flushPendingWrites() {
                             }
                         }
                         else
+                            if (!shouldPrompt()) return false; else
                             switch (MessageBox(GetDesktopWindow(), L"Disk writing is taking too long.\nWhat would you like to do?", L"Disk Writing Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION)) {
                             case IDABORT:
                                 m_blockWriting = true;
@@ -669,6 +673,7 @@ bool SectorCacheMFM::flushPendingWrites() {
                                 }
                             }
                             else
+                                if (!shouldPrompt()) return false; else
                                 if (MessageBox(GetDesktopWindow(), L"Disk verifying is taking too long.\nWhat would you like to do?", L"Disk Verifying Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION) != IDRETRY) {
                                     removeFailedWritesFromCache();
                                     return false;

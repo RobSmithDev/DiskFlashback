@@ -96,6 +96,12 @@
     <ClCompile Include="mfminterface.cpp">
       <Filter>Interfaces\Sector Interface</Filter>
     </ClCompile>
+    <ClCompile Include="pll.cpp">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="SCPFile.cpp">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -205,6 +211,12 @@
       <Filter>Interfaces\floppybridge</Filter>
     </ClInclude>
     <ClInclude Include="mfminterface.h">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="pll.h">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="SCPFile.h">
       <Filter>Interfaces\Sector Interface</Filter>
     </ClInclude>
   </ItemGroup>

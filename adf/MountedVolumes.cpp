@@ -13,6 +13,7 @@
 #include "fatfs/source/diskio.h"
 #include "resource.h"
 #include "menu.h"
+#include "SCPFile.h"
 
 #define TIMERID_MONITOR_FILESYS 1000
 #define WM_DISKCHANGE (WM_USER + 1)
@@ -431,14 +432,25 @@ bool VolumeManager::mountFile(const std::wstring& filename) {
         return true;
     }
     else {
-        // Assume its some kind of image file
-        m_io = new SectorRW_File(filename, fle);
-        if (!m_io->available()) {
-            CloseHandle(fle);
-            return false;
+        buffer[4] = '\0';
+        if (strcmp(buffer, "SCP") == 0) {
+            // Assume its some kind of image file
+            m_io = new SCPFile(fle, [this](bool diskInserted, SectorType diskFormat) {
+                // push this in the main thread incase its not!
+                triggerRemount();
+             });
+            if (!m_io->available()) return false;
+            fatfsSectorCache = m_io;
+            return true;
         }
-        fatfsSectorCache = m_io;
-        return true;
+        else {
+
+            // Assume its some kind of image file
+            m_io = new SectorRW_File(filename, fle);
+            if (!m_io->available()) return false;
+            fatfsSectorCache = m_io;
+            return true;
+        }
     }
 
     return false;

@@ -26,7 +26,8 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 // Trigger the applet loading if this is called for some other reason
 void startTrayIcon(const std::wstring& exe) {
-    if (FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE));
+#ifndef _DEBUG
+    if (FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE)) return;
 
     std::wstring cmd = L"\"" + exe + L"\"";
     PROCESS_INFORMATION pi;
@@ -37,6 +38,7 @@ void startTrayIcon(const std::wstring& exe) {
     CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
     if (pi.hThread) CloseHandle(pi.hThread);
     if (pi.hProcess) CloseHandle(pi.hProcess);
+#endif
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
@@ -56,7 +58,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             std::wstring ext = txt.substr(pos+1);
             for (WCHAR& c : ext) c = towupper(c);
             // Disk image file
-            if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF")) {
+            if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP")) {
                 VolumeManager* vol = new VolumeManager(hInstance, exeName, '?', false);
                 if (!vol->mountFile(txt)) {
                     delete vol;

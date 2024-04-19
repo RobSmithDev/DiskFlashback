@@ -30,6 +30,7 @@ LicenseFile=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\adflib.t
 OutputDir=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\
 OutputBaseFilename=DiskFlashbackInstall
 SetupIconFile=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
+UninstallDisplayIcon=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -39,10 +40,10 @@ ArchitecturesInstallIn64BitMode=x64
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\dokansetup.exe"; DestDir: "{app}"; Flags: ignoreversion; AfterInstall: InstallDokan
+Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\dokansetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall; AfterInstall: InstallDokan
 Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\FloppyBridge_x64.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\Release\adf.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\Release\adflib.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\adflib.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\fatfs.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\dokan2.dll"; DestDir: "{app}"; Flags: ignoreversion
@@ -127,7 +128,7 @@ Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount\command"
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-;Name: "{userstartup}\My Program"; Filename: "{app}\{#MyAppExeName}"
+Name: "{userstartup}\My Program"; Filename: "{app}\{#MyAppExeName}"
 
 [Code]
 
@@ -175,5 +176,5 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var ResultCode: Integer;
 begin
-  //if CurStep = ssDone then ExecAsOriginalUser (ExpandConstant('{app}\{#MyAppName}'), '', '', SW_SHOW, ewNoWait, ResultCode);
+  if CurStep = ssDone then ExecAsOriginalUser (ExpandConstant('{app}\{#MyAppName}'), '', '', SW_SHOW, ewNoWait, ResultCode);
 end;

@@ -181,6 +181,8 @@ IDI_ICON3               ICON                    "ufloppy.ico"
 
 IDI_ICON4               ICON                    "floppy3.ico"
 
+IDI_ICON5               ICON                    "floppy4.ico"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //

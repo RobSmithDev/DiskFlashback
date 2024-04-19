@@ -5,7 +5,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>"f:\ST Amiga Format 4 1988-10 (rnc_dualformat) [s19].scp"</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>"C:\Users\Rob\OneDrive\Original Layout\Desktop\pcdisk.scp"</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

@@ -88,7 +88,8 @@ protected:
     virtual bool resetDrive(uint32_t cylinder) = 0;
     virtual bool writeCompleted() = 0;
     virtual bool cylinderSeek(uint32_t cylinder, bool upperSide) = 0;
-    virtual uint32_t mfmRead(uint32_t cylinder, bool upperSide, bool retryMode, void* data, uint32_t maxLength) = 0;
+    virtual uint32_t mfmRead(uint32_t cylinder, bool upperSide, bool retryMode, void* data, uint32_t maxLength) = 0; // return BITS written
+    virtual uint32_t mfmRead(uint32_t track, bool retryMode, void* data, uint32_t maxLength) { return 0; };
     virtual bool mfmWrite(uint32_t cylinder, bool upperSide, bool fromIndex, void* data, uint32_t maxLength) = 0;
     virtual bool shouldPrompt() { return true; };
     void setReady();

@@ -436,6 +436,7 @@
     <Image Include="floppy.ico" />
     <Image Include="floppy2.ico" />
     <Image Include="floppy3.ico" />
+    <Image Include="floppy4.ico" />
     <Image Include="ufloppy.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

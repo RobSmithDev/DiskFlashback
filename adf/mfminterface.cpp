@@ -368,7 +368,12 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
     uint32_t bitsReceived;
     do {
         motorInUse(track % m_numHeads[fileSystem]);
-        bitsReceived = mfmRead(track / m_numHeads[fileSystem], track % m_numHeads[fileSystem], retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
+        // Try both methods
+        if (fileSystem == 1) {  // Hybrid file system
+            bitsReceived = mfmRead(track * 2, retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
+        } else bitsReceived = mfmRead(track, retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
+        if (!bitsReceived) bitsReceived = mfmRead(track / m_numHeads[fileSystem], track % m_numHeads[fileSystem], retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
+
         if (!bitsReceived) {
             if (GetTickCount64() - start > TRACK_READ_TIMEOUT) return false;
             else Sleep(50);

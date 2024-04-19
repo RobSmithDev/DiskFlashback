@@ -7,28 +7,26 @@ class PLL {
 private:
 	// Clock
 	int32_t m_clock = 0;
-	int32_t m_latency = 0;
-	int32_t m_prevLatency = 0;
-	int32_t m_totalRealFlux = 0;
 	int32_t m_nFluxSoFar = 0;
-	uint8_t* buffer = nullptr;
-	uint32_t bufferLength = 0;   // bits remaining
-	uint32_t bufferPositionBYTE = 0;
-	uint32_t bufferPositionBIT = 0;
-	uint32_t bufferPosition = 0; // in bits
 
-	// Add data to the output. Returns TRUE if full
-	bool writeData(uint32_t numZeros);
-	bool addBit(bool bit);
+	// Decoded buffer 
+	std::vector<uint8_t> m_mfmData;
+	// How many bits remaining until we need a new byte
+	uint32_t m_bitsRemaining = 0;
+
+	inline void addBit(const uint8_t& bit);
 public:
 	PLL();
 
-	// Reset the track with the size of the buffer
-	void newTrack(void* data, uint32_t maxLength);
-
-	// Submit flux to the PLL - returns how much space is left IN BITS
-	uint32_t decodeFlux(const std::vector<uint16_t>& flux);
-
 	// Reset the PLL
 	void reset();
+
+	// Reset the track buffer
+	void newTrack();
+
+	// Submit flux to the PLL
+	void decodeFlux(const uint32_t fluxTime);
+
+	// Finishes the track, returns its size in BITS and a pointer to the buffer containing it which you should copy
+	uint32_t finaliseTrack(void** buffer);
 };

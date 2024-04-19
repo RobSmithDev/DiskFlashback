@@ -271,5 +271,6 @@
       <Filter>res</Filter>
     </Image>
     <Image Include="floppy3.ico" />
+    <Image Include="floppy4.ico" />
   </ItemGroup>
 </Project>

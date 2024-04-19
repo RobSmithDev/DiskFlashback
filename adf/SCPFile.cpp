@@ -3,37 +3,34 @@
 
 
 #pragma pack(1) 
-
 /* Taken from https://www.cbmstuff.com/downloads/scp/scp_image_specs.txt
 This information is copyright(C) 2012 - 2020 By Jim Drew. Permission is granted
 for inclusion with any source code when keeping this copyright notice.
 */
 struct SCPFileHeader {
-	char			headerSCP[3];
-	unsigned char	version;
-	unsigned char	diskType;
-	unsigned char	numRevolutions;
-	unsigned char	startTrack;
-	unsigned char   endTrack;
-	unsigned char	flags;
-	unsigned char	bitcellEncoding;   // 0=16 bits per sample, 
-	unsigned char	numHeads;
-	unsigned char   timeBase;          // Resolution. Time in ns = (timeBase+1)*25
-	uint32_t	checksum;
+	int8_t	headerSCP[3];
+	uint8_t	version;
+	uint8_t	diskType;
+	uint8_t	numRevolutions;
+	uint8_t	startTrack;
+	uint8_t endTrack;
+	uint8_t	flags;
+	uint8_t	bitcellEncoding;   // 0=16 bits per sample, 
+	uint8_t	numHeads;
+	uint8_t timeBase;          // Resolution. Time in ns = (timeBase+1)*25
+	uint32_t checksum;
 };
 
 struct SCPTrackHeader {
-	char			headerTRK[3];
-	unsigned char	trackNumber;
+	int8_t headerTRK[3];
+	uint8_t	trackNumber;
 };
 
 struct SCPTrackRevolution {
-	uint32_t	indexTime;		// Time in NS/25 for this revolution
-	uint32_t	trackLength;	// Number of bit-cells in this revolution
-	uint32_t	dataOffset;		// From the start of SCPTrackHeader 
+	uint32_t indexTime;		// Time in NS/25 for this revolution
+	uint32_t trackLength;	// Number of bit-cells in this revolution
+	uint32_t dataOffset;		// From the start of SCPTrackHeader 
 };
-
-// Track data is 16-bit value in NS/25.  If =0 means no flux transition for max time 
 #pragma pack()
 
 #define BITFLAG_INDEX		0
@@ -42,149 +39,219 @@ struct SCPTrackRevolution {
 #define BITFLAG_EXTENDED    6
 #define BITFLAG_FLUXCREATOR 7
 
-typedef std::vector<uint16_t> SCPTrackData;
-
-struct SCPTrackInMemory {
-	SCPTrackHeader header;
-	std::vector<SCPTrackRevolution> revolution;
-	std::vector<SCPTrackData> revolutionData;
-};
-
 // Actually read the file
-bool SCPFile::readSCPFile(HANDLE file) {
+bool SCPFile::readSCPFile() {
 	DWORD read;
 	SCPFileHeader header;
-	SetFilePointer(file, 0, NULL, FILE_BEGIN);
-	if (!ReadFile(file, &header, sizeof(header), &read, NULL)) read = 0;
+	SetFilePointer(m_file, 0, NULL, FILE_BEGIN);
+	if (!ReadFile(m_file, &header, sizeof(header), &read, NULL)) read = 0;
 	if (read != sizeof(header)) return false;
 
-	const DWORD fluxMultiplier = (header.timeBase + 1) * 25;
-	numHeads = header.numHeads;
+	m_fluxMultiplier = (header.timeBase + 1) * 25;
+	m_firstTrack = header.startTrack;
+	m_lastTrack = header.endTrack;
+	m_numRevolutions = header.numRevolutions;
+	if (m_lastTrack >= 168) return false;
 
-	// Read the offsets table
+	// Read the offsets table	
 	std::vector<uint32_t> trackOffsets;
 	trackOffsets.resize(168);
 
-	if (!ReadFile(file, trackOffsets.data(), sizeof(uint32_t) * trackOffsets.size(), &read, NULL)) read = 0;
-	if (read != sizeof(uint32_t) * trackOffsets.size()) return false;		
-
-	// Read in all the tracks
-	for (uint32_t track = header.startTrack; track <= header.endTrack; track++) {
-		// Find the track data
-		if (SetFilePointer(file, trackOffsets[track], NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;
-
-		// Read track header
-		SCPTrackInMemory trk;
-		if (!ReadFile(file, &trk.header, sizeof(trk.header), &read, NULL)) read = 0;
-		if ((read != sizeof(trk.header)) || ((trk.header.headerTRK[0] != 'T') || (trk.header.headerTRK[1] != 'R') || (trk.header.headerTRK[2] != 'K'))) return false;
-
-		// Now read in the track info - the start of each revolution
-		for (int r = 0; r < header.numRevolutions; r++) {
-			SCPTrackRevolution rev;
-			if (!ReadFile(file, &rev, sizeof(rev), &read, NULL)) read = 0;
-			if (read != sizeof(rev)) return false;
-			trk.revolution.push_back(rev);
-		}
-
-		SCPTrackData allData;
-		// And now read in their data
-		for (uint32_t r = 0; r < header.numRevolutions; r++) {
-			// Goto the data
-			std::vector<uint16_t> actualFluxTimes;
-			if (SetFilePointer(file, trk.revolution[r].dataOffset + trackOffsets[track], NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;
-
-			allData.resize(trk.revolution[r].trackLength);
-			trk.revolution[r].dataOffset = actualFluxTimes.size();  // for use later on
-
-			if (!ReadFile(file, (char*)allData.data(), trk.revolution[r].trackLength * 2, &read, NULL)) read = 0;
-			if (read != trk.revolution[r].trackLength * 2) return false;
-
-			// Convert allData into proper flux times in nanoseconds
-			DWORD lastTime = 0;
-			for (const uint16_t t : allData) {
-				const uint16_t t2 = htons(t);  // paws naidne
-				if (t2 == 0) lastTime += 65536; else {
-					DWORD totalFlux = (lastTime + t2) * fluxMultiplier;
-					actualFluxTimes.push_back(totalFlux);
-					lastTime = 0;
-				}
-			}
-
-			trk.revolution[r].trackLength = actualFluxTimes.size() - trk.revolution[r].dataOffset;
-
-			TrackRev rev2;
-			rev2.mfmData = actualFluxTimes;
-
-			// Find and insert
-			auto i = m_tracks.find(track);
-			if (i == m_tracks.end()) {
-				Track trk;
-				trk.revs.push_back(rev2);
-				m_tracks.insert(std::pair(track, trk));
-			}
-			else i->second.revs.push_back(rev2);
-		}
+	if (!ReadFile(m_file, trackOffsets.data(), (DWORD)(sizeof(uint32_t) * trackOffsets.size()), &read, NULL)) read = 0;
+	if (read != sizeof(uint32_t) * trackOffsets.size()) return false;
+	
+	// Prepare track areas
+	for (uint32_t trk = m_firstTrack; trk <= m_lastTrack; trk++) {
+		Track t;
+		t.lastRev = 0;
+		t.m_fileOffset = trackOffsets[trk];
+		t.m_trackIsBad = false;
+		m_tracks.insert(std::pair(trk, t));
 	}
+
+	// Decode a few tracks to check if its valid
+	if (!decodeTrack(m_firstTrack)) return false;
+	if (!decodeTrack(m_lastTrack)) return false;
+
 	return true;
 } 
 
+// Decode a specific track into MFM
+bool SCPFile::decodeTrack(uint32_t track) {
+	if (track < m_firstTrack) return false;
+	if (track > m_lastTrack) return false;
+
+	auto trk = m_tracks.find(track);
+	if (trk == m_tracks.end()) return false;
+
+	if (!trk->second.revolutions.empty()) return true;
+	if (trk->second.m_trackIsBad) return false;
+
+	// Temporarly mark the track as bad
+	trk->second.m_trackIsBad = true;
+
+	// Goto the track data
+	if (SetFilePointer(m_file, trk->second.m_fileOffset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;
+
+	// Read track header and validate it
+	SCPTrackHeader header;
+	DWORD read;
+	if (!ReadFile(m_file, &header, sizeof(header), &read, NULL)) read = 0;
+	if ((read != sizeof(header)) || ((header.headerTRK[0] != 'T') || (header.headerTRK[1] != 'R') || (header.headerTRK[2] != 'K'))) return false;
+	if (header.trackNumber != track) return false;
+
+	std::vector<SCPTrackRevolution> revolutions;
+	// Now read in the track info - the start of each revolution
+	for (uint32_t r = 0; r < m_numRevolutions; r++) {
+		SCPTrackRevolution rev;
+		if (!ReadFile(m_file, &rev, sizeof(rev), &read, NULL)) read = 0;
+		if (read != sizeof(rev)) return false;
+		revolutions.push_back(rev);
+	}
+
+	// Temp buffer for flux timing data
+	std::vector<uint16_t> data;
+
+	m_pll.reset();
+
+	// Quick scan for density 
+	if (!m_density) {
+		// This is for guessing DD vs HD data
+		uint32_t ns2 = 0;
+		uint32_t ns6 = 0;
+
+		for (const SCPTrackRevolution& rev : revolutions) {
+			if (SetFilePointer(m_file, rev.dataOffset + trk->second.m_fileOffset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;
+			// Read in the RAW flux timing
+			data.resize(rev.trackLength);
+			if (!ReadFile(m_file, (char*)data.data(), rev.trackLength * 2, &read, NULL)) read = 0;
+			if (read != rev.trackLength * 2) return false;
+
+			uint32_t lastTime = 0;
+			for (const uint16_t t : data) {
+				const uint16_t t2 = htons(t);  // paws naidne
+				if (t2 == 0) lastTime += 65536; else {
+					const uint32_t totalFlux = (lastTime + t2) * m_fluxMultiplier;
+					if (totalFlux < 2500) ns2++;  // High Density 01 would be 2000ns
+					if (totalFlux > 5000) ns6++;  // Double density 001 would be 6000ns
+					lastTime = 0;
+				}
+			}
+		}
+		m_density = ns2 > ns6 ? 2 : 1;
+	}
+
+	// Now read in and decode each track, directly into MFM
+	for (const SCPTrackRevolution& rev : revolutions) {
+		m_pll.newTrack();
+
+		if (SetFilePointer(m_file, rev.dataOffset + trk->second.m_fileOffset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;
+
+		// Read in the RAW flux timing
+		data.resize(rev.trackLength);
+		if (!ReadFile(m_file, (char*)data.data(), rev.trackLength * 2, &read, NULL)) read = 0;
+		if (read != rev.trackLength * 2) return false;
+
+		// Convert data into MFM
+		uint32_t lastTime = 0;
+		for (const uint16_t t : data) {
+			const uint16_t t2 = htons(t);  // paws naidne
+			if (t2 == 0) lastTime += 65536; else {
+				const uint32_t totalFlux = (lastTime + t2) * m_fluxMultiplier;
+				m_pll.decodeFlux(totalFlux * m_density);
+				lastTime = 0;
+			}
+		}
+
+		// Have a look at what we got
+		void* memory = nullptr;
+		uint32_t sizeInBits = m_pll.finaliseTrack(&memory);
+
+		// Make enough memory
+		trk->second.revolutions.push_back(Revolution());		
+		trk->second.revolutions.back().sizeInBits = sizeInBits;
+		trk->second.revolutions.back().mfmData.resize((sizeInBits + 7) / 8);
+
+		// Save it
+		memcpy_s(&trk->second.revolutions.back().mfmData[0], trk->second.revolutions.back().mfmData.size(), memory, (sizeInBits + 7) / 8);
+	}
+
+	trk->second.m_trackIsBad = trk->second.revolutions.empty();
+
+	return !trk->second.m_trackIsBad;
+}
+
+
 // Flags from WINUAE
 SCPFile::SCPFile(HANDLE file, std::function<void(bool diskInserted, SectorType diskFormat)> diskChangeCallback) 
-	: SectorCacheMFM(diskChangeCallback) {
+	: SectorCacheMFM(diskChangeCallback), m_file(file) {
 
-	if (!readSCPFile(file)) m_tracks.clear();
-
-	checkHD();
-
-	CloseHandle(file);
+	if (!readSCPFile()) m_tracks.clear();
 
 	if (m_tracks.size()) setReady();
 }
 
+SCPFile::~SCPFile() {
+	CloseHandle(m_file);
+}
 
 // Return TRUE if it loaded OK
 bool SCPFile::isDiskInDrive() {
 	return !m_tracks.empty();
 }
 
-// Scan if the data looks like HD data
-void SCPFile::checkHD() {
-	if (m_tracks.empty()) return;
-	auto i = m_tracks.begin();
-
-	// look at the data
-	uint32_t ns2 = 0;
-	uint32_t ns6 = 0;
-	for (uint16_t fluxTime : i->second.revs[0].mfmData) {
-		if (fluxTime < 3000) ns2++;
-		if (fluxTime > 5000) ns6++;
-	}
-
-	m_hd = ns2 > ns6;
-}
-
 // Extract (and decode)
-uint32_t SCPFile::mfmRead(uint32_t cylinder, bool upperSide, bool retryMode, void* data, uint32_t maxLength) {
-	const uint32_t track = (cylinder * numHeads) + (upperSide ? 1 : 0);
+uint32_t SCPFile::mfmRead(uint32_t track, bool retryMode, void* data, uint32_t maxLength) {
+	if (!decodeTrack(track)) return 0;
 	
 	// Does the track exist?
 	auto i = m_tracks.find(track);
 	if (i == m_tracks.end()) return 0;
-	if (i->second.revs.size() < 1) return 0;
+	if (i->second.revolutions.size() < 1) return 0;
 
 	uint32_t rev = i->second.lastRev;
+	// Goto the next revolution next time
+	i->second.lastRev = (i->second.lastRev + 1) % i->second.revolutions.size();
 
-	m_pll.newTrack(data, maxLength);
-	int counter = 0;
+	// copy in the current revolution of data
+	memcpy_s(data, maxLength, i->second.revolutions[rev].mfmData.data(), min(maxLength, i->second.revolutions[rev].mfmData.size()));
 
-	uint32_t remaining = 0;
-	for (uint32_t counter=0; counter<10; counter++) {
-		remaining = m_pll.decodeFlux(i->second.revs[rev].mfmData);
-		rev = (rev + 1) % i->second.revs.size();
-		if (remaining < 1) return maxLength * 2;
-		counter++;
+	// Calc the number of bits we *can* store
+	int32_t bitsRemaining = (int32_t)(maxLength * 8) - (int32_t)i->second.revolutions[rev].sizeInBits;
+	if (bitsRemaining<=0) return maxLength * 8;
+		
+	// Space left, see if the data is byte aligned to a byte or not so we can try to fill it from the NEXT revolution
+	const uint32_t bitsMismatchRemaining = bitsRemaining & 7;
+
+	// Is data byte aligned?
+	if (bitsMismatchRemaining == 0) {
+		uint8_t* outputByte = (uint8_t*)data;
+		const uint32_t spaceUsed = i->second.revolutions[rev].sizeInBits / 8;
+		outputByte += spaceUsed;
+		const uint32_t bytesToCopy = min(maxLength - spaceUsed, (uint32_t)i->second.revolutions[rev].mfmData.size());
+		memcpy_s(outputByte, maxLength - spaceUsed, i->second.revolutions[rev].mfmData.data(), bytesToCopy);
+
+		// Return how much we actually copied
+		return (spaceUsed + bytesToCopy) * 8;
 	}
+	else {
+		uint8_t* outputByte = (uint8_t*)data;
+		outputByte += i->second.revolutions[rev].sizeInBits / 8;
 
-	i->second.lastRev = (i->second.lastRev + 1) % i->second.revs.size();
-	return (maxLength*8)-remaining;
+		// Not aligned.
+		for (const uint8_t byte : i->second.revolutions[i->second.lastRev].mfmData) {
+
+			// mis-aligned output
+			*outputByte |= byte >> (8 - bitsMismatchRemaining);
+			outputByte++;
+			bitsRemaining -= 8;
+			if (bitsRemaining <= 0) return maxLength * 8;
+
+			// Prepare next byte
+			*outputByte = byte << bitsMismatchRemaining;
+		}
+
+		// This shouldn't really ever get reached
+		return (maxLength * 8) - bitsRemaining;
+	}
 }

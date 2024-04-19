@@ -155,12 +155,38 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 		uint32_t sectorNumber = 0;
 		void* sectorData = malloc(m_io->sectorSize());
 		if (!sectorData) return false;  // out of memory
+
+		int counter = 0;
 		
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < m_io->numSectorsPerTrack(); sec++) {
 				if (!m_io->readData(sectorNumber, m_io->sectorSize(), sectorData)) {
-					free(sectorData);
-					return false;
+					WCHAR txt[128];
+					if (counter == 5) {
+						memset(sectorData, 0, m_io->sectorSize());
+					} else
+					if (counter == 4) {
+						swprintf_s(txt, L"Track %i, Sector %i was not found.\r\nWrite blank sector for all future missing sectors?", (int)track, (int)sec);
+						if (MessageBox(m_dialogBox, txt, L"Lots of Data Missing", MB_YESNO) != IDYES) {
+							free(sectorData);
+							return false;
+						}
+						else {
+							memset(sectorData, 0, m_io->sectorSize());
+							counter++;
+						}
+					}
+					else {
+						swprintf_s(txt, L"Track %i, Sector %i was not found.\r\nWrite blank sector?", (int)track, (int)sec);
+						if (MessageBox(m_dialogBox, txt, L"Data Missing", MB_YESNO) != IDYES) {
+							free(sectorData);
+							return false;
+						}
+						else {
+							memset(sectorData, 0, m_io->sectorSize());
+							counter++;
+						}
+					}
 				}
 				if (m_abortCopy) {
 					free(sectorData);

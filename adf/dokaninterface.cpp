@@ -3,7 +3,7 @@
 
 extern DOKAN_OPERATIONS fs_operations;
 
-#define SHOWDEBUG
+//#define SHOWDEBUG
 
 #pragma region DokanFileSystemBase
 DokanFileSystemBase::DokanFileSystemBase(DokanFileSystemManager* owner) : m_owner(owner) {
@@ -131,14 +131,14 @@ void wideToAnsi(const std::wstring& wstr, std::string& str) {
 }
 
 void ansiToWide(const std::string& wstr, std::wstring& str) {
-    int size = MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), wstr.length(), NULL, 0);
+    int size = MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), (int)wstr.length(), NULL, 0);
     if (size) {
         str.resize(size);
-        str.resize(MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), wstr.length(), &str[0], size));
+        str.resize(MultiByteToWideChar(CP_ACP, 0, wstr.c_str(), (int)wstr.length(), &str[0], size));
     }
 }
 #pragma endregion MiscFuncs
-
+   
 #pragma region DokanInterface
 NTSTATUS fs_checkVolume(const std::wstring& fname, DokanFileSystemManager* manager) {
 

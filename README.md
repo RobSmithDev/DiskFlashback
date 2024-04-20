@@ -5,7 +5,7 @@ A Windows package to use Floppy Disk Images Files & Real Floppy Disks in Windows
 Most of the USB floppy drives are terrible. And modifying a drive for DrawBridge removes the IBM/PC floppy disk support in Windows. Plus I was getting annoyed having to boot WinUAE just to copy a file to an ADF (or disk). So I built this - And all the silly playground arguments from childhood now behind us I gave a little love to the Atari ST too (untested, I don't have one!)...
 
 ## Features
-- Mount ADF, DMS, IMG, IMA, ST, HDA, HDF and SCP disk and hard drive files as virtual drives
+- Mount ADF, DMS*, IMG, IMA, ST, MSA*, HDA, HDF and SCP* disk and hard drive files as virtual drives
 - Supports AmigaDOS OFS/FFS DD & HD Disks
 - Supports IBM/PC FAT12/16 DD 720k & HD 1.44Mb Disks
 - Supports Atari ST FAT12/16 GemDOS Single and Double Sided normal & extended Disks
@@ -16,6 +16,8 @@ Most of the USB floppy drives are terrible. And modifying a drive for DrawBridge
 - Write disk images to real floppy disks
 - Install boot blocks on Amiga floppy disks
 - Optionally silently swap file extensions (eg: mod.thismusic to thismusic.mod)
+* are read only
+
 
 ## How does it work?
 DiskFlashback is powered by:

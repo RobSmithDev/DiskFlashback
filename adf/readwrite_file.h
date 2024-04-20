@@ -4,21 +4,36 @@
 #include <dokan/dokan.h>
 #include <unordered_map>
 #include "sectorCache.h"
-
+#include <map>
 
 class SectorRW_File : public SectorCacheEngine {
 private:
+    enum SectorMode {smNormal, smMSA};
+
+    struct DecodedTrack {
+        uint32_t seekPos;   // Where the actual data starts
+        uint16_t dataSize;
+        std::vector<uint8_t> data;
+    };
+
     HANDLE m_file;
     uint32_t m_sectorsPerTrack;
     SectorType m_fileType;
     uint32_t m_serialNumber;
     uint32_t m_bytesPerSector;
     uint32_t m_totalTracks;
+    uint32_t m_firstTrack;
     uint32_t m_numHeads;
+    SectorMode m_mode;
+
+    // MAP as I want the track numbers in order
+    std::map<uint32_t, DecodedTrack> m_trackSearch;
 protected:
     virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
     virtual bool internalWriteData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) override;
 
+    // Decode the track from this point in the file
+    bool decodeMSATrack(DecodedTrack& track);
 public:
     SectorRW_File(const std::wstring& filename, HANDLE fle);
     ~SectorRW_File();

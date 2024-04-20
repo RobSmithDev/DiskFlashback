@@ -59,6 +59,7 @@ Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedType
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".img"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".ima"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".st"; ValueData: "";
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".msa"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".scp"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\mount\icon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1"
@@ -72,7 +73,8 @@ Root: HKCU; Subkey: "Software\Classes\.hda"; ValueType: string; ValueName: ""; V
 Root: HKCU; Subkey: "Software\Classes\.hdf"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.amiga.hd"; Flags: uninsdeletevalue createvalueifdoesntexist
 Root: HKCU; Subkey: "Software\Classes\.img"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.ibmpc"; Flags: uninsdeletevalue createvalueifdoesntexist
 Root: HKCU; Subkey: "Software\Classes\.ima"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.ibmpc"; Flags: uninsdeletevalue createvalueifdoesntexist
-Root: HKCU; Subkey: "Software\Classes\.st"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.atarist"; Flags: uninsdeletevalue createvalueifdoesntexist
+Root: HKCU; Subkey: "Software\Classes\.st";  ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.atarist"; Flags: uninsdeletevalue createvalueifdoesntexist
+Root: HKCU; Subkey: "Software\Classes\.msa"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.atarist"; Flags: uninsdeletevalue createvalueifdoesntexist
 Root: HKCU; Subkey: "Software\Classes\.scp"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.flux"; Flags: uninsdeletevalue createvalueifdoesntexist
 
 ; Setup the Open With Prog ID

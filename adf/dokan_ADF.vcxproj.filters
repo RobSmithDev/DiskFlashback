@@ -3,7 +3,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="floppybridge_lib.cpp">
-      <Filter>Interfaces\floppybridge</Filter>
+      <Filter>Interfaces\Sector Interface\floppybridge</Filter>
     </ClCompile>
     <ClCompile Include="dlgFormat.cpp">
       <Filter>Dialogs</Filter>
@@ -108,10 +108,10 @@
       <Filter>res</Filter>
     </ClInclude>
     <ClInclude Include="floppybridge_lib.h">
-      <Filter>Interfaces\floppybridge</Filter>
+      <Filter>Interfaces\Sector Interface\floppybridge</Filter>
     </ClInclude>
     <ClInclude Include="floppybridge_abstract.h">
-      <Filter>Interfaces\floppybridge</Filter>
+      <Filter>Interfaces\Sector Interface\floppybridge</Filter>
     </ClInclude>
     <ClInclude Include="dlgFormat.h">
       <Filter>Dialogs</Filter>
@@ -208,7 +208,7 @@
       <Filter>Dialogs</Filter>
     </ClInclude>
     <ClInclude Include="floppybridge_common.h">
-      <Filter>Interfaces\floppybridge</Filter>
+      <Filter>Interfaces\Sector Interface\floppybridge</Filter>
     </ClInclude>
     <ClInclude Include="mfminterface.h">
       <Filter>Interfaces\Sector Interface</Filter>
@@ -226,9 +226,6 @@
     </Filter>
     <Filter Include="Interfaces">
       <UniqueIdentifier>{5c738464-8c69-45d0-a89d-5735bcf50d27}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Interfaces\floppybridge">
-      <UniqueIdentifier>{9b804ff8-f264-4b2b-89df-ac6181bf8c04}</UniqueIdentifier>
     </Filter>
     <Filter Include="Dialogs">
       <UniqueIdentifier>{978bb8fb-2646-4e0f-92f7-939f6bfc3e23}</UniqueIdentifier>
@@ -254,6 +251,9 @@
     <Filter Include="Interfaces\IBM\FatFS">
       <UniqueIdentifier>{b9b8b178-9866-4b17-a1f5-b0d06bce984a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Interfaces\Sector Interface\floppybridge">
+      <UniqueIdentifier>{9b804ff8-f264-4b2b-89df-ac6181bf8c04}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">
@@ -270,7 +270,11 @@
     <Image Include="ufloppy.ico">
       <Filter>res</Filter>
     </Image>
-    <Image Include="floppy3.ico" />
-    <Image Include="floppy4.ico" />
+    <Image Include="floppy3.ico">
+      <Filter>res</Filter>
+    </Image>
+    <Image Include="floppy4.ico">
+      <Filter>res</Filter>
+    </Image>
   </ItemGroup>
 </Project>

@@ -48,8 +48,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     LPWSTR* argv = nullptr;
     if (wcslen(pCmdLine)) argv = CommandLineToArgvW(pCmdLine, &argc);
-
-    // BRIDGE L 1 config  FILE L 1 f:\testing.adf FILE L 1 d:\pc.img   BRIDGE L 1 config   FILE L f:\testdisk.adf  FILE L f:\rom\XTHardDiskBackup.hdf  FILE L f:\testdisk.adf  FILE L "D:\Virtual Floppy Drive\dokany-master\xdms\xdms\x64\Debug\moo\amos3d.dms" FILE L 1 "E:\Youtube Backup\PlipBox\amiga\BestWB.1.3.1\DOpus.dms" 
+     
     // See if its just a disk image on the command line
     if (argc == 1) {
         std::wstring txt = argv[0];
@@ -58,7 +57,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             std::wstring ext = txt.substr(pos+1);
             for (WCHAR& c : ext) c = towupper(c);
             // Disk image file
-            if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP")) {
+            if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"MSA") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP")) {
                 VolumeManager* vol = new VolumeManager(hInstance, exeName, '?', false);
                 if (!vol->mountFile(txt)) {
                     delete vol;

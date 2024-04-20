@@ -16,6 +16,7 @@ struct DriveInfo {
     HWND hWnd;
     std::wstring volumeName;
     std::wstring volumeType;
+    uint16_t driveType;
     bool isPhysicalDrive;
 };
 
@@ -80,7 +81,7 @@ private:
     void monitorPhysicalDrive();
 
     // Eject/close physical drives running
-    bool closePhysicalDrive(bool dontNotify = false);
+    bool closePhysicalDrive(bool dontNotify = false, uint16_t driveType = 0xFFFF);
 
 
 public:

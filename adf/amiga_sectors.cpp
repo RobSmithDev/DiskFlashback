@@ -42,16 +42,14 @@ static uint8_t bootblock_ffs[] = {
 
 
 // Grabs a copy of the bootblock for the system required.  target must be 1024 bytes in size
-void fetchBootBlockCode_AMIGA(bool ffs, uint8_t* target, const std::string& comment) {
+void fetchBootBlockCode_AMIGA(bool ffs, uint8_t* target) {
 	if (ffs) {
 		size_t size = sizeof(bootblock_ofs) / sizeof(*bootblock_ofs);
 		memcpy_s(target, 1024, bootblock_ofs, size);
-		strcpy_s((char*)(target + size + 8), 1024 - (size + 8), comment.c_str());
 	}
 	else {
 		size_t size = sizeof(bootblock_ffs) / sizeof(*bootblock_ffs);
 		memcpy_s(target, 1024, bootblock_ffs, size);
-		strcpy_s((char*)(target + size + 8), 1024 - (size + 8), comment.c_str());
 	}
 }
 

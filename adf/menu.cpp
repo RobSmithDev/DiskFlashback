@@ -47,6 +47,10 @@ BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
             info.hWnd = hwnd;
             info.isPhysicalDrive = wcsstr(tmpText, L"BRIDGE.") != nullptr;
             uint32_t counter = 0;
+            if (info.isPhysicalDrive) {
+                info.driveType = _wtoi(tmpText + 7);
+            }
+            else info.driveType = 0xFFFF;
 
             while (*pos) {
                 counter++;
@@ -499,14 +503,14 @@ void CTrayMenu::mountDisk() {
 }
 
 // Eject/close physical drives running
-bool CTrayMenu::closePhysicalDrive(bool dontNotify) {
+bool CTrayMenu::closePhysicalDrive(bool dontNotify, uint16_t driveType) {
     bool ret = false;
     for (auto& drive : m_drives)
-        if (drive.second.isPhysicalDrive) {
+        if (drive.second.isPhysicalDrive && (drive.second.driveType == driveType)) {
             PostMessage(drive.second.hWnd, WM_USER, dontNotify? REMOTECTRL_EJECT_SILENT: REMOTECTRL_EJECT, (LPARAM)drive.first[0]);
-            ret = true;
+            return true;
         }
-    return ret;
+    return false;
 }
 
 // Monitor the physical drive and enable/close as required
@@ -590,9 +594,12 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
     setupMenu();   
 
     // Make sure the icon stays even if explorer dies
-    m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT { setupIcon(); return 0; });
+    m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT {
+        setupIcon(); return 0; });
+
     m_window.setMessageHandler(WM_USER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         handleMenuInput((UINT)wParam, (UINT)lParam); return 0; });
+
     m_window.setMessageHandler(WM_PHYSICAL_EJECT, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         if (m_processUsingDrive) return 0;
         // Turn off the "enabled" option
@@ -601,55 +608,63 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
         CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | MF_UNCHECKED);
         return 0;
         });
+
     m_window.setMessageHandler(WM_REMOTEUSAGE, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         // Turn off the "enabled" option
         if (m_processUsingDrive) CloseHandle(m_processUsingDrive);
         m_processUsingDrive = 0;
 
-        if (wParam == 0) 
-            if (lParam) m_processUsingDrive = OpenProcess(SYNCHRONIZE, FALSE, (DWORD)lParam);
+        uint16_t driveType = wParam & 0x7FFF;
+        bool releaseDrive = (wParam & 0x8000) == 0;
 
+        if (releaseDrive && lParam) {
+            m_processUsingDrive = OpenProcess(SYNCHRONIZE, FALSE, (DWORD)lParam);
 
-        if (m_processUsingDrive) {
-            populateDrives();
-            if (closePhysicalDrive(true)) {
-                m_didNotifyFail = true;
-                WCHAR name[1024];
-                m_lastBalloonIsUpdate = false;
+            if (m_processUsingDrive) {
+                populateDrives();
 
-                HANDLE tmp = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, (DWORD)lParam);
-                if (tmp) {
-                    wcscpy_s(m_notify.szInfo, L"Suspending real floppy drive while ");
-                    name[GetProcessImageFileName(tmp, name, 1024)] = L'\0';
-                    std::wstring n = name;
-                    size_t i = n.rfind(L"\\");
-                    if (i != std::wstring::npos) n = n.substr(i + 1);
-                    wcscat_s(m_notify.szInfo, n.c_str());
-                    wcscat_s(m_notify.szInfo, L" requires it.");
-                    CloseHandle(tmp);
+                if (closePhysicalDrive(true, driveType)) {
+                    m_didNotifyFail = true;
+                    WCHAR name[1024];
+                    m_lastBalloonIsUpdate = false;
+
+                    HANDLE tmp = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, (DWORD)lParam);
+                    if (tmp) {
+                        wcscpy_s(m_notify.szInfo, L"Suspending real floppy drive while ");
+                        name[GetProcessImageFileName(tmp, name, 1024)] = L'\0';
+                        std::wstring n = name;
+                        size_t i = n.rfind(L"\\");
+                        if (i != std::wstring::npos) n = n.substr(i + 1);
+                        wcscat_s(m_notify.szInfo, n.c_str());
+                        wcscat_s(m_notify.szInfo, L" requires it.");
+                        CloseHandle(tmp);
+                    }
+                    else {
+                        wcscpy_s(m_notify.szInfo, L"Suspending real floppy drive while it is in use");
+                    }
+                    // Do popup for updates available
+                    m_notify.uFlags |= NIF_INFO;
+                    m_notify.dwInfoFlags = NIIF_INFO;
+                    wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                    Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+                    m_notify.uFlags &= ~NIF_INFO;
+
+                    // Wait a short time for it to *actually* disappear
+                    for (uint32_t t = 0; t < 10; t++) {
+                        Sleep(200);
+                        populateDrives();
+                        if (!closePhysicalDrive(true, driveType)) return 0;
+                    }
                 }
                 else {
-                    wcscpy_s(m_notify.szInfo, L"Suspending real floppy drive while it is in use");
-                }
-                // Do popup for updates available
-                m_notify.uFlags |= NIF_INFO;
-                m_notify.dwInfoFlags = NIIF_INFO;
-                wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
-                Shell_NotifyIcon(NIM_MODIFY, &m_notify);
-                m_notify.uFlags &= ~NIF_INFO;
-
-                // Wait a short time for it to *actually* disappear
-                for (uint32_t t = 0; t < 10; t++) {
-                    Sleep(200);
-                    populateDrives();
-                    if (!closePhysicalDrive(true)) return 0;
+                    CloseHandle(m_processUsingDrive);
+                    m_processUsingDrive = 0;
                 }
             }
         }
         return 0;
     });
     
-
     m_window.setMessageHandler(WM_TIMER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         switch (wParam) {
         case TIMERID_UPDATE_CHECK:

@@ -8,7 +8,7 @@
 #include "sectorCommon.h"
 
 // Grabs a copy of the bootblock for the system required.  target must be 1024 bytes in size
-void fetchBootBlockCode_AMIGA(bool ffs, uint8_t* target, const std::string& comment);
+void fetchBootBlockCode_AMIGA(bool ffs, uint8_t* target);
 
 // Very simple 
 void getTrackDetails_AMIGA(const bool isID, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector);

@@ -162,14 +162,12 @@ bool MountedVolume::installAmigaBootBlock() {
     if (!getADFVolume()) return false;
     if (isWriteProtected()) return false;
 
-    const std::string appName = "Installed with " APPLICATION_NAME;
-
     // 1024 bytes is required
     uint8_t* mem = (uint8_t*)malloc(1024);
     if (!mem) return false;
 
     memset(mem, 0, 1024);
-    fetchBootBlockCode_AMIGA(isFFS(getADFVolume()->dosType), mem, appName);
+    fetchBootBlockCode_AMIGA(isFFS(getADFVolume()->dosType), mem);
 
     // Nothing writes to where thr boot block is so it's safe to do this
     bool ok = adfInstallBootBlock(getADFVolume(), mem) == RC_OK;

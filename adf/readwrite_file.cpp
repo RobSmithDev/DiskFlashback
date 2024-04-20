@@ -105,7 +105,6 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
         }
 
         if ((m_fileType == SectorType::stIBM) || (m_fileType == SectorType::stAtari)) {
-            DWORD read;
             uint8_t data[128];
             if (internalReadData(0, min(m_bytesPerSector, 128), data)) {
                 uint32_t totalSectors;

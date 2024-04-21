@@ -29,7 +29,7 @@ DiskFlashback is powered by:
 DiskFlashback is OpenSource and available under the GPL2 Licence, and available from GitHub.
 
 ## Notes for Developers
-You can trigger DiskFlashback to release control of the physical floppy drive (Drawbridge, Greaseweazle and SupercardPRO), and have it restore access too using a simple Windows command.  DiskFlashback will aos automatically restore access after the application making the request terminates.
+You can trigger DiskFlashback to release control of the physical floppy drive (Drawbridge, Greaseweazle and SupercardPRO), and have it restore access too using a simple Windows command.  DiskFlashback will also automatically restore access after the application making the request terminates.
 
 ```  
 void releaseVirtualDrives(bool release, int controllerType) {

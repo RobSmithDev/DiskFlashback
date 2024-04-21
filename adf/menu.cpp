@@ -16,6 +16,7 @@
 #define MENUID_CREATEDISK       1
 #define MENUID_MOUNTDISK        2
 #define MENUID_ABOUT            3
+#define MENUID_DONATE           4
 #define MENUID_QUIT             10
 #define MENUID_ENABLED          20
 #define MENUID_CONFIGURE        21
@@ -125,7 +126,8 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates Now");
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
-    AppendMenu(m_hUpdates, MF_STRING, MENUID_ABOUT,                            L"&About...");
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_DONATE, L"&Donate...");
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_ABOUT, L"&About...");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_QUIT,                L"&Quit");
 
     CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
@@ -374,11 +376,20 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     if ((index >= MENUID_IMAGE_HD) && (index < MENUID_IMAGE_HD + 3)) runCreateImage(true, index - MENUID_IMAGE_HD);
 
     switch (index) {
+    case MENUID_DONATE:
+        ShellExecute(m_window.hwnd(), L"open", L"https://ko-fi.com/robsmithdev", NULL, NULL, SW_SHOW);
+        break;
     case MENUID_ABOUT: {
         DWORD v = getAppVersion();
             std::wstring msg = std::wstring(APPLICATION_NAME_L) + L" V" + std::to_wstring(v >> 24) + L"." + std::to_wstring((v >> 16) & 0xFF) + L"." + std::to_wstring((v >> 8) & 0xFF) + L"." + std::to_wstring(v & 0xFF) + L"\r\n";
             msg += L"Copyright \x00A9 2024 RobSmithDev\r\n\r\n";
-            msg += L"Visit https://robsmithdev.co.uk/diskflashback for more information";
+            msg += L"For more information visit:\r\nhttps://robsmithdev.co.uk/diskflashback\r\n\r\n";
+            msg += L"DiskFlashback uses the following to make all of this possible:\r\n";
+            msg += L"\x2022 Dokany (Virtual Drives)\r\n";
+            msg += L"\x2022 ADFLib (OFS/FFS File System)\r\n";
+            msg += L"\x2022 FatFS (FAT12/16 File System)\r\n";
+            msg += L"\x2022 xDMS (DMS Decompression)\r\n";
+            msg += L"\x2022 FloppyBridge (Floppy Drive Access)";
             MessageBox(m_window.hwnd(), msg.c_str(), L"About DiskFlashback", MB_OK | MB_ICONINFORMATION);
         }
         break;
@@ -597,8 +608,15 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
     m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT {
         setupIcon(); return 0; });
 
+
     m_window.setMessageHandler(WM_USER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         handleMenuInput((UINT)wParam, (UINT)lParam); return 0; });
+
+    m_window.setMessageHandler(WM_DOQUIT, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        if ((wParam == 20) && (lParam == 30)) PostQuitMessage(0);
+        return 0;
+        });
+
 
     m_window.setMessageHandler(WM_PHYSICAL_EJECT, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         if (m_processUsingDrive) return 0;

@@ -8,13 +8,13 @@
 #define MyAppExeName "DiskFlashback.exe"
 #define MyAppAssocKey "DiskFlashback"
 
+
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{ABCA6F16-2CF6-4CD9-AB97-672E757E598A}
 AppName={#MyAppName}
-AppVersion={#MyAppVersion}
-VersionInfoVersion={#MyAppVersion}
+AppVersion={#MyAppVersion}VersionInfoVersion={#MyAppVersion}
 AppCopyright=© 2024 {#MyAppPublisher}
 ;AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -29,9 +29,9 @@ LicenseFile=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\adflib.t
 ;PrivilegesRequired=lowest
 OutputDir=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\
 OutputBaseFilename=DiskFlashbackInstall
-SetupIconFile=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
-UninstallDisplayIcon=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
-Compression=lzma
+//SetupIconFile=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
+//UninstallDisplayIcon=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
+Compression=zip
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
@@ -42,6 +42,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\dokansetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall; AfterInstall: InstallDokan
 Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\FloppyBridge.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\FloppyBridge_x64.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\Release\adflib.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\adflib.txt"; DestDir: "{app}"; Flags: ignoreversion
@@ -132,14 +133,100 @@ Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount\command"
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{userstartup}\My Program"; Filename: "{app}\{#MyAppExeName}"
 
+[Run]
+Filename: "https://robsmithdev.co.uk/diskflashback_intro"; Description: "View Getting Started Guide"; Flags: shellexec  postinstall runascurrentuser
+
 [Code]
 
 var CancelWithoutPrompt: boolean;
+var page_option : TInputOptionWizardPage;
+var AmigaForeverFolder, WinUAEFolder:String;
+var AmigaForeverIndex, WinUAEIndex:Integer;
+
+Procedure CloseApplication;
+Var W:HWND;
+    A:Integer;
+Begin
+     W:=FindWindowByWindowName('DiskFlashback Tray Control');
+     If (W<>0) then SendMessage(W,$400+10,20,30);
+     For A:=1 To 10 Do
+     Begin
+          W:=FindWindowByWindowName('DiskFlashback Tray Control');
+          IF W<>0 Then Sleep(100);
+     End;
+End;
+
+
+procedure InitializeWizard();
+Var A,Counter:Integer;
+    _FloppyBridgeVersion, _AmigaForeverVersion, _WinUAEVersion, Tmp:String;
+    FloppyBridgeVersion,AmigaForeverVersion, WinUAEVersion:Int64;
+begin
+    ExtractTemporaryFile('FloppyBridge_x64.dll');
+    GetVersionNumbersString(ExpandConstant('{tmp}\FloppyBridge_x64.dll'), _FloppyBridgeVersion);
+    DeleteFile(ExpandConstant('{tmp}\FloppyBridge_x64.dll'));
+    StrToVersion(_FloppyBridgeVersion, FloppyBridgeVersion);
+    AmigaForeverIndex := -1;
+    WinUAEIndex := -1;
+    Counter:=0;
+
+    if RegQueryStringValue(HKCR, 'Cloanto.RetroPlatform.lha\shell\open\command', '', AmigaForeverFolder) then
+    begin     
+        A:=Pos('" ', AmigaForeverFolder);
+        AmigaForeverFolder := trim(Copy(AmigaForeverFolder,1,A));
+        If (Copy(AmigaForeverFolder,1,1) = '"') and (Copy(AmigaForeverFolder,length(AmigaForeverFolder),1)= '"') Then
+            AmigaForeverFolder:=Copy(AmigaForeverFolder,2,Length(AmigaForeverFolder)-2);
+        AmigaForeverFolder:=ExtractFilePath(AmigaForeverFolder)+'WinUAE\Plugins\';
+        If (Length(AmigaForeverFolder)<1) then AmigaForeverFolder:='C:\Program Files (x86)\Cloanto\Amiga Forever\WinUAE\plugins';
+    end;
+
+    if RegQueryStringValue(HKCR, 'WinUAE\shell\open\command', '', WinUAEFolder) then
+    begin     
+        A:=Pos('" ', WinUAEFolder);
+        WinUAEFolder := trim(Copy(WinUAEFolder,1,A));
+        If (Copy(WinUAEFolder,1,1) = '"') and (Copy(WinUAEFolder,length(WinUAEFolder),1)= '"') Then
+            WinUAEFolder:=Copy(WinUAEFolder,2,Length(WinUAEFolder)-2);
+        WinUAEFolder:=ExtractFilePath(WinUAEFolder)+'Plugins\';
+        If (Length(WinUAEFolder)<1) then WinUAEFolder:='c:\program files\winuae\plugins\';
+    end;
+
+    page_option := CreateInputOptionPage(3,'FloppyBridge Plugin','DiskFlashback includes the latest version of the FloppyBridge plugin ('+_FloppyBridgeVersion+').','Install/update the plugin in the following products:',False,True);
+    if (length(WinUAEFolder)>0) Then
+    Begin
+         GetVersionNumbersString(WinUAEFolder + 'FloppyBridge_x64.dll', _WinUAEVersion);
+         StrToVersion(_WinUAEVersion, WinUAEVersion);
+         if (ComparePackedVersion(WinUAEVersion, FloppyBridgeVersion)<0) then
+         begin
+             WinUAEIndex:=Counter; Inc(Counter);
+             If WinUAEVersion<1 Then 
+                page_option.Add('Install FloppyBridge for WinUAE')
+             Else page_option.Add('Update WinUAE FloppyBridge Plugin (current version: '+_WinUAEVersion+')');
+             page_option.values[Counter-1] := true;
+         end Else WinUAEFolder:='';
+    End;
+
+    if (length(AmigaForeverFolder)>0) Then
+    Begin
+         GetVersionNumbersString(AmigaForeverFolder + 'FloppyBridge_x64.dll', _AmigaForeverVersion);
+         StrToVersion(_AmigaForeverVersion, AmigaForeverVersion);
+         if (ComparePackedVersion(AmigaForeverVersion, FloppyBridgeVersion)<0) then
+         begin
+             AmigaForeverIndex:=Counter; Inc(Counter);
+             If AmigaForeverVersion<1 Then 
+                page_option.Add('Install FloppyBridge for Amiga Forever')
+             Else page_option.Add('Update Amiga Forever FloppyBridge Plugin (current version: '+_AmigaForeverVersion+')');
+             page_option.values[Counter-1] := true;
+         end Else AmigaForeverFolder:='';
+    End;
+
+    If (Counter=0) Then page_option.Free;
+    CloseApplication;
+end;
 
 procedure CancelButtonClick(CurPageID: Integer; var Cancel, Confirm: Boolean);
 begin
   if CurPageID=wpInstalling then
-    Confirm := not CancelWithoutPrompt;
+      Confirm := not CancelWithoutPrompt;
 end;
 
 procedure InstallDokan;
@@ -159,7 +246,7 @@ begin
 
          Res:=ComparePackedVersion(installedVersion, newVersion);
          if (Res>=0) Then Exit;
-         if (MsgBox('DiskFlashback uses Dokan to provide a virtual file system.'#13#10'The version you have installed is too old ('+_installedVersion+').'#13#10#13#10'Please uninstall that version of "Donan Library" from your system first, restart, and then try again.'#13#10#13#10'Open Installed Apps control panel?', mbConfirmation, MB_YESNO) = IDYES) Then
+         if (MsgBox('DiskFlashback uses Dokan to provide a virtual file system.'#13#10'The version you have installed is too old (V'+_installedVersion+').'#13#10#13#10'Please uninstall that version of "Donan Library" from your system first, restart, and then try again.'#13#10#13#10'Open Installed Apps control panel?', mbConfirmation, MB_YESNO) = IDYES) Then
              ShellExecAsOriginalUser('open','ms-settings:appsfeatures','','',SW_SHOW,ewNoWait,res);         
          CancelWithoutPrompt := true;
          WizardForm.Close;
@@ -175,8 +262,26 @@ begin
      End;  
 end;
 
+Procedure InstallPluginTo(TargetFolder:String);
+Begin
+     FileCopy(ExpandConstant('{app}\FloppyBridge.dll'),TargetFolder+'FloppyBridge.dll', false); 
+     FileCopy(ExpandConstant('{app}\FloppyBridge_x64.dll'),TargetFolder+'FloppyBridge_x64.dll', false); 
+End;
+
+Procedure CopyFloppyBridge;
+Begin
+     If AmigaForeverIndex>=0 Then
+          if (page_option.Values[AmigaForeverIndex]) Then
+              InstallPluginTo(AmigaForeverFolder);
+
+     If WinUAEIndex>=0 Then
+          if (page_option.Values[WinUAEIndex]) Then
+              InstallPluginTo(WinUAEFolder);
+End;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var ResultCode: Integer;
 begin
+  if CurStep = ssPostInstall Then CopyFloppyBridge;
   if CurStep = ssDone then ExecAsOriginalUser (ExpandConstant('{app}\{#MyAppName}'), '', '', SW_SHOW, ewNoWait, ResultCode);
 end;

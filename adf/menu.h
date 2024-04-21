@@ -12,6 +12,8 @@
 // LPARAM is the process ID making the request.  The application will monitor and auto restore if the process exits
 #define WM_REMOTEUSAGE        (WM_USER+2)
 
+#define WM_DOQUIT             (WM_USER+10)
+
 struct DriveInfo {
     HWND hWnd;
     std::wstring volumeName;

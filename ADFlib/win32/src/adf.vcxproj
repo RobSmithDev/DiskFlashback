@@ -1,0 +1,444 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="DebugDLL|x64">
+      <Configuration>DebugDLL</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="ReleaseDLL|x64">
+      <Configuration>ReleaseDLL</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{70B5FAD1-B4B3-3DF0-A4CE-3F0AC4343ECD}</ProjectGuid>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+    <Keyword>Win32Proj</Keyword>
+    <Platform>x64</Platform>
+    <ProjectName>adf</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\Virtual Floppy Drive\dokany-master\x64\Debug</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">D:\Virtual Floppy Drive\dokany-master\x64\Debug\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\Virtual Floppy Drive\dokany-master\x64\Debug</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">D:\Virtual Floppy Drive\dokany-master\x64\Debug\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">adflib</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">adflib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.lib</TargetExt>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">.dll</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\Release\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\Release\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">adf.dir\Release\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">adf.dir\Release\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">adflib</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">adflib</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.lib</TargetExt>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">.dll</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\MinSizeRel\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">adf.dir\MinSizeRel\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">adf</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">.lib</TargetExt>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\RelWithDebInfo\</OutDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">adf.dir\RelWithDebInfo\</IntDir>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">adf</TargetName>
+    <TargetExt Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">.lib</TargetExt>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;BUILD_DLL;_EXPORTING;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;BUILD_DLL;_EXPORTING;CMAKE_INTDIR=\"Debug\";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <Optimization>Disabled</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions> _CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;BUILD_DLL;_EXPORTING;CMAKE_INTDIR="Debug";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <LanguageStandard>Default</LanguageStandard>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;BUILD_DLL;_EXPORTING;CMAKE_INTDIR=\"Debug\";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) -O3</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;BUILD_DLL;_EXPORTING;CMAKE_INTDIR="Release";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;BUILD_DLL;_EXPORTING;CMAKE_INTDIR=\"Release\";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>%(AdditionalOptions) -O3</AdditionalOptions>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <PreprocessorDefinitions> _CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;NDEBUG;BUILD_DLL;_EXPORTING;CMAKE_INTDIR="Release";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;BUILD_DLL;_EXPORTING;CMAKE_INTDIR=\"Release\";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <Optimization>MinSpace</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;BUILD_DLL;_EXPORTING;CMAKE_INTDIR="MinSizeRel";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <DebugInformationFormat>
+      </DebugInformationFormat>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;BUILD_DLL;_EXPORTING;CMAKE_INTDIR=\"MinSizeRel\";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ExceptionHandling>
+      </ExceptionHandling>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <Optimization>MaxSpeed</Optimization>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <UseFullPaths>false</UseFullPaths>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;BUILD_DLL;_EXPORTING;CMAKE_INTDIR="RelWithDebInfo";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;BUILD_DLL;_EXPORTING;CMAKE_INTDIR=\"RelWithDebInfo\";%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+    <Midl>
+      <AdditionalIncludeDirectories>D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic;D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+    <Lib>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\CMakeLists.txt">
+      <StdOutEncoding>UTF-8</StdOutEncoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/src/CMakeLists.txt</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">Building Custom Rule D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/src/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib" "-BD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32" --check-stamp-file "D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32/src/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib" "-BD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32" --check-stamp-file "D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32/src/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\CMakeFiles\generate.stamp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='DebugDLL|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/src/CMakeLists.txt</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">Building Custom Rule D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/src/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib" "-BD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32" --check-stamp-file "D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32/src/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib" "-BD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32" --check-stamp-file "D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32/src/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\CMakeFiles\generate.stamp</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='ReleaseDLL|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/src/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib" "-BD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32" --check-stamp-file "D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32/src/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/src/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+"C:\Program Files\CMake\bin\cmake.exe" "-SD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib" "-BD:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32" --check-stamp-file "D:/Virtual Floppy Drive/dokany-master/FloppyDrive/ADFlib/win32/src/CMakeFiles/generate.stamp"
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adflib.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_bitm.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_bitm.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_blk.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_cache.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_cache.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev.c" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_dump.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_dump.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_flop.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_flop.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_hd.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_hd.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dir.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dir.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_env.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_env.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_err.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file_block.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file_block.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file_util.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_link.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_link.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_raw.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_raw.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_salv.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_salv.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_str.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_str.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_types.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_util.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_util.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_version.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_vol.c" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_vol.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\defendian.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\hd_blk.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\prefix.h" />
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_nativ.h" />
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic\adf_nativ.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\ZERO_CHECK.vcxproj">
+      <Project>{3815DE0D-98F9-303D-9766-303F416FA556}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

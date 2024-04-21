@@ -1,0 +1,147 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_bitm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_cache.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_dump.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_flop.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_hd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dir.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_env.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file_block.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_link.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_raw.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_salv.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_str.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_util.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_vol.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic\adf_nativ.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adflib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_bitm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_blk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_cache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_dump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_flop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_hd.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_env.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_err.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file_block.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_file_util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_link.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_raw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_salv.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_str.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_vol.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\defendian.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\hd_blk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\prefix.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_nativ.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{DE9B5657-AC97-35A5-B38F-7ABFC8A0F9A9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{1F23464E-435D-3575-A761-FA8C5E26B8DC}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

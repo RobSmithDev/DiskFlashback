@@ -28,6 +28,19 @@ DiskFlashback is powered by:
 - [FloppyBridge](https://amiga.robsmithdev.co.uk/winuae) for Real Floppy Disk Support
 DiskFlashback is OpenSource and available under the GPL2 Licence, and available from GitHub.
 
+## Notes for Developers
+You can trigger DiskFlashback to release control of the physical floppy drive (Drawbridge, Greaseweazle and SupercardPRO), and have it restore access too using a simple Windows command.  DiskFlashback will aos automatically restore access after the application making the request terminates.
+
+```  
+void releaseVirtualDrives(bool release, int controllerType) {
+	HWND remoteWindow = FindWindow(L"VIRTUALDRIVE_CONTROLLER_CLASS", L"DiskFlashback Tray Control");
+	if (remoteWindow) SendMessage(remoteWindow, WM_USER + 2, (controllerType & 0x7FFF) | (release ? 0 : 0x8000), (LPARAM)GetCurrentProcessId());
+}
+```
+*controllerType* should be: 0 (DrawBridge), 1 (Greaseweazle) or 2 (SupercardPRO)
+
+
+
 ## Summary
 DiskFlashback is OpenSource and available under the [GPL2 Licence](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) and can be [downloaded from this site](https://robsmithdev.co.uk/diskflashback)
 

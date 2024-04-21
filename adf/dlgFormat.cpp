@@ -53,7 +53,13 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	SendMessage(ctrl, CB_ADDSTRING, 3, (LPARAM)L"Atari (Single Sided)");
 	SendMessage(ctrl, CB_ADDSTRING, 4, (LPARAM)L"Atari (Double Sided)");
 	SendMessage(ctrl, CB_ADDSTRING, 5, (LPARAM)L"Atari (Extended)");
-	SendMessage(ctrl, CB_SETCURSEL, (m_io->getSystemType() == SectorType::stAmiga) ? 0 : 2, 0);
+	switch (m_io->getSystemType()) {
+	case SectorType::stAmiga: SendMessage(ctrl, CB_SETCURSEL, 0, 0); break;
+	case SectorType::stIBM: SendMessage(ctrl, CB_SETCURSEL, 2, 0); break;
+	case SectorType::stAtari: SendMessage(ctrl, CB_SETCURSEL, 4, 0); break;
+	default: SendMessage(ctrl, CB_SETCURSEL, 0, 0); break;
+	}
+	
 
 	ctrl = GetDlgItem(hwnd, IDC_LABEL);
 	SendMessage(ctrl, EM_SETLIMITTEXT, 34, 0);

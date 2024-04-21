@@ -114,17 +114,17 @@ Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.hd\shell\mount\comm
 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell"; ValueType: string; ValueName: ""; ValueData: "mount"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
-Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},1"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},0"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell"; ValueType: string; ValueName: ""; ValueData: "mount"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
-Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},1"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},3"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell"; ValueType: string; ValueName: ""; ValueData: "mount"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
-Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},1"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},4"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 
@@ -156,6 +156,15 @@ Begin
      End;
 End;
 
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  case CurUninstallStep of
+    usUninstall:
+      begin
+        CloseApplication();
+      end;
+  end;
+end;
 
 procedure InitializeWizard();
 Var A,Counter:Integer;

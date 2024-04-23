@@ -25,11 +25,10 @@ private:
 
 	// Add data to the context menu for disk images
 	void setupContextForFileType(bool add, const std::wstring& path, uint32_t icon, WCHAR driveLetter);
-	void setupFiletypeContextMenu(bool add, WCHAR driveLetter);
 public:
 	ShellRegistery(const std::wstring& mainEXE) : m_mainEXE(mainEXE) {};
 
 	void mountDismount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource);
-
+	void setupFiletypeContextMenu(bool add, WCHAR driveLetter);
 	void setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t iconIndex, bool isPhysicalDisk);
 };

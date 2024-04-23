@@ -12,6 +12,7 @@
 #include "drivecontrol.h"
 #include "floppybridge_lib.h"
 #include "psapi.h"
+#include "shellMenus.h"
 
 #define MENUID_CREATEDISK       1
 #define MENUID_MOUNTDISK        2
@@ -28,6 +29,10 @@
 
 #define TIMERID_UPDATE_CHECK      1000
 #define TIMERID_TRIGGER_REALDRIVE 1001
+
+#ifndef DBT_DEVICEARRIVAL
+#define DBT_DEVICEARRIVAL 0x8000
+#endif
 
 #pragma comment(lib,"Version.lib")
 #pragma comment(lib,"Ws2_32.lib")
@@ -446,7 +451,7 @@ void CTrayMenu::doContextMenu(POINT pt) {
             flags |= TPM_BOTTOMALIGN; else flags |= TPM_TOPALIGN;
     }
     else flags |= TPM_BOTTOMALIGN | TPM_RIGHTALIGN;
-    populateDrives();
+    cleanupDriveIcons();
     SetForegroundWindow(m_window.hwnd());
     uint32_t index = TrackPopupMenu(m_hMenu, flags, pt.x, pt.y, 0, m_window.hwnd(), NULL);
     PostMessage(m_window.hwnd(), WM_NULL, 0, 0);
@@ -591,9 +596,40 @@ void CTrayMenu::monitorPhysicalDrive() {
     }
 }
 
+// Is this drive letter one of ours?
+bool CTrayMenu::isOurDrive(WCHAR letter) {
+    for (auto& drive : m_drives) 
+        if ((drive.first.length()) && (drive.first[0] == letter)) return true;
+    return false;
+}
+
+// Tidy up drive icons and associations incase the host was accidently shut down without being tidied up
+void CTrayMenu::cleanupDriveIcons() {
+    populateDrives();
+
+    ShellRegistery reg(m_exeName);
+    
+    DWORD drv = GetLogicalDrives();
+    for (uint32_t drive = 0; drive <= 25; drive++) {
+        // Is this one of our drive letters?
+        if (!isOurDrive(L'A' + drive)) {
+            // remove letter stuff
+            reg.mountDismount(false, L'A' + drive, NULL);
+            reg.setupDriveIcon(false, L'A' + drive, 0, false);
+        }
+    }
+    bool hasPhysical = false;
+    for (auto& drive : m_drives)
+        hasPhysical |= drive.second.isPhysicalDrive;
+
+    if (!hasPhysical) reg.setupFiletypeContextMenu(false, L'?');
+}
+
+
 CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInstance(hInstance), m_window(hInstance, APP_TITLE), m_exeName(exeName) {
     memset(&m_notify, 0, sizeof(m_notify));
     loadConfiguration(m_config);
+    cleanupDriveIcons();
 
     memset(&m_floppyPi, 0, sizeof(m_floppyPi));
 
@@ -688,6 +724,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInst
         case TIMERID_UPDATE_CHECK:
             KillTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK);
             if (m_config.checkForUpdates) checkForUpdates(false);
+            cleanupDriveIcons();
             SetTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK, 60000 * 60, NULL);
             break;
 
@@ -722,6 +759,7 @@ CTrayMenu::~CTrayMenu() {
     DestroyMenu(m_hCreateListHD);
     DestroyMenu(m_hUpdates);
     if (m_floppyPi.hProcess) CloseHandle(m_floppyPi.hProcess);
+    cleanupDriveIcons();
 }
 
 // Main loop

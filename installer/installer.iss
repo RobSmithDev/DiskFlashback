@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "DiskFlashback"
-#define MyAppVersion "1.0"
+#define MyAppVersion "1.0.0.1"
 #define MyAppPublisher "RobSmithDev"
 #define MyAppURL "https://robsmithdev.co.uk/diskflashback"
 #define MyAppExeName "DiskFlashback.exe"
@@ -14,7 +14,8 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{ABCA6F16-2CF6-4CD9-AB97-672E757E598A}
 AppName={#MyAppName}
-AppVersion={#MyAppVersion}VersionInfoVersion={#MyAppVersion}
+AppVersion={#MyAppVersion}
+VersionInfoVersion={#MyAppVersion}
 AppCopyright=© 2024 {#MyAppPublisher}
 ;AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}

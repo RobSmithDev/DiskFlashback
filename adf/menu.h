@@ -85,6 +85,11 @@ private:
     // Eject/close physical drives running
     bool closePhysicalDrive(bool dontNotify = false, uint16_t driveType = 0xFFFF);
 
+    // Is this drive letter one of ours?
+    bool isOurDrive(WCHAR letter);
+
+    // Tidy up drive icons and associations incase the host was accidently shut down without being tidied up
+    void cleanupDriveIcons();
 
 public:
     CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName);

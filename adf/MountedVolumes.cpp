@@ -24,6 +24,21 @@ typedef struct {
     HWND windowFound;
 } WindowSearch;
 
+// Searches for an empty drive letter with the ideal one being supplied
+WCHAR findEmptyLetter(const WCHAR letter) {
+    DWORD drv = GetLogicalDrives();
+    uint32_t index = (letter == L'?' ? 6 : ((uint32_t)(letter - L'A')) % 26);
+    for (uint32_t i = 0; i < 26; i++) {
+        // Is this drive in use?
+        if ((drv & (1 << index)) == 0) {
+            // No? Perfect
+            return index + L'A';
+        }
+        index = (index + 1) % 26;
+    }
+    return letter;
+}
+
 // Search windows for one that uses the drive letter specified
 BOOL CALLBACK windowSearchCallback(_In_ HWND hwnd, _In_ LPARAM lParam) {
     WCHAR tmpText[100];
@@ -244,7 +259,7 @@ VolumeManager::~VolumeManager()  {
 uint32_t VolumeManager::mountIBMVolumes(uint32_t startPoint) {
     if (!m_fatDevice) return startPoint;
     
-    WCHAR letter = m_firstDriveLetter + startPoint;
+    WCHAR letter = findEmptyLetter( m_firstDriveLetter + startPoint);
 
     if (startPoint >= m_volumes.size()) {
         // new volume required
@@ -260,7 +275,7 @@ uint32_t VolumeManager::mountIBMVolumes(uint32_t startPoint) {
 uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
     if (!m_adfDevice) return startPoint;
 
-    WCHAR letter = m_firstDriveLetter + startPoint;
+    WCHAR letter = findEmptyLetter(m_firstDriveLetter + startPoint);
     
     // Attempt to mount all drives
     for (int volumeNumber = 0; volumeNumber < m_adfDevice->nVol; volumeNumber++) {
@@ -270,10 +285,10 @@ uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
             m_volumes.back()->start();
         }
         if (m_volumes[ startPoint]->mountFileSystem(m_adfDevice, volumeNumber, m_triggerExplorer)) startPoint++;
-        if (letter != L'?') {
-            letter++;
-            if (letter > 'Z') letter = 'A';
-        }
+
+        letter++;
+        if (letter > 'Z') letter = 'A';
+        letter = findEmptyLetter(letter);
     }
     return startPoint;
 }
@@ -667,7 +682,7 @@ bool VolumeManager::run(bool triggerExplorer) {
     });
 
     // Not quite Highlander, as there There must always be one (at least one!)
-    m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, m_firstDriveLetter, m_forceReadOnly));
+    m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, findEmptyLetter(m_firstDriveLetter), m_forceReadOnly));
     startVolumes();
 
     // Start a timer to monitor things

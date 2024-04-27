@@ -13,6 +13,10 @@
 */
 #pragma once
 
+#ifndef BRIDGEDRIVERHANDLE
+typedef void* BridgeDriverHandle;
+#endif
+
 namespace FloppyBridge {
 
 	// Type of bridge mode

@@ -626,10 +626,10 @@ void CTrayMenu::cleanupDriveIcons() {
 }
 
 
-CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName) : m_hInstance(hInstance), m_window(hInstance, APP_TITLE), m_exeName(exeName) {
+CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSilentStart) : m_hInstance(hInstance), m_window(hInstance, APP_TITLE), m_exeName(exeName) {
     memset(&m_notify, 0, sizeof(m_notify));
     loadConfiguration(m_config);
-    cleanupDriveIcons();
+    if (!isSilentStart) cleanupDriveIcons();
 
     memset(&m_floppyPi, 0, sizeof(m_floppyPi));
 

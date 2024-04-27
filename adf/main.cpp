@@ -29,7 +29,7 @@ void startTrayIcon(const std::wstring& exe) {
 #ifndef _DEBUG
     if (FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE)) return;
 
-    std::wstring cmd = L"\"" + exe + L"\"";
+    std::wstring cmd = L"\"" + exe + L"\" SILENT";
     PROCESS_INFORMATION pi;
     STARTUPINFO si;
     ZeroMemory(&si, sizeof(si));
@@ -48,37 +48,46 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     LPWSTR* argv = nullptr;
     if (wcslen(pCmdLine)) argv = CommandLineToArgvW(pCmdLine, &argc);
+
+    bool isSilentStart = false;
+
+    if (argc >= 1) {
+        std::wstring txt = argv[0];
+        isSilentStart = txt == L"SILENT";
+    }
      
     // See if its just a disk image on the command line
     if (argc == 1) {
         std::wstring txt = argv[0];
-        size_t pos = txt.rfind(L".");
-        if (pos != std::wstring::npos) {
-            std::wstring ext = txt.substr(pos+1);
-            for (WCHAR& c : ext) c = towupper(c);
-            // Disk image file
-            if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"MSA") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP")) {
-                VolumeManager* vol = new VolumeManager(hInstance, exeName, '?', false);
-                if (!vol->mountFile(txt)) {
+        if (!isSilentStart) {
+            size_t pos = txt.rfind(L".");
+            if (pos != std::wstring::npos) {
+                std::wstring ext = txt.substr(pos + 1);
+                for (WCHAR& c : ext) c = towupper(c);
+                // Disk image file
+                if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"MSA") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP")) {
+                    VolumeManager* vol = new VolumeManager(hInstance, exeName, '?', false);
+                    if (!vol->mountFile(txt)) {
+                        delete vol;
+                        return RETURNCODE_MOUNTFAIL;
+                    }
+                    startTrayIcon(exeName);
+                    try {
+                        vol->run(true);
+                    }
+                    catch (const std::exception& ex) {
+                        UNREFERENCED_PARAMETER(ex);
+                    }
                     delete vol;
-                    return RETURNCODE_MOUNTFAIL;
+                    return 0;
                 }
-                startTrayIcon(exeName);
-                try {
-                    vol->run(true);
-                }
-                catch (const std::exception& ex) {
-                    UNREFERENCED_PARAMETER(ex);
-                }
-                delete vol;
-                return 0;
             }
         }
     }
 
     if (argc < 3) {
         if (FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE)) return 0;
-        CTrayMenu menu(hInstance, exeName);
+        CTrayMenu menu(hInstance, exeName, isSilentStart);
         menu.run();
         return 0;
     }

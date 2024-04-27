@@ -92,7 +92,7 @@ private:
     void cleanupDriveIcons();
 
 public:
-    CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName);
+    CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSilentStart);
     ~CTrayMenu();
 
     // Main loop

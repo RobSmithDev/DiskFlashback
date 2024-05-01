@@ -52,6 +52,8 @@ bool SCPFile::readSCPFile() {
 	m_lastTrack = header.endTrack;
 	m_numRevolutions = header.numRevolutions;
 	if (m_lastTrack >= 168) return false;
+	// only support 16-bit data
+	if (!((header.bitcellEncoding == 0) || (header.bitcellEncoding == 16))) return false;
 
 	// Read the offsets table	
 	std::vector<uint32_t> trackOffsets;
@@ -90,6 +92,9 @@ bool SCPFile::decodeTrack(uint32_t track) {
 	// Temporarly mark the track as bad
 	trk->second.m_trackIsBad = true;
 
+	// This means no data
+	if (trk->second.m_fileOffset == 0) return false;
+
 	// Goto the track data
 	if (SetFilePointer(m_file, trk->second.m_fileOffset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;
 
@@ -114,11 +119,11 @@ bool SCPFile::decodeTrack(uint32_t track) {
 
 	m_pll.reset();
 
-	// Quick scan for density 
+	// Quick scan for density - can't rely on the header information being correct as it quite often isnt!
 	if (!m_density) {
 		// This is for guessing DD vs HD data
 		uint32_t ns2 = 0;
-		uint32_t ns6 = 0;
+		uint32_t ns6 = 0;		
 
 		for (const SCPTrackRevolution& rev : revolutions) {
 			if (SetFilePointer(m_file, rev.dataOffset + trk->second.m_fileOffset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;

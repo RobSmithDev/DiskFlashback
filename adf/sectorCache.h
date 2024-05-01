@@ -106,4 +106,7 @@ public:
 
     // Is this working and available
     virtual bool available() = 0;
+
+    // Raid shutdown to release resource
+    virtual void quickClose() = 0;
 };

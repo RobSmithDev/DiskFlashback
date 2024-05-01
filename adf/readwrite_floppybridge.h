@@ -51,5 +51,5 @@ public:
     virtual std::wstring getDriverName() override;
 
     // Rapid shutdown
-    void quickClose();
+    virtual void quickClose() override;
 };

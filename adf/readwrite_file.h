@@ -69,4 +69,7 @@ public:
     // Fetch the serial number of the disk
     virtual uint32_t serialNumber() override { return m_serialNumber; };
 
+    // Rapid shutdown
+    virtual void quickClose() override;
+
 };

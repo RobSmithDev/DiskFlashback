@@ -196,9 +196,19 @@ SCPFile::SCPFile(HANDLE file, std::function<void(bool diskInserted, SectorType d
 	if (m_tracks.size()) setReady();
 }
 
+
 SCPFile::~SCPFile() {
-	CloseHandle(m_file);
+	quickClose();
 }
+
+// Rapid shutdown
+void SCPFile::quickClose() {
+	if (m_file != INVALID_HANDLE_VALUE) {
+		CloseHandle(m_file);
+		m_file = INVALID_HANDLE_VALUE;
+	}
+}
+
 
 // Return TRUE if it loaded OK
 bool SCPFile::isDiskInDrive() {

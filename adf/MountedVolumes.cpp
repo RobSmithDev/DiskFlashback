@@ -611,10 +611,9 @@ LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM c
             if (m_io->isPhysicalDisk()) title += L"." + std::to_wstring(m_io->id());
             title += L"_";
             for (auto& f : m_volumes) f->unmountFileSystem();
-            if (m_io->isPhysicalDisk()) {
-                SectorRW_FloppyBridge* drive = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
-                if (drive) drive->quickClose();
-            }
+
+            m_io->flushWriteCache();
+            m_io->quickClose();
             for (auto& f : m_volumes) f->stop();
             TerminateProcess(GetCurrentProcess(), 0);  // dirty but fast
         }

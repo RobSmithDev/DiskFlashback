@@ -56,4 +56,8 @@ public:
     // Fetch the size of the disk file
     virtual uint32_t getDiskDataSize() override { return m_diskSize; };
     virtual bool available() override;
+
+    // Raid shutdown to release resource
+    virtual void quickClose() override {};
+
 };

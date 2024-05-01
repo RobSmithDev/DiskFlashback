@@ -162,8 +162,17 @@ bool SectorRW_File::decodeMSATrack(DecodedTrack& track) {
 }
 
 SectorRW_File::~SectorRW_File() {
-    CloseHandle(m_file);
+    quickClose();
 }
+
+// Rapid shutdown
+void SectorRW_File::quickClose() {
+    if (m_file != INVALID_HANDLE_VALUE) {
+        CloseHandle(m_file);
+        m_file = INVALID_HANDLE_VALUE;
+    }
+}
+
 
 // Fetch the size of the disk file
 uint32_t SectorRW_File::getDiskDataSize() {

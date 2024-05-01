@@ -73,4 +73,7 @@ public:
 
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() override { return L"SCP File"; };
+
+    // Rapid shutdown
+    virtual void quickClose() override;
 };

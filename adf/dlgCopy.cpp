@@ -1,3 +1,19 @@
+/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+ * https://robsmithdev.co.uk/diskflashback
+ *
+ * This file is multi-licensed under the terms of the Mozilla Public
+ * License Version 2.0 as published by Mozilla Corporation and the
+ * GNU General Public License, version 2 or later, as published by the
+ * Free Software Foundation.
+ *
+ * MPL2: https://www.mozilla.org/en-US/MPL/2.0/
+ * GPL2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+ *
+ * This file is maintained at https://github.com/RobSmithDev/DiskFlashback
+ */
+
+
+
 #include "dlgCopy.h"
 #include <Windows.h>
 #include "sectorCache.h"
@@ -25,7 +41,7 @@ INT_PTR CALLBACK copyCallback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	if (dlg) return dlg->handleDialogProc(hwnd, msg, wParam, lParam); else return FALSE;
 }
 
-INT_PTR DialogCOPY::doModal() {
+INT_PTR DialogCOPY::doModal(bool fileSystemRecognised) {
 	if (m_backup) {
 		// Request filename
 		OPENFILENAME dlg;
@@ -33,7 +49,7 @@ INT_PTR DialogCOPY::doModal() {
 		memset(&dlg, 0, sizeof(dlg));
 		dlg.lStructSize = sizeof(dlg);
 		dlg.hwndOwner = m_hParent;
-		std::wstring filter;
+		std::wstring filter; 
 		std::wstring defaultFormat;
 		switch (m_io->getSystemType()) {
 		case SectorType::stAmiga:
@@ -62,6 +78,10 @@ INT_PTR DialogCOPY::doModal() {
 		dlg.lpstrTitle = title.c_str();
 		dlg.nMaxFile = MAX_PATH;
 		if (!GetSaveFileName(&dlg))  return 0;
+
+		if (!fileSystemRecognised) 
+			if (MessageBox(m_hParent, L"WARNING: The filesystem of the current disk was not recognised. This may not backup correctly.\r\n\r\nDo you want to continue?", title.c_str(), MB_YESNO | MB_ICONQUESTION) != IDYES) return 0;
+
 		m_filename = filename;
 	}
 	else {

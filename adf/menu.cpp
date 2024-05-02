@@ -1,3 +1,17 @@
+/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+ * https://robsmithdev.co.uk/diskflashback
+ *
+ * This file is multi-licensed under the terms of the Mozilla Public
+ * License Version 2.0 as published by Mozilla Corporation and the
+ * GNU General Public License, version 2 or later, as published by the
+ * Free Software Foundation.
+ *
+ * MPL2: https://www.mozilla.org/en-US/MPL/2.0/
+ * GPL2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+ *
+ * This file is maintained at https://github.com/RobSmithDev/DiskFlashback
+ */
+
 #include <dokan/dokan.h>
 #include <shellapi.h>
 #include "SignalWnd.h"
@@ -26,6 +40,8 @@
 #define MENUID_IMAGE_DD         30
 #define MENUID_IMAGE_HD         40
 #define MENUID_EJECTSTART       100
+#define MENUID_COPYTODISK       200
+#define MENUID_COPYTOIMAGE      201
 
 #define TIMERID_UPDATE_CHECK      1000
 #define TIMERID_TRIGGER_REALDRIVE 1001
@@ -36,6 +52,8 @@
 
 #pragma comment(lib,"Version.lib")
 #pragma comment(lib,"Ws2_32.lib")
+
+static const WCHAR* IconHint = L"DiskFlashback - Right Click for Menu";
 
 // Search windows for one that uses the drive letter specified
 BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
@@ -66,6 +84,7 @@ BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
                 GetVolumeInformation(path, buffer2, 100, NULL, NULL, NULL, buffer3, 100);
                 info.volumeName = buffer2;
                 info.volumeType = buffer3;
+                info.valid = (info.volumeType != L"Unknown") && (info.volumeType != L"No Disk");
                 swprintf_s(path, L"%c:", pos[0]);
                 mapping->insert(std::make_pair(path, info));
                 pos++;
@@ -83,10 +102,10 @@ void CTrayMenu::setupIcon() {
     m_notify.cbSize = sizeof(m_notify);
     m_notify.hWnd = m_window.hwnd();
     m_notify.uID = 0;
-    m_notify.uFlags = NIF_ICON | NIF_TIP | NIF_STATE | NIF_MESSAGE;
+    m_notify.uFlags = NIF_ICON | NIF_TIP | NIF_STATE | NIF_MESSAGE | NIF_SHOWTIP;
     m_notify.uCallbackMessage = WM_USER;
     m_notify.hIcon = LoadIcon(m_hInstance, MAKEINTRESOURCE(IDI_ICON1));
-    wcscpy_s(m_notify.szTip, L"DiskFlashback Control");
+    wcscpy_s(m_notify.szTip, IconHint);
     m_notify.dwState = 0;
     m_notify.uVersion = NOTIFYICON_VERSION_4;
     Shell_NotifyIcon(NIM_ADD, &m_notify);
@@ -101,6 +120,7 @@ void CTrayMenu::setupMenu() {
     m_hUpdates = CreatePopupMenu();
     m_hCreateListDD = CreatePopupMenu();
     m_hCreateListHD = CreatePopupMenu();
+    m_hCopy = CreatePopupMenu();
 
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD    , L"Amiga ADF...");
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD + 1, L"IBM PC...");    
@@ -115,12 +135,15 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListDD, L"Double Density");
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListHD, L"High Density");
 
+    AppendMenu(m_hCopy, MF_STRING, MENUID_COPYTODISK, L"File to Real Disk...");
+    AppendMenu(m_hCopy, MF_STRING, MENUID_COPYTOIMAGE, L"Real Disk to File...");
     
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCreateList,    L"Create Disk Image");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_MOUNTDISK,           L"Mount Disk Image...");
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCopy,          L"Copy");
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hDriveMenu,     L"Eject");
     AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
-    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hUpdates,      L"Settings");
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hUpdates,       L"Settings");
     AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
 
     AppendMenu(m_hUpdates, MF_STRING, MENUID_RENAMEEXT, L"Automatically Swap File Extensions (Amiga)");
@@ -128,6 +151,7 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hUpdates, MF_STRING, MENUID_ENABLED, L"Mount Physical Drive");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_CONFIGURE, L"Configure Physical Drive...");
+
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates Now");
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
@@ -202,12 +226,61 @@ void CTrayMenu::populateDrives() {
     while (DeleteMenu(m_hDriveMenu, 0, MF_BYPOSITION)) {};
     EnumWindows(windowSearchCallback2, (LPARAM)&m_drives);
     DWORD pos = MENUID_EJECTSTART;
+    bool physicalDrive = false;
+    bool isMounted = false;
     for (const auto& d : m_drives) {
         std::wstring full = d.first + L" " + d.second.volumeName + L" (" + d.second.volumeType + L")";
         AppendMenu(m_hDriveMenu, MF_STRING, pos++, full.c_str());
+        if (d.second.isPhysicalDrive) {
+            physicalDrive = true;
+            isMounted = d.second.valid;
+        }
     }
     if (m_drives.size() < 1) {
         AppendMenu(m_hDriveMenu, MF_STRING | MF_DISABLED,0, L"no drives mounted");
+    }
+
+    EnableMenuItem(m_hCopy, MENUID_COPYTODISK, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
+    EnableMenuItem(m_hCopy, MENUID_COPYTOIMAGE, MF_BYCOMMAND | ((physicalDrive && isMounted ) ? MF_ENABLED : MF_DISABLED));
+}
+
+// Trigger copy image to disk
+void CTrayMenu::handleCopyToDisk() {
+    // Request filename
+    OPENFILENAME dlg;
+    WCHAR filename[MAX_PATH] = { 0 };
+    memset(&dlg, 0, sizeof(dlg));
+    dlg.lStructSize = sizeof(dlg);
+    dlg.hwndOwner = m_window.hwnd();
+    std::wstring filter;
+    std::wstring defaultFormat;
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st;\0All Files(*.*)\0*.*\0\0";
+    dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
+    dlg.lpstrTitle = L"Select disk image to copy to floppy";
+    dlg.lpstrFile = filename;
+    dlg.nMaxFile = MAX_PATH;
+    if (GetOpenFileName(&dlg)) {
+        for (const auto& d : m_drives) {
+            if (d.second.isPhysicalDrive) {
+                COPYDATASTRUCT str;
+                std::wstring command = d.first.substr(0, 1) + filename;
+                str.lpData = (PVOID) command.c_str();
+                str.cbData = command.length() * 2;
+                str.dwData = REMOTECTRL_COPYTODISK;
+                LRESULT res = SendMessage(d.second.hWnd, WM_COPYDATA, (WPARAM)m_window.hwnd(), (LPARAM)&str);
+                return;
+            }
+        }
+    }
+}
+
+// Trigger copy disk to image
+void CTrayMenu::handleCopyToImage() {
+    for (const auto& d : m_drives) {
+        if (d.second.isPhysicalDrive) {
+            PostMessage(d.second.hWnd, WM_COPYTOFILE, 0, 0);
+            return;
+        }
     }
 }
 
@@ -366,7 +439,7 @@ void CTrayMenu::installIBMPCFS(bool isHD, bool isIBMPC, SectorCacheEngine* fle) 
 
 // Handle the menu click result
 void CTrayMenu::handleMenuResult(uint32_t index) {
-    if (index >= MENUID_EJECTSTART) {
+    if ((index >= MENUID_EJECTSTART) && (index <= MENUID_EJECTSTART+26)) {
         index -= MENUID_EJECTSTART;
         if (index < m_drives.size()) {
             auto it = m_drives.begin();
@@ -381,6 +454,13 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     if ((index >= MENUID_IMAGE_HD) && (index < MENUID_IMAGE_HD + 3)) runCreateImage(true, index - MENUID_IMAGE_HD);
 
     switch (index) {
+    case MENUID_COPYTODISK:
+        handleCopyToDisk();
+        break;
+    case MENUID_COPYTOIMAGE:
+        handleCopyToImage();
+        break;
+
     case MENUID_DONATE:
         ShellExecute(m_window.hwnd(), L"open", L"https://ko-fi.com/robsmithdev", NULL, NULL, SW_SHOW);
         break;
@@ -417,7 +497,7 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     case MENUID_ENABLED: 
         m_config.enabled = !m_config.enabled;
         saveConfiguration(m_config);
-        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);       
         break;
     case MENUID_CREATEDISK: break;
     case MENUID_MOUNTDISK: mountDisk(); break;
@@ -522,7 +602,7 @@ void CTrayMenu::mountDisk() {
 bool CTrayMenu::closePhysicalDrive(bool dontNotify, uint16_t driveType) {
     bool ret = false;
     for (auto& drive : m_drives)
-        if (drive.second.isPhysicalDrive && (drive.second.driveType == driveType)) {
+        if (drive.second.isPhysicalDrive && ((drive.second.driveType == driveType) || (driveType == 0xFFFF))) {
             PostMessage(drive.second.hWnd, WM_USER, dontNotify? REMOTECTRL_EJECT_SILENT: REMOTECTRL_EJECT, (LPARAM)drive.first[0]);
             return true;
         }
@@ -758,6 +838,7 @@ CTrayMenu::~CTrayMenu() {
     DestroyMenu(m_hCreateListDD);
     DestroyMenu(m_hCreateListHD);
     DestroyMenu(m_hUpdates);
+    DestroyMenu(m_hCopy);
     if (m_floppyPi.hProcess) CloseHandle(m_floppyPi.hProcess);
     cleanupDriveIcons();
 }

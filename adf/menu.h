@@ -1,16 +1,23 @@
+/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+ * https://robsmithdev.co.uk/diskflashback
+ *
+ * This file is multi-licensed under the terms of the Mozilla Public
+ * License Version 2.0 as published by Mozilla Corporation and the
+ * GNU General Public License, version 2 or later, as published by the
+ * Free Software Foundation.
+ *
+ * MPL2: https://www.mozilla.org/en-US/MPL/2.0/
+ * GPL2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+ *
+ * This file is maintained at https://github.com/RobSmithDev/DiskFlashback
+ */
+
 #pragma once
 
 #include <string>
 #include <vector>
 #include "dlgConfig.h"
 
-#define APP_TITLE L"DiskFlashback Tray Control"
-#define WM_PHYSICAL_EJECT     (WM_USER+1)
-
-// Sent by other programs to "dismount" any real drives while they operate
-// WPARAM = 0 to switch drive OFF, and 1 to switch back ON again
-// LPARAM is the process ID making the request.  The application will monitor and auto restore if the process exits
-#define WM_REMOTEUSAGE        (WM_USER+2)
 
 #define WM_DOQUIT             (WM_USER+10)
 
@@ -20,6 +27,7 @@ struct DriveInfo {
     std::wstring volumeType;
     uint16_t driveType;
     bool isPhysicalDrive;
+    bool valid;
 };
 
 class SectorCacheEngine;
@@ -36,6 +44,7 @@ private:
     HMENU m_hCreateListDD = 0;
     HMENU m_hCreateListHD = 0;
     HMENU m_hUpdates = 0;
+    HMENU m_hCopy = 0;
     PROCESS_INFORMATION m_floppyPi;
     bool m_lastBalloonIsUpdate = false;
     bool m_didNotifyFail = false;
@@ -90,6 +99,12 @@ private:
 
     // Tidy up drive icons and associations incase the host was accidently shut down without being tidied up
     void cleanupDriveIcons();
+
+    // Trigger copy disk to image
+    void handleCopyToImage();
+
+    // Trigger copy image to disk
+    void handleCopyToDisk();
 
 public:
     CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSilentStart);

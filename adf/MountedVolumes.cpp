@@ -1,3 +1,17 @@
+/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+ * https://robsmithdev.co.uk/diskflashback
+ *
+ * This file is multi-licensed under the terms of the Mozilla Public
+ * License Version 2.0 as published by Mozilla Corporation and the
+ * GNU General Public License, version 2 or later, as published by the
+ * Free Software Foundation.
+ *
+ * MPL2: https://www.mozilla.org/en-US/MPL/2.0/
+ * GPL2: https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
+ *
+ * This file is maintained at https://github.com/RobSmithDev/DiskFlashback
+ */
+
 
 #include "MountedVolumes.h"
 #include "MountedVolume.h"
@@ -17,6 +31,7 @@
 
 #define TIMERID_MONITOR_FILESYS 1000
 #define WM_DISKCHANGE (WM_USER + 1)
+#define WM_COPYTOFILE (WM_USER + 2)
 
 #pragma region CONTROL_INTERFACE
 typedef struct {
@@ -272,24 +287,37 @@ uint32_t VolumeManager::mountIBMVolumes(uint32_t startPoint) {
 }
 
 // Mount the new amiga volumes
-uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
-    if (!m_adfDevice) return startPoint;
-
+uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {   
     WCHAR letter = findEmptyLetter(m_firstDriveLetter + startPoint);
-    
-    // Attempt to mount all drives
-    for (int volumeNumber = 0; volumeNumber < m_adfDevice->nVol; volumeNumber++) {
+
+    bool mountAsNDOS = m_adfDevice == nullptr;
+    if (m_adfDevice && m_adfDevice->nVol == 0) mountAsNDOS = true;
+
+    if (mountAsNDOS && (m_currentSectorFormat == SectorType::stAmiga)) {
         if (startPoint >= m_volumes.size()) {
             // new volume required
             m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
             m_volumes.back()->start();
         }
-        if (m_volumes[ startPoint]->mountFileSystem(m_adfDevice, volumeNumber, m_triggerExplorer)) startPoint++;
-
-        letter++;
-        if (letter > 'Z') letter = 'A';
-        letter = findEmptyLetter(letter);
+        if (m_volumes[startPoint]->mountFileSystem(m_adfDevice, 0xFFFFFFFF, m_triggerExplorer)) startPoint++;
     }
+    else {
+        if (!m_adfDevice) return startPoint;
+        // Attempt to mount all drives
+        for (int volumeNumber = 0; volumeNumber < m_adfDevice->nVol; volumeNumber++) {
+            if (startPoint >= m_volumes.size()) {
+                // new volume required
+                m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
+                m_volumes.back()->start();
+            }
+            if (m_volumes[startPoint]->mountFileSystem(m_adfDevice, volumeNumber, m_triggerExplorer)) startPoint++;
+
+            letter++;
+            if (letter > 'Z') letter = 'A';
+            letter = findEmptyLetter(letter);
+        }
+    }
+
     return startPoint;
 }
 
@@ -322,7 +350,7 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
     unmountPhysicalFileSystems();
 
     if (!diskInserted) {        
-
+        m_currentSectorFormat = SectorType::stUnknown;
         while (m_volumes.size() > 1) {            
             MountedVolume* v = m_volumes[m_volumes.size() - 1];
             m_volumes.erase(m_volumes.begin() + m_volumes.size() - 1);
@@ -335,12 +363,13 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
         }
     }
     else {
+        m_currentSectorFormat = diskFormat;
         uint32_t volumesNeeded = 1;
         // Create device based on what system was detected
         switch (diskFormat) {
             case SectorType::stAmiga:                
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
-                if (!m_adfDevice) diskFormat = SectorType::stUnknown;                     
+                //if (!m_adfDevice) diskFormat = SectorType::stUnknown; so we can show NDOS
                 break;
             case SectorType::stHybrid:
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
@@ -540,7 +569,7 @@ LRESULT VolumeManager::handleCopyToDiskRequest(const std::wstring message) {
 
     m_threads.emplace_back(std::thread([this, filename, potentialParent, volumeFound]() {        
         DialogCOPY dlg(m_hInstance, potentialParent, m_io, volumeFound, filename);
-        return dlg.doModal();
+        return dlg.doModal(true);
     }));
 
     return MESSAGE_RESPONSE_OK;
@@ -570,7 +599,7 @@ LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM c
     case REMOTECTRL_COPYTOADF:
         m_threads.emplace_back(std::thread([parentWindow, this, volume]() {
             DialogCOPY dlg(m_hInstance, parentWindow, m_io, volume);
-            return dlg.doModal();
+            return dlg.doModal(volume->isDriveRecognised());
             }));
         return MESSAGE_RESPONSE_OK;
 
@@ -678,6 +707,16 @@ bool VolumeManager::run(bool triggerExplorer) {
     m_window.setMessageHandler(WM_DISKCHANGE, [this](WPARAM wParam, LPARAM lParam) -> LRESULT {
         diskChanged((wParam == 1), (SectorType)lParam);
         return 0;
+    });
+
+    // Receive a notification of disk change
+    m_window.setMessageHandler(WM_COPYTOFILE, [this](WPARAM wParam, LPARAM lParam) -> LRESULT {
+        if (m_volumes.size() < 1) return 0;
+        HWND parentWindow = GetDesktopWindow();
+        MountedVolume* volume = m_volumes[0];
+        // Fake it 'till we make it
+        handleRemoteRequest(volume, REMOTECTRL_COPYTOADF, GetDesktopWindow());
+        return 0;       
     });
 
     // Not quite Highlander, as there There must always be one (at least one!)

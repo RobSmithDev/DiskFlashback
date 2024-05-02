@@ -1,0 +1,27 @@
+DiskFlashback Release Notes
+---------------------------
+https://robsmithdev.co.uk/diskflashback
+
+
+1.0.0.5
+	Improved handling for NDOS disks where system type is known but not file system
+	New menu option in the system menu with "Copy to Disk" and "Copy to Image" incase you couldnt find them for the file context menus
+	Added warning if you try to backup a real disk to an image file and the file system was not recognised
+	Added copyright and licence notices to the headers of files
+	Fixed the system tray icon tool tip
+
+1.0.0.4
+	Improced SCP file code
+	Faster Unmount of Disk Images
+
+1.0.0.3
+	Added auto-start of the system menu if for some reason it's not running
+
+1.0.0.2
+	Updated FloppyBridge fixing a few bugs
+
+1.0.0.1
+	Now cleans up drive icons on startup incase they're there from a bad quit
+
+1.0.0.0
+	Initial release

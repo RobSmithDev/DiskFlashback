@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "DiskFlashback"
-#define MyAppVersion "1.0.0.4"
+#define MyAppVersion "1.0.0.5"
 #define MyAppPublisher "RobSmithDev"
 #define MyAppURL "https://robsmithdev.co.uk/diskflashback"
 #define MyAppExeName "DiskFlashback.exe"

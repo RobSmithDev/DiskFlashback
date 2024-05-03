@@ -27,7 +27,7 @@
 class SectorRW_FloppyBridge : public SectorCacheMFM {
 private:
     FloppyBridgeAPI* m_bridge       = nullptr;
-
+    FloppyBridge::BridgeDensityMode m_densityMode = FloppyBridge::BridgeDensityMode::bdmAuto;
 protected:
     virtual bool restoreDrive() override;
     virtual void releaseDrive() override;

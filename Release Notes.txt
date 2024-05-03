@@ -2,6 +2,13 @@ DiskFlashback Release Notes
 ---------------------------
 https://robsmithdev.co.uk/diskflashback
 
+1.0.0.6
+	Further improved NDOS disk support for Amiga
+	Prevent attempted auto-mount of real drive if no COM ports are detected, and slowed this down too.
+	Detects if you disconnect your Drawbridge, Greaseweazle or Supercard PRO board and removes the drive.
+	Fixed DD/HD detection if the wrong format is written to the disk
+	Added option to force the density when writing a floppy disk (use with care, you can't actually override the density)
+	Changed mounting of physical drives to be off by default (d'oh)
 
 1.0.0.5
 	Improved handling for NDOS disks where system type is known but not file system
@@ -11,7 +18,7 @@ https://robsmithdev.co.uk/diskflashback
 	Fixed the system tray icon tool tip
 
 1.0.0.4
-	Improced SCP file code
+	Improved SCP file code
 	Faster Unmount of Disk Images
 
 1.0.0.3

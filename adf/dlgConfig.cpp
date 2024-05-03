@@ -44,7 +44,7 @@ uint32_t getStamp() {
 // Load config from the registry
 bool loadConfiguration(AppConfig& config) {
 	config.checkForUpdates = true;
-	config.enabled = true;
+	config.enabled = false;
 	config.floppyProfile = "";
 	config.driveLetter = 'A';
 	config.lastCheck = getStamp() - 5;
@@ -78,7 +78,7 @@ bool loadConfiguration(AppConfig& config) {
 
 	dataSize = sizeof(dTemp);
 	if (RegQueryValueExA(key, KEY_LAST_UPDATE_CHECK, NULL, NULL, (LPBYTE)&dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;
-	if (dataSize == sizeof(dTemp)) config.lastCheck = dTemp;
+	if (dataSize == sizeof(dTemp)) config.lastCheck = dTemp != 0;
 
 	dataSize = sizeof(dTemp);
 	if (RegQueryValueExA(key, KEY_AUTO_RENAME, NULL, NULL, (LPBYTE)&dTemp, &dataSize) != ERROR_SUCCESS) dataSize = 0;

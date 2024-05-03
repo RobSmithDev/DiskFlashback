@@ -168,6 +168,10 @@ NTSTATUS fs_checkVolume(const std::wstring& fname, DokanFileSystemManager* manag
         if (fname.length() <= 2) return STATUS_SUCCESS;
         return STATUS_UNRECOGNIZED_MEDIA;
     }
+    if (!manager->isNonDOS()) {
+        if (fname.length() <= 2) return STATUS_SUCCESS;
+        return STATUS_UNRECOGNIZED_MEDIA;
+    }
     return STATUS_SUCCESS;
 }
 
@@ -662,8 +666,14 @@ static NTSTATUS DOKAN_CALLBACK fs_getvolumeinformation(LPWSTR volumename_buffer,
         *filesystem_flags = FILE_READ_ONLY_VOLUME;
         return STATUS_SUCCESS;
     }
-    if (!manager->isDriveRecognised()) {
+    if (manager->isNonDOS()) {
         wcscpy_s(volumename_buffer, volumename_size, L"NDOS");
+        wcscpy_s(filesystem_name_buffer, filesystem_name_size, L"Unknown");
+        *filesystem_flags = FILE_READ_ONLY_VOLUME;
+        return STATUS_SUCCESS;
+    }
+    if (!manager->isDriveRecognised()) {
+        wcscpy_s(volumename_buffer, volumename_size, L"Unknown");
         wcscpy_s(filesystem_name_buffer, filesystem_name_size, L"Unknown");
         *filesystem_flags = FILE_READ_ONLY_VOLUME;
         return STATUS_SUCCESS;

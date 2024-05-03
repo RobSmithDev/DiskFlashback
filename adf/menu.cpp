@@ -85,6 +85,7 @@ BOOL CALLBACK windowSearchCallback2(_In_ HWND hwnd, _In_ LPARAM lParam) {
                 info.volumeName = buffer2;
                 info.volumeType = buffer3;
                 info.valid = (info.volumeType != L"Unknown") && (info.volumeType != L"No Disk");
+                if ((!info.valid) && (info.volumeName == L"NDOS")) info.valid = true;
                 swprintf_s(path, L"%c:", pos[0]);
                 mapping->insert(std::make_pair(path, info));
                 pos++;
@@ -497,7 +498,8 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     case MENUID_ENABLED: 
         m_config.enabled = !m_config.enabled;
         saveConfiguration(m_config);
-        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);       
+        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);  
+        m_timeoutBeforeRestart = 10; // trigger quick restart
         break;
     case MENUID_CREATEDISK: break;
     case MENUID_MOUNTDISK: mountDisk(); break;
@@ -612,6 +614,8 @@ bool CTrayMenu::closePhysicalDrive(bool dontNotify, uint16_t driveType) {
 // Monitor the physical drive and enable/close as required
 void CTrayMenu::monitorPhysicalDrive() {
 
+    m_timeoutBeforeRestart++;
+
     if (m_processUsingDrive) {
         if (WaitForSingleObject(m_processUsingDrive, 0) == WAIT_OBJECT_0) {
             CloseHandle(m_processUsingDrive);
@@ -623,6 +627,8 @@ void CTrayMenu::monitorPhysicalDrive() {
     if (m_floppyPi.hProcess) {
         // Check if it terminated
         if (WaitForSingleObject(m_floppyPi.hProcess, 0) == WAIT_OBJECT_0) {
+            // Process closed
+            m_timeoutBeforeRestart=0;
             DWORD code = 0;
             GetExitCodeProcess(m_floppyPi.hProcess, &code);
             if (code == RETURNCODE_MOUNTFAILDRIVE) {
@@ -652,17 +658,23 @@ void CTrayMenu::monitorPhysicalDrive() {
     }
 
     if (m_config.enabled) {
-        if ((m_processUsingDrive == 0) && (m_floppyPi.hProcess == 0) && (!m_config.floppyProfile.empty())) {
-            std::string driveLetter; driveLetter.resize(1); driveLetter[0] = m_config.driveLetter;
-            std::wstring driveLetterW; ansiToWide(driveLetter, driveLetterW);
-            std::wstring profileW; ansiToWide(m_config.floppyProfile, profileW);
+        // Onlt retry every more than 3 seconds
+        if ((m_processUsingDrive == 0) && (m_floppyPi.hProcess == 0) && (!m_config.floppyProfile.empty()) && (m_timeoutBeforeRestart>3)) {
+            // See if theres any suitable COM ports
+            std::vector<const TCHAR*> ports;
+            FloppyBridgeAPI::enumCOMPorts(ports);
+            if (!ports.empty()) {
+                std::string driveLetter; driveLetter.resize(1); driveLetter[0] = m_config.driveLetter;
+                std::wstring driveLetterW; ansiToWide(driveLetter, driveLetterW);
+                std::wstring profileW; ansiToWide(m_config.floppyProfile, profileW);
 
-            std::wstring cmd = L"\"" + m_exeName + L"\" BRIDGE " +driveLetterW + L" 1 \"" + profileW + L"\"";
-            STARTUPINFO si; ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
+                std::wstring cmd = L"\"" + m_exeName + L"\" BRIDGE " + driveLetterW + L" 1 \"" + profileW + L"\"";
+                STARTUPINFO si; ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
 
-            CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &m_floppyPi);
-            if (m_floppyPi.hThread) CloseHandle(m_floppyPi.hThread);
-            m_floppyPi.hThread = 0;
+                CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &m_floppyPi);
+                if (m_floppyPi.hThread) CloseHandle(m_floppyPi.hThread);
+                m_floppyPi.hThread = 0;
+            }
         }
     }
     else {

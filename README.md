@@ -3,6 +3,7 @@ A Windows package to use Floppy Disk Images Files & Real Floppy Disks in Windows
 
 ## Why?
 Most of the USB floppy drives are terrible. And modifying a drive for DrawBridge removes the IBM/PC floppy disk support in Windows. Plus I was getting annoyed having to boot WinUAE just to copy a file to an ADF (or disk). So I built this - And all the silly playground arguments from childhood now behind us I gave a little love to the Atari ST too (untested, I don't have one!)...
+Checkout https://robsmithdev.co.uk/diskflashback for more details!
 
 ## Features
 - Mount ADF, DMS*, IMG, IMA, ST, MSA*, HDA, HDF and SCP* disk and hard drive files as virtual drives (* are read only)

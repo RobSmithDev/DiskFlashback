@@ -70,10 +70,12 @@ private:
     bool m_forceWriteProtect;
     bool m_driveLocked = false;
     DOKAN_HANDLE m_dokanInstance = 0;
+    bool m_isNonDOS = false;
     DOKAN_OPTIONS dokan_options;   // stupidly these are always needed in scope!
 protected:
     void setActiveFileSystem(DokanFileSystemBase* fileSystem) { m_activeFileSystem = fileSystem; };
     virtual bool isForcedWriteProtect() { return m_forceWriteProtect; };
+    void setIsNONDos(bool isNonDOS) { m_isNonDOS = isNonDOS; };
 public:
     DokanFileSystemManager(WCHAR initialLetter, bool forceWriteProtect, const std::wstring &mainExe);
 
@@ -101,6 +103,9 @@ public:
 
     // Shut down the file system
     virtual void shutdownFS() = 0;
+
+    // Return TRUE if this is a NON-DOS disk, but the disk type was recognised
+    virtual bool isNonDOS() { return m_isNonDOS; };
 
     // Notifications of the file system being mounted
     virtual void onMounted(const std::wstring& mountPoint, PDOKAN_FILE_INFO dokanfileinfo);

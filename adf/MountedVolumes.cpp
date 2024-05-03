@@ -280,6 +280,7 @@ uint32_t VolumeManager::mountIBMVolumes(uint32_t startPoint) {
         // new volume required
         m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
         m_volumes.back()->start();
+        m_volumes.back()->setSystemRecognisedSectorFormat(true);
     }
     if (m_volumes[startPoint]->mountFileSystem(m_fatDevice, 0, m_triggerExplorer)) startPoint++;
 
@@ -298,6 +299,7 @@ uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
             // new volume required
             m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
             m_volumes.back()->start();
+            m_volumes.back()->setSystemRecognisedSectorFormat(true);
         }
         if (m_volumes[startPoint]->mountFileSystem(m_adfDevice, 0xFFFFFFFF, m_triggerExplorer)) startPoint++;
     }
@@ -361,10 +363,15 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
                 delete v;
             }));
         }
+        for (MountedVolume* volume : m_volumes)
+            volume->setSystemRecognisedSectorFormat(false);
     }
     else {
         m_currentSectorFormat = diskFormat;
         uint32_t volumesNeeded = 1;
+        for (MountedVolume* volume : m_volumes)
+            volume->setSystemRecognisedSectorFormat(diskFormat != SectorType::stUnknown);
+
         // Create device based on what system was detected
         switch (diskFormat) {
             case SectorType::stAmiga:                
@@ -540,6 +547,14 @@ void VolumeManager::checkRunningFileSystems() {
     // See if the process is done for
     bool running = m_threads.size() > 0;
     if (!running) for (const MountedVolume* volume : m_volumes) running |= volume->isRunning();
+
+    // Something's gone wrong in floppybridge?
+    if ((m_io) && (m_io->isPhysicalDisk()) && (!m_io->available())) {
+        KillTimer(m_window.hwnd(), TIMERID_MONITOR_FILESYS);
+        PostQuitMessage(0);
+    }
+
+
     if (!running) {
         KillTimer(m_window.hwnd(), TIMERID_MONITOR_FILESYS);
         PostQuitMessage(0);

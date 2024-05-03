@@ -234,6 +234,7 @@ DWORD DokanFileSystemAmigaFS::amigaToWindowsAttributes(const int32_t access, int
 int32_t DokanFileSystemAmigaFS::locatePath(const std::wstring& path, PDOKAN_FILE_INFO dokanfileinfo, std::string& filename) {
     // Strip off prefix of '\'
     std::wstring search = ((path.length()) && (path[0] == '\\')) ? path.substr(1) : path;
+    if (!m_volume) return 0;
     adfToRootDir(m_volume);
 
     // Bypass for speed

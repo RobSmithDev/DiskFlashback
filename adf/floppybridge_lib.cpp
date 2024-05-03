@@ -111,6 +111,7 @@ typedef void 			 (CALLING_CONVENSION* _DRIVER_setMotorStatus)(BridgeDriverHandle
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_isReady)(BridgeDriverHandle bridgeDriverHandle);
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_isDiskInDrive)(BridgeDriverHandle bridgeDriverHandle);
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_hasDiskChanged)(BridgeDriverHandle bridgeDriverHandle);
+typedef bool 			 (CALLING_CONVENSION* _DRIVER_isStillWorking)(BridgeDriverHandle bridgeDriverHandle);
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_isMFMPositionAtIndex)(BridgeDriverHandle bridgeDriverHandle, int mfmPositionBits);
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_isMFMDataAvailable)(BridgeDriverHandle bridgeDriverHandle);
 typedef bool 			 (CALLING_CONVENSION* _DRIVER_getMFMBit)(BridgeDriverHandle bridgeDriverHandle, int mfmPositionBits);
@@ -205,6 +206,7 @@ _DRIVER_isReadyToWrite	DRIVER_isReadyToWrite = nullptr;
 _DRIVER_getTrack DRIVER_getTrack = nullptr;
 _DRIVER_putTrack DRIVER_putTrack = nullptr;
 _DRIVER_setDirectMode DRIVER_setDirectMode = nullptr;
+_DRIVER_isStillWorking DRIVER_isStillWorking = nullptr;
 
 
 // Sets up the bridge.  We assume it will persist while the application is open.
@@ -301,7 +303,7 @@ void prepareBridge() {
 	DRIVER_getTrack = (_DRIVER_getTrack)GETFUNC(hBridgeDLLHandle, "DRIVER_getTrack");
 	DRIVER_putTrack = (_DRIVER_putTrack)GETFUNC(hBridgeDLLHandle, "DRIVER_putTrack");
 	DRIVER_setDirectMode = (_DRIVER_setDirectMode)GETFUNC(hBridgeDLLHandle, "DRIVER_setDirectMode");
-	
+	DRIVER_isStillWorking = (_DRIVER_isStillWorking)GETFUNC(hBridgeDLLHandle, "DRIVER_isStillWorking");
 
 	// Test a few
 	if ((!BRIDGE_About) || (!BRIDGE_NumDrivers) || (!BRIDGE_DeleteProfile)) {
@@ -818,7 +820,9 @@ const FloppyDiskBridge::BridgeDriver* FloppyBridgeAPI::getDriverInfo() {
 const unsigned int FloppyBridgeAPI::getDriverTypeIndex() const {
 	return m_driverIndex;
 }
-	
+bool FloppyBridgeAPI::isStillWorking() {
+	return DRIVER_isStillWorking(m_handle);
+}
 bool FloppyBridgeAPI::resetDrive(int trackNumber) {
 	return DRIVER_resetDrive(m_handle, trackNumber);
 }

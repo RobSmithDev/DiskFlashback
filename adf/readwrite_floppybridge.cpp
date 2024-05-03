@@ -112,7 +112,7 @@ bool SectorRW_FloppyBridge::isDriveWriteProtected() {
 
 // Is available?
 bool SectorRW_FloppyBridge::available() {
-    return m_bridge && m_bridge->isAvailable();
+    return m_bridge && m_bridge->isAvailable() && m_bridge->isStillWorking();
 }
 
 // Rapid shutdown
@@ -133,11 +133,14 @@ SectorRW_FloppyBridge::~SectorRW_FloppyBridge() {
 // Returns TRUE if the inserted disk is HD
 bool SectorRW_FloppyBridge::isHD() {
     if (!m_bridge) return false;
+    if (m_densityMode != FloppyBridge::BridgeDensityMode::bdmAuto)
+        return m_densityMode == FloppyBridge::BridgeDensityMode::bdmHDOnly;
     return m_bridge->getDriveTypeID() == FloppyDiskBridge::DriveTypeID::dti35HD;
 }
 
 // Change the denity more of the bridge
 bool SectorRW_FloppyBridge::setForceDensityMode(FloppyBridge::BridgeDensityMode mode) {
     if (!m_bridge) return false;
+    m_densityMode = mode;
     return m_bridge->setBridgeDensityMode(mode);
 }

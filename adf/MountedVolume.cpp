@@ -268,6 +268,11 @@ bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex, 
     return m_FatFS != nullptr;
 }
 
+// Set if the system recognised the sector format even if it didnt understand the disk
+void MountedVolume::setSystemRecognisedSectorFormat(bool wasRecognised) {
+    setIsNONDos(!wasRecognised);
+}
+
 bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex, bool showExplorer) {
     if (m_ADFvolume) {
         adfUnMount(m_ADFvolume);
@@ -286,6 +291,7 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     // Hook up ADF_operations
     m_amigaFS->setCurrentVolume(m_ADFvolume);
     m_amigaFS->resetFileSystem();
+    setSystemRecognisedSectorFormat(m_ADFvolume != nullptr);
     setActiveFileSystem(adfDevice ? m_amigaFS : nullptr);
     m_registry->setupDriveIcon(true, getMountPoint()[0], 1, m_io->isPhysicalDisk());
     m_registry->mountDismount(true, getMountPoint()[0], m_io);

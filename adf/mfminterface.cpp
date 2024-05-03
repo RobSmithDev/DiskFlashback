@@ -560,15 +560,15 @@ bool SectorCacheMFM::flushPendingWrites() {
         // Theres some missing data. We we'll request the track again and fill in the gaps
         if (fillData) {
             // 1. Take a copy
-            const std::unordered_map<int, DecodedSector> backup = m_trackCache[0][track].sectors;
+            const std::map<int, DecodedSector> backup = m_trackCache[0][track].sectors;
             if (m_writeOnly) {
                 for (uint32_t sec = 0; sec < m_sectorsPerTrack[0]; sec++) {
                     auto it = m_trackCache[0][track].sectors.find(sec);
                     // Does a sector with this number exist?
                     if (it == m_trackCache[0][track].sectors.end()) {
                         DecodedSector tmp;
-                        memset(&tmp, 0, sizeof(tmp));
                         tmp.numErrors = 0;
+                        tmp.data.resize(m_bytesPerSector[0]);;
                         m_trackCache[0][track].sectors.insert(std::make_pair(sec, tmp));
                     }
                 }
@@ -587,8 +587,13 @@ bool SectorCacheMFM::flushPendingWrites() {
             }
         }
 
+        // Remove sectors that shouldn't be there
+        while (m_trackCache[0][track].sectors.size() > m_sectorsPerTrack[0]) 
+            m_trackCache[0][track].sectors.erase(m_trackCache[0][track].sectors.rbegin()->first);
+
         // We will now have a complete track worth of sectors so we can now finally commit this to disk (hopefully) plus we will verify it
         uint32_t numBytes;
+
         switch (m_diskType) {
         case SectorType::stAmiga: numBytes = encodeSectorsIntoMFM_AMIGA(isHD(), m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
         case SectorType::stIBM: numBytes = encodeSectorsIntoMFM_IBM(isHD(), false, &m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
@@ -680,7 +685,7 @@ bool SectorCacheMFM::flushPendingWrites() {
                 }
                 else {
                     // Writing succeeded. Now to do a verify!
-                    const std::unordered_map<int, DecodedSector> backup = m_trackCache[0][track].sectors;
+                    const std::map<int, DecodedSector> backup = m_trackCache[0][track].sectors;
                     for (;;) {
                         if (!doTrackReading(0, track, retries > 1)) {
                             if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);

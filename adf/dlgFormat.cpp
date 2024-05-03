@@ -99,6 +99,8 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	SetWindowLong(ctrl, GWL_STYLE, GetWindowLong(ctrl, GWL_STYLE) | PBS_SMOOTH);
 	SendMessage(ctrl, PBM_SETSTEP, 1, 0);
 
+	CheckRadioButton(hwnd, IDC_DD, IDC_AUTO, IDC_AUTO);
+
 	BringWindowToTop(hwnd);
 	SetForegroundWindow(hwnd);
 	enableControls(true);
@@ -116,6 +118,12 @@ void DialogFORMAT::enableControls(bool enable) {
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_INT), enable && (sel < 2));
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_BB), enable && (sel < 2));
 	EnableWindow(GetDlgItem(m_dialogBox, ID_START), enable);
+
+	SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
+
+	EnableWindow(GetDlgItem(m_dialogBox, IDC_DD), enable && bridge);
+	EnableWindow(GetDlgItem(m_dialogBox, IDC_HD), enable && bridge);
+	EnableWindow(GetDlgItem(m_dialogBox, IDC_AUTO), enable && bridge);
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 }
 
@@ -141,7 +149,7 @@ bool isBlank(uint8_t* mem, uint32_t size) {
 }
 
 // Actually do the format
-bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, uint32_t formatMode, const std::string& volumeLabel) {
+bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, uint32_t density, uint32_t formatMode, const std::string& volumeLabel) {
 	if (!m_io->isDiskPresent()) {
 		MessageBox(m_hParent, L"No disk in drive. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 		return false;
@@ -161,34 +169,42 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks + 4));
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
 
-	m_io->resetCache();
 	SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
+	bool isHD;
+	switch (density) {
+	case 0: isHD = false; break;
+	case 1: isHD = true; break;
+	default: isHD = bridge->isHD(); break;
+	}
+	bridge->setForceDensityMode(isHD ? FloppyBridge::BridgeDensityMode::bdmHDOnly : FloppyBridge::BridgeDensityMode::bdmDDOnly);
+
+	m_io->resetCache();
 	uint32_t numSectors = 0;
 	uint32_t numHeads = 2;
 	if (bridge) {
 		switch (formatMode) {
 		case 0:
 		case 1:
-			numSectors = bridge->isHD() ? 22 : 11;
+			numSectors = isHD ? 22 : 11;
 			bridge->overwriteSectorSettings(SectorType::stAmiga, totalTracks/2,2,  numSectors, 512);
 			break;
 		case 2:
-			numSectors = bridge->isHD() ? 18 : 9;
+			numSectors = isHD ? 18 : 9;
 			bridge->overwriteSectorSettings(SectorType::stIBM, totalTracks/2,2,  numSectors, 512);
 			break;
 		case 3:
-			numSectors = bridge->isHD() ? 18 : 9;
+			numSectors = isHD ? 18 : 9;
 			totalTracks = 80;
 			numHeads = 1;
 			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks, 1, numSectors, 512);
 			break;
 		case 4:
-			numSectors = bridge->isHD() ? 18 : 9;
+			numSectors = isHD ? 18 : 9;
 			totalTracks = 80 * 2;
 			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks / 2, 2, numSectors, 512);
 			break;
 		case 5:
-			numSectors = bridge->isHD() ? 22 : 11;
+			numSectors = isHD ? 22 : 11;
 			totalTracks = 83 * 2;
 			bridge->overwriteSectorSettings(SectorType::stAtari, totalTracks / 2, 2, numSectors, 512);
 			break;
@@ -205,19 +221,24 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		memset(sector, 0, 512);
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < numSectors; sec++) {
-				if (m_abortFormat) return false;
+				if (m_abortFormat) 
+					return false;
 				if (!m_io->writeData(sectorNumber, DEFAULT_SECTOR_BYTES, sector))
 					return false;
 				sectorNumber++;
 			}
-			if (!m_io->flushWriteCache()) return false;
+			if (!m_io->flushWriteCache()) 
+				return false;
 			SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, track+1, 0);
 		}
 		progress = totalTracks;
+		m_io->resetCache();
 	}
 	else bridge->createBlankSectors();
 
 	if (m_abortFormat) return false;
+
+
 	switch (formatMode) {
 	case 0:  // AMIGAAAA
 	case 1:
@@ -238,7 +259,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	{
 		BYTE work[FF_MAX_SS];
 		MKFS_PARM opt;
-		getMkFsParams(bridge->isHD(), SectorType::stIBM, opt);
+		getMkFsParams(isHD, SectorType::stIBM, opt);
 		if (f_mkfs(L"\\", &opt, work, sizeof(work)) != FR_OK) return false;
 		std::wstring t;
 		ansiToWide(volumeLabel, t);
@@ -317,15 +338,24 @@ void DialogFORMAT::doFormat() {
 		bool dirCache = SendMessage(GetDlgItem(m_dialogBox, IDC_CACHE), BM_GETCHECK, 0, 0) == BST_CHECKED;
 		bool intMode = SendMessage(GetDlgItem(m_dialogBox, IDC_INT), BM_GETCHECK, 0, 0) == BST_CHECKED;
 		bool installBB = SendMessage(GetDlgItem(m_dialogBox, IDC_BB), BM_GETCHECK, 0, 0) == BST_CHECKED;
+
+		uint32_t density = 2;
+		if (SendMessage(GetDlgItem(m_dialogBox, IDC_DD), BM_GETCHECK, 0, 0) == BST_CHECKED) density = 0; else
+			if (SendMessage(GetDlgItem(m_dialogBox, IDC_HD), BM_GETCHECK, 0, 0) == BST_CHECKED) density = 1;
+
 		uint32_t formatMode = (uint32_t)SendMessage(GetDlgItem(m_dialogBox, IDC_FILESYSTEM), CB_GETCURSEL, 0, 0);
 		std::string volumeLabel;
 		WCHAR name[64];
 		GetWindowText(GetDlgItem(m_dialogBox, IDC_LABEL), name, 64);
 		wideToAnsi(name, volumeLabel);
 
-		m_formatThread = new std::thread([this, quickFormat, dirCache, intMode, installBB, formatMode, volumeLabel]() {
+		m_formatThread = new std::thread([this, quickFormat, dirCache, intMode, installBB, density, formatMode, volumeLabel]() {
 			m_io->setWritingOnlyMode(true);
-			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, formatMode, volumeLabel);
+			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, density, formatMode, volumeLabel);
+			{
+				SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
+				if (bridge) bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
+			}
 			m_io->setWritingOnlyMode(false);
 			m_fs->setLocked(false);
 			m_fs->restoreUnmountedDrive(false);

@@ -272,6 +272,7 @@ public:
 	virtual const BridgeDriver* getDriverInfo() override;	
 	virtual unsigned char getBitSpeed() override;
 	virtual DriveTypeID getDriveTypeID() override;
+	virtual bool isStillWorking() override;
 	virtual const char* getLastErrorMessage() override;
 	virtual bool resetDrive(int trackNumber) override;
 	virtual bool isAtCylinder0() override;

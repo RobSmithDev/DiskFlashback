@@ -49,6 +49,7 @@ private:
     bool m_lastBalloonIsUpdate = false;
     bool m_didNotifyFail = false;
     HANDLE m_processUsingDrive = 0;
+    DWORD m_timeoutBeforeRestart = 10;
 
     std::map<std::wstring, DriveInfo> m_drives;
     const std::wstring m_exeName;

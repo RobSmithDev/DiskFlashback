@@ -23,8 +23,12 @@
 #define IDC_CABLE                       1009
 #define IDC_COMPORT                     1010
 #define IDC_CAPTION                     1011
-#define IDC_LETTER                      1011
+#define IDC_LETTER                      1012
 #define IDC_AUTODETECT                  1013
+#define IDC_DD                          1014
+#define IDC_HD                          1015
+#define IDC_HD2                         1016
+#define IDC_AUTO                        1017
 
 // Next default values for new objects
 // 
@@ -32,7 +36,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        115
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1012
+#define _APS_NEXT_CONTROL_VALUE         1018
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

@@ -62,6 +62,9 @@ public:
     virtual void restoreUnmountedDrive(bool restorePreviousSystem);
     virtual uint32_t getTotalTracks() override;
 
+    // Set if the system recognised the sector format even if it didnt understand the disk
+    void setSystemRecognisedSectorFormat(bool wasRecognised);
+
     // Returns FALSE if files are open
     bool setLocked(bool enableLock);
 

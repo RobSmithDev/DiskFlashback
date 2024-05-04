@@ -168,7 +168,7 @@ NTSTATUS fs_checkVolume(const std::wstring& fname, DokanFileSystemManager* manag
         if (fname.length() <= 2) return STATUS_SUCCESS;
         return STATUS_UNRECOGNIZED_MEDIA;
     }
-    if (!manager->isNonDOS()) {
+    if (manager->isNonDOS()) {
         if (fname.length() <= 2) return STATUS_SUCCESS;
         return STATUS_UNRECOGNIZED_MEDIA;
     }

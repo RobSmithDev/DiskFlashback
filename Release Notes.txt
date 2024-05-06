@@ -9,6 +9,7 @@ https://robsmithdev.co.uk/diskflashback
 	Fixed DD/HD detection if the wrong format is written to the disk
 	Added option to force the density when writing a floppy disk (use with care, you can't actually override the density)
 	Changed mounting of physical drives to be off by default (d'oh)
+        Fixed failing to mount Amiga Rigid Disk Block Images
 
 1.0.0.5
 	Improved handling for NDOS disks where system type is known but not file system

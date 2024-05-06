@@ -125,10 +125,26 @@ RETCODE adfReleaseDevice(struct AdfDevice* const dev) {
 }
 RETCODE adfNativeReadSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, uint8_t* const buf) {
     SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
+
+    if (size != 512) {
+        uint8_t buffer[512];
+        if (!d->readData(n, 512, buffer)) return RC_ERROR;
+        memcpy_s(buf, size, buffer, min(size, 512));
+        return RC_OK;
+    }
+
     return d->readData(n, size, buf) ? RC_OK : RC_ERROR;
 }
 RETCODE adfNativeWriteSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, const uint8_t* const buf) {
     SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
+
+    if (size != 512) {
+        uint8_t buffer[512];
+        if (!d->readData(n, 512, buffer)) return RC_ERROR;
+        memcpy_s(buffer, size, buf, min(size, 512));
+        return d->writeData(n, 512, buffer) ? RC_OK : RC_ERROR;
+    }
+
     return d->writeData(n, size, buf) ? RC_OK : RC_ERROR;
 }
 BOOL adfIsDevNative(const char* const devName) {
@@ -374,7 +390,7 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
 
         // Create device based on what system was detected
         switch (diskFormat) {
-            case SectorType::stAmiga:                
+            case SectorType::stAmiga:   
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
                 //if (!m_adfDevice) diskFormat = SectorType::stUnknown; so we can show NDOS
                 break;

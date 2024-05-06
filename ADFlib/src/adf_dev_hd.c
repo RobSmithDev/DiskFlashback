@@ -221,26 +221,28 @@ RETCODE adfMountHd ( struct AdfDevice * const dev )
     freeList(listRoot);
 
     next = rdsk.fileSysHdrList;
-    while( next!=-1 ) {
-        rc = adfReadFSHDblock ( dev, next, &fshd ); 
-        if ( rc != RC_OK ) {
-            for ( i = 0 ; i < dev->nVol ; i++ )
-                free ( dev->volList[i] );
-            free(dev->volList);
-            (*adfEnv.eFct)("adfMount : adfReadFSHDblock");
-            return rc;
+    if (next != -1) {
+        while (next != -1) {
+            rc = adfReadFSHDblock(dev, next, &fshd);
+            if (rc != RC_OK) {
+                for (i = 0; i < dev->nVol; i++)
+                    free(dev->volList[i]);
+                free(dev->volList);
+                (*adfEnv.eFct)("adfMount : adfReadFSHDblock");
+                return rc;
+            }
+            next = fshd.next;
         }
-        next = fshd.next;
-    }
 
-    next = fshd.segListBlock;
-    while( next!=-1 ) {
-        rc = adfReadLSEGblock ( dev, next, &lseg ); 
-        if ( rc != RC_OK ) {
-            (*adfEnv.wFct)("adfMount : adfReadLSEGblock");
-            // abort here ?
+        next = fshd.segListBlock;
+        while (next != -1) {
+            rc = adfReadLSEGblock(dev, next, &lseg);
+            if (rc != RC_OK) {
+                (*adfEnv.wFct)("adfMount : adfReadLSEGblock");
+                // abort here ?
+            }
+            next = lseg.next;
         }
-        next = lseg.next;
     }
 
     return RC_OK;

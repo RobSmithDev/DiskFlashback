@@ -377,12 +377,26 @@ void DialogFORMAT::doFormat() {
 	}
 }
 
+
 // Dialog window message handler
 INT_PTR DialogFORMAT::handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	switch (msg) {
 	case WM_INITDIALOG:
 		handleInitDialog(hwnd);
 		return TRUE;
+
+	case WM_USER+20:
+		AllowSetForegroundWindow(GetCurrentProcessId());
+		SetForegroundWindow(hwnd);
+		SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+		BringWindowToTop(hwnd);
+		SetActiveWindow(hwnd);
+		AllowSetForegroundWindow(ASFW_ANY);
+		break;
+
+	case WM_SHOWWINDOW:
+		if (wParam) PostMessage(hwnd, WM_USER + 20, 0, 0);
+		break;
 
 	case WM_DESTROY:
 		if (m_formatThread) {

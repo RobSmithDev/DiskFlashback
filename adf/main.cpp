@@ -117,7 +117,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         HWND wnd = VolumeManager::FindControlWindowForDrive(driveLetter);
         std::wstring param = argv[2];
         if (wnd) {
-            if (param == CTRL_PARAM_FORMAT) SendMessage(wnd, WM_USER, REMOTECTRL_FORMAT, (LPARAM)driveLetter);
+            if (param == CTRL_PARAM_FORMAT) {
+                std::wstring letter = L" "; letter[0] = driveLetter;
+                std::wstring winname = L"Format Disk Drive " + letter + L":";
+                HWND formatWindow = FindWindow(NULL, winname.c_str());
+                if (formatWindow) {
+                    PostMessage(formatWindow, WM_USER + 20, 0, 0);
+                } else SendMessage(wnd, WM_USER, REMOTECTRL_FORMAT, (LPARAM)driveLetter);
+            }
             if (param == CTRL_PARAM_EJECT) SendMessage(wnd, WM_USER, REMOTECTRL_EJECT, (LPARAM)driveLetter);
             if (param == CTRL_PARAM_INSTALLBB) SendMessage(wnd, WM_USER, REMOTECTRL_INSTALLBB, (LPARAM)driveLetter);
             if (param == CTRL_PARAM_COPY2DISK) {

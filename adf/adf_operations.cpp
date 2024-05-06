@@ -279,6 +279,7 @@ int32_t DokanFileSystemAmigaFS::locatePath(const std::wstring& path, PDOKAN_FILE
 NTSTATUS DokanFileSystemAmigaFS::fs_createfile(const std::wstring& filename, const PDOKAN_IO_SECURITY_CONTEXT security_context, const ACCESS_MASK generic_desiredaccess, const uint32_t file_attributes, const uint32_t shareaccess, const uint32_t creation_disposition, const bool fileSupersede, PDOKAN_FILE_INFO dokanfileinfo) {
     dokanfileinfo->Context = 0;
     uint32_t file_attributes_and_flags = file_attributes;
+    if (!m_volume) return STATUS_UNRECOGNIZED_MEDIA;
 
     std::wstring windowsPath = filename;
 

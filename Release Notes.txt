@@ -10,6 +10,7 @@ https://robsmithdev.co.uk/diskflashback
 	Added option to force the density when writing a floppy disk (use with care, you can't actually override the density)
 	Changed mounting of physical drives to be off by default (d'oh)
         Fixed failing to mount Amiga Rigid Disk Block Images
+	Fixed bug where the current real flopy drive configuration was not shown upon re-opening the config dialog
 
 1.0.0.5
 	Improved handling for NDOS disks where system type is known but not file system

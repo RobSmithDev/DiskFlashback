@@ -24,14 +24,14 @@
 #ifndef ADF_NATIV_H
 #define ADF_NATIV_H
 
-#include"adf_dev.h"
+#include "adf_dev.h"
 
 struct AdfNativeFunctions {
 
     /* called by adfMount() */
     RETCODE (*adfInitDevice)( struct AdfDevice * const dev,
                               const char * const       name,
-                              const BOOL               ro );
+                              const int               ro );
 
     /* called by adfUnMount() */
     RETCODE (*adfReleaseDevice)(struct AdfDevice * const dev);

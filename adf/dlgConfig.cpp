@@ -117,7 +117,7 @@ DialogConfig::DialogConfig(HINSTANCE hInstance, HWND hParent) : m_hInstance(hIns
 	FloppyBridgeAPI::getDriverList(m_driverList);
 	FloppyBridgeAPI::enumCOMPorts(m_comPortList);
 
-	if (m_config.floppyProfile.length()) FloppyBridgeAPI::createDriverFromString(m_config.floppyProfile.c_str());
+	if (m_config.floppyProfile.length()) m_api = FloppyBridgeAPI::createDriverFromString(m_config.floppyProfile.c_str());
 	if (!m_api) {
 		m_api = FloppyBridgeAPI::createDriver(0);
 		m_api->setAutoCacheMode(false);

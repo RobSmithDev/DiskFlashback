@@ -364,42 +364,6 @@ void VolumeManager::unmountPhysicalFileSystems() {
 }
 
 
-typedef struct rootblock
-{
-    LONG disktype;
-    ULONG options;          /* bit 0 is harddisk mode */
-    ULONG datestamp;
-    UWORD creationday;      /* days since Jan. 1, 1978 (like ADOS; WORD instead of LONG) */
-    UWORD creationminute;   /* minutes past midnight */
-    UWORD creationtick;     /* ticks past minute */
-    UWORD protection;       /* protection bits (ala ADOS) */
-    char diskname[32];     /* disk label (pascal string) */
-    ULONG lastreserved;     /* reserved area. blocknumbers */
-    ULONG firstreserved;
-    ULONG reserved_free;    /* number of reserved blocks (blksize blocks) free */
-    UWORD reserved_blksize; /* size of reserved blocks in bytes */
-    UWORD rblkcluster;      /* number of blocks in rootblock, including bitmap */
-    ULONG blocksfree;       /* blocks free */
-    ULONG alwaysfree;       /* minimum number of blocks free */
-    ULONG roving_ptr;       /* current LONG bitmapfield nr for allocation */
-    ULONG deldir;           /* (before 4.3) deldir location */
-    ULONG disksize;         /* disksize in sectors */
-    ULONG extension;        /* rootblock extension */
-    ULONG not_used;
-    union
-    {
-        struct
-        {
-            ULONG bitmapindex[5];   /* 5 bitmap indexblocks */
-            ULONG indexblocks[99];  /* 99 indexblocks */
-        } _small;
-        struct
-        {
-            ULONG bitmapindex[104]; /* 104 bitmap indexblock */
-        } large;
-    } idx;
-} rootblock_t;
-
 // Notification received that the current disk changed
 void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {    
     unmountPhysicalFileSystems();
@@ -430,23 +394,6 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
             case SectorType::stAmiga:   
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
                 //if (!m_adfDevice) diskFormat = SectorType::stUnknown; so we can show NDOS
-                rootblock_t r;
-
-                if (m_io->readData(m_adfDevice->volList[0]->firstBlock, sizeof(r), &r)) {
-                    r.alwaysfree = 0;
-
-                }
-                // PFS3 RootBlock = 2
-                // PFS3 
-
-                uint8_t b[512];
-                m_adfDevice->volList[0]->mounted = TRUE;
-                m_adfDevice->volList[0]->dev = m_adfDevice;
-                adfReadBlock(m_adfDevice->volList[0], 2, b);
-                memcpy_s(&r, sizeof(r), b, sizeof(r));
-                
-
-
                 break;
             case SectorType::stHybrid:
                 m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);

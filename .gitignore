@@ -4,3 +4,5 @@ Win32/Debug
 /adflib/regtests/
 *.lnk
 fatfs/documents/
+.vs
+PFS3lib/x64

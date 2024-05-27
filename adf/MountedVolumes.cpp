@@ -13,6 +13,8 @@
  */
 
 
+
+
 #include "MountedVolumes.h"
 #include "MountedVolume.h"
 #include "psapi.h"
@@ -20,6 +22,7 @@
 #include "readwrite_dms.h"
 #include "readwrite_file.h"
 #include "adflib/src/adflib.h"
+#include "adflib/src/adf_dev_driver.h"
 #include "amiga_sectors.h"
 #include "dlgFormat.h"
 #include "dlgCopy.h"
@@ -107,66 +110,6 @@ HWND VolumeManager::FindPotentialExplorerParent() {
     return parent;
 }
 #pragma endregion CONTROL_INTERFACE
-
-#pragma region ADFLIB
-// ADFLib Native Functions
-RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const BOOL ro) {
-    // it's a *terrible* hack, but we're using the name pointer to point back to the SectorCacheEngine class
-    SectorCacheEngine* cache = (SectorCacheEngine*)name;
-    if (!cache) return RC_ERROR;
-    dev->size = cache->getDiskDataSize();
-    dev->nativeDev = (void*)cache;
-
-    return RC_OK;
-}
-RETCODE adfReleaseDevice(struct AdfDevice* const dev) {
-    dev->nativeDev = nullptr;
-    return RC_OK;
-}
-RETCODE adfNativeReadSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, uint8_t* const buf) {
-    SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
-
-    if (size != 512) {
-        uint8_t buffer[512];
-        if (!d->readData(n, 512, buffer)) return RC_ERROR;
-        memcpy_s(buf, size, buffer, min(size, 512));
-        return RC_OK;
-    }
-
-    return d->readData(n, size, buf) ? RC_OK : RC_ERROR;
-}
-RETCODE adfNativeWriteSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, const uint8_t* const buf) {
-    SectorCacheEngine* d = (SectorCacheEngine*)dev->nativeDev;
-
-    if (size != 512) {
-        uint8_t buffer[512];
-        if (!d->readData(n, 512, buffer)) return RC_ERROR;
-        memcpy_s(buffer, size, buf, min(size, 512));
-        return d->writeData(n, 512, buffer) ? RC_OK : RC_ERROR;
-    }
-
-    return d->writeData(n, size, buf) ? RC_OK : RC_ERROR;
-}
-BOOL adfIsDevNative(const char* const devName) {
-    return true;
-}
-void Warning(char* msg) {
-#ifdef _DEBUG
-    fprintf(stderr, "Warning <%s>\n", msg);
-#endif
-}
-void Error(char* msg) {
-#ifdef _DEBUG
-    fprintf(stderr, "Error <%s>\n", msg);
-#endif
-    // exit(1);
-}
-void Verbose(char* msg) {
-#ifdef _DEBUG
-    fprintf(stderr, "Verbose <%s>\n", msg);
-#endif
-}
-#pragma endregion ADFLIB
 
     #pragma region FATFS
 
@@ -264,15 +207,7 @@ VolumeManager::VolumeManager(HINSTANCE hInstance, const std::wstring& mainExe, W
     m_autoRename = cfg.autoRename;
 
     // Prepare the ADF library
-    adfEnvInitDefault();
-    adfSetEnvFct((AdfLogFct)Error, (AdfLogFct)Warning, (AdfLogFct)Verbose, NULL);
-    struct AdfNativeFunctions native;
-    native.adfInitDevice = adfInitDevice;
-    native.adfReleaseDevice = adfReleaseDevice;
-    native.adfNativeReadSector = adfNativeReadSector;
-    native.adfNativeWriteSector = adfNativeWriteSector;
-    native.adfIsDevNative = adfIsDevNative;
-    adfSetNative(&native);
+    adfPrepNativeDriver();
 
     // Prepare FatFS
     fatfsSectorCache = nullptr;
@@ -352,7 +287,7 @@ void VolumeManager::unmountPhysicalFileSystems() {
         volume->unmountFileSystem();
 
     if (m_adfDevice) {
-        adfUnMountDev(m_adfDevice);
+        adfDevUnMount(m_adfDevice);
         m_adfDevice = nullptr;
     }
 
@@ -392,11 +327,12 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
         // Create device based on what system was detected
         switch (diskFormat) {
             case SectorType::stAmiga:   
-                m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
-                //if (!m_adfDevice) diskFormat = SectorType::stUnknown; so we can show NDOS
+                m_adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)m_io, m_forceReadOnly ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE);
+                if (m_adfDevice) adfDevMount(m_adfDevice);
                 break;
             case SectorType::stHybrid:
-                m_adfDevice = adfMountDev((char*)m_io, m_forceReadOnly);
+                m_adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)m_io, m_forceReadOnly ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE); 
+                if (m_adfDevice) adfDevMount(m_adfDevice);
                 m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
                 if (m_fatDevice) {
                     memset(m_fatDevice, 0, sizeof(FATFS));

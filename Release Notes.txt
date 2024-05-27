@@ -2,6 +2,13 @@ DiskFlashback Release Notes
 ---------------------------
 https://robsmithdev.co.uk/diskflashback
 
+1.0.1.0
+	Fixed disabling "auto-detect com port" beign ignored
+	Better support for hard disk image files larger than 4G (some partitions got ignored before)
+	Upgraded to use the new ADFLib v0.9
+	Changed error handling when reading from disks to include the Always Ignore option
+	Added Amiga PFS3 file system support (this was a real PITA!)
+
 1.0.0.6
 	Further improved NDOS disk support for Amiga
 	Prevent attempted auto-mount of real drive if no COM ports are detected, and slowed this down too.

@@ -16,8 +16,12 @@
 
 #include "dokaninterface.h"
 #include "adf_operations.h"
+#include "pfs3_operations.h"
 #include "fat_operations.h"
 #include "fatfs/source/ff.h"
+#include "PFS3lib/pfs3.h"
+#include "adf_nativedriver.h"
+
 
 class ShellRegistery;
 class VolumeManager;
@@ -33,7 +37,10 @@ private:
     AdfVolume* m_ADFvolume = nullptr;
     uint32_t m_partitionIndex = 0;
     DokanFileSystemAmigaFS* m_amigaFS = nullptr;
+    DokanFileSystemAmigaPFS3* m_amigaPFS3 = nullptr;
     DokanFileSystemFATFS* m_IBMFS = nullptr;
+
+    IPFS3* m_pfs3 = nullptr;
     bool m_tempUnmount = false;
     ShellRegistery* m_registry;
     FATFS* m_FatFS = nullptr;

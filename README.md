@@ -26,6 +26,7 @@ DiskFlashback is powered by:
 - [ADFLib](https://github.com/lclevy/ADFlib) for the Amiga File System
 - [FatFS](http://elm-chan.org/fsw/ff/) for the FAT12/16 File System
 - [xDMS](https://zakalwe.fi/~shd/foss/xdms/) for DMS File Support
+- [pfs3aio](https://github.com/tonioni/pfs3aio) for the Amiga PFS3 File System
 - [FloppyBridge](https://amiga.robsmithdev.co.uk/winuae) for Real Floppy Disk Support
 DiskFlashback is OpenSource and available under the GPL2 Licence, and available from GitHub.
 
@@ -44,6 +45,7 @@ void releaseVirtualDrives(bool release, int controllerType) {
 
 ## Summary
 DiskFlashback is OpenSource and available under the [GPL2 Licence](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html) and can be [downloaded from this site](https://robsmithdev.co.uk/diskflashback)
+
 
 Join me on [Discord](https://discord.gg/HctVgSFEXu) for further discussions and also support me on [Patreon](https://www.patreon.com/RobSmithDev)
   

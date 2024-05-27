@@ -21,7 +21,7 @@
 
 class SectorRW_DMS : public SectorCacheEngine {
 private:
-    DWORD m_diskSize = 0;
+    uint64_t m_diskSize = 0;
     uint16_t m_diskType = 0; // type of archive
     uint16_t m_geninfo = 0; // flags
     uint16_t m_sectorsPerTrack = 0;   
@@ -68,7 +68,7 @@ public:
     virtual uint32_t serialNumber() override { return 0x444D5330; };
 
     // Fetch the size of the disk file
-    virtual uint32_t getDiskDataSize() override { return m_diskSize; };
+    virtual uint64_t getDiskDataSize() override { return m_diskSize; };
     virtual bool available() override;
 
     // Raid shutdown to release resource

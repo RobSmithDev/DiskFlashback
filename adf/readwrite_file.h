@@ -22,7 +22,9 @@
 
 class SectorRW_File : public SectorCacheEngine {
 private:
-    enum SectorMode {smNormal, smMSA};
+    enum SectorMode {smNormal, // Standard Sector Image
+                     smMSA  // MSA Compressed disk image
+    };
 
     struct DecodedTrack {
         uint32_t seekPos;   // Where the actual data starts
@@ -71,7 +73,7 @@ public:
     virtual uint32_t getNumHeads() override { return m_numHeads; };
 
     // Fetch the size of the disk file
-    virtual uint32_t getDiskDataSize() override;
+    virtual uint64_t getDiskDataSize() override;
     virtual bool available() override;
 
     // Get the type of file that is loaded

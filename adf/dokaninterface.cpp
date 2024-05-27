@@ -12,7 +12,6 @@
  * This file is maintained at https://github.com/RobSmithDev/DiskFlashback
  */
 
-
 #include "dokaninterface.h"
 
 extern DOKAN_OPERATIONS fs_operations;

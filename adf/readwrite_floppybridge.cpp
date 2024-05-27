@@ -96,8 +96,6 @@ SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile, std::fu
     m_bridge = FloppyBridgeAPI::createDriverFromString(profile.c_str());
     if (m_bridge) {
         m_bridge->setBridgeMode(FloppyBridge::BridgeMode::bmStalling);
-        m_bridge->setComPortAutoDetect(true);
-
         setReady();
     }
 }

@@ -160,9 +160,9 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	}
 	m_fs->temporaryUnmountDrive();
 
-	uint8_t mode = formatMode ? FSMASK_FFS : 0;
-	if (intMode) mode |= FSMASK_INTL;
-	if (dirCache) mode |= FSMASK_DIRCACHE;
+	uint8_t mode = formatMode ? ADF_DOSFS_FFS : 0;
+	if (intMode) mode |= ADF_DOSFS_INTL;
+	if (dirCache) mode |= ADF_DOSFS_DIRCACHE;
 
 	uint32_t totalTracks = 80 * 2;
 	//if (totalTracks == 0) totalTracks = 80 * 2;
@@ -243,16 +243,17 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	case 0:  // AMIGAAAA
 	case 1:
 	{
-		AdfDevice* dev = adfOpenDev((char*)m_io, false);
+		AdfDevice* dev = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)m_io, ADF_ACCESS_MODE_READWRITE);
 		if (!dev) return false;
+		adfDevMount(dev);
 		dev->heads = 2;
 		dev->sectors = numSectors;
 		dev->cylinders = totalTracks / 2;
-		if (adfCreateFlop(dev, volumeLabel.c_str(), mode) != RC_OK) {
-			adfUnMountDev(dev);
+		if (adfCreateFlop(dev, volumeLabel.c_str(), mode) != ADF_RC_OK) {
+			adfDevUnMount(dev);
 			return false;
 		}
-		adfUnMountDev(dev);
+		adfDevUnMount(dev);
 	}
 		break;
 	case 2:  // PC

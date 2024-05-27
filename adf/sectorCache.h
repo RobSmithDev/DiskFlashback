@@ -85,8 +85,8 @@ public:
     virtual void setWritingOnlyMode(bool only) {  };
 
     // Fetch the size of the disk file
-    virtual uint32_t getDiskDataSize() = 0;
-    virtual uint32_t hybridGetDiskDataSize() { return getDiskDataSize(); };
+    virtual uint64_t getDiskDataSize() = 0;
+    virtual uint64_t hybridGetDiskDataSize() { return getDiskDataSize(); };
 
     // Return the number of heads/sides
     virtual uint32_t getNumHeads() = 0;

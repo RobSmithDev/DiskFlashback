@@ -31,30 +31,33 @@ MountedVolume::MountedVolume(VolumeManager* manager, const std::wstring& mainEXE
 	DokanFileSystemManager(driveLetter, forceWriteProtect, mainEXE), m_io(io), m_manager(manager) {
     m_registry = new ShellRegistery(mainEXE);
     m_amigaFS = new DokanFileSystemAmigaFS(this, manager->autoRename());
+    m_amigaPFS3 = new DokanFileSystemAmigaPFS3(this, manager->autoRename());
     m_IBMFS = new DokanFileSystemFATFS(this);
+
 }
 
 MountedVolume::~MountedVolume() {
     if (m_amigaFS) delete m_amigaFS;
     if (m_IBMFS) delete m_IBMFS;
     if (m_registry) delete m_registry;
+    if (m_amigaPFS3) delete m_amigaPFS3;
 }
 
-// Special version that doesnt fail if the file system is unknown
-RETCODE refreshAmigaVolume(struct AdfDevice* const dev) {
+// Special version that doesnt fail if the file system is unknown - used for floppy disks only
+ADF_RETCODE refreshAmigaVolume(struct AdfDevice* const dev) {
     struct AdfVolume* vol;
-    struct bRootBlock root;
+    struct AdfRootBlock root;
     char diskName[35];
 
     dev->cylinders = 80;
     dev->heads = 2;
-    if (dev->devType == DEVTYPE_FLOPDD)
+    if (dev->devType == ADF_DEVTYPE_FLOPDD)
         dev->sectors = 11;
     else
         dev->sectors = 22;
 
     vol = (struct AdfVolume*)malloc(sizeof(struct AdfVolume));
-    if (!vol) return RC_ERROR;
+    if (!vol) return ADF_RC_ERROR;
 
     vol->mounted = TRUE;
     vol->firstBlock = 0;
@@ -63,7 +66,7 @@ RETCODE refreshAmigaVolume(struct AdfDevice* const dev) {
     vol->blockSize = 512;
     vol->dev = dev;
 
-    if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == RC_OK) {
+    if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == ADF_RC_OK) {
         memset(diskName, 0, 35);
         memcpy_s(diskName, 35, root.diskName, root.nameLen);
         diskName[34] = '\0';  // make sure its null terminted
@@ -82,12 +85,12 @@ RETCODE refreshAmigaVolume(struct AdfDevice* const dev) {
     dev->volList = (struct AdfVolume**)malloc(sizeof(struct AdfVolume*));
     if (!dev->volList) {
         free(vol);
-        return RC_ERROR;
+        return ADF_RC_ERROR;
     }
     dev->volList[0] = vol;
     dev->nVol = 1;
 
-    return RC_OK;
+    return ADF_RC_OK;
 }
 
 
@@ -181,10 +184,10 @@ bool MountedVolume::installAmigaBootBlock() {
     if (!mem) return false;
 
     memset(mem, 0, 1024);
-    fetchBootBlockCode_AMIGA(isFFS(getADFVolume()->dosType), mem);
+    fetchBootBlockCode_AMIGA(adfDosFsIsFFS(getADFVolume()->fs.type), mem);
 
     // Nothing writes to where thr boot block is so it's safe to do this
-    bool ok = adfInstallBootBlock(getADFVolume(), mem) == RC_OK;
+    bool ok = adfVolInstallBootBlock(getADFVolume(), mem) == ADF_RC_OK;
 
     free(mem);
 
@@ -262,9 +265,9 @@ bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex, 
         //SHChangeNotify(SHCNE_MEDIAINSERTED, SHCNF_PATH, m_drive.c_str(), NULL);
     }
     m_tempUnmount = false;
-
+#ifndef _DEBUG
     if (showExplorer && m_FatFS) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
-
+#endif
     return m_FatFS != nullptr;
 }
 
@@ -275,8 +278,12 @@ void MountedVolume::setSystemRecognisedSectorFormat(bool wasRecognised) {
 
 bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex, bool showExplorer) {
     if (m_ADFvolume) {
-        adfUnMount(m_ADFvolume);
+        adfVolUnMount(m_ADFvolume);
         m_ADFvolume = nullptr;
+    }
+    if (m_pfs3) {
+        delete m_pfs3;
+        m_pfs3 = nullptr;
     }
     m_ADFdevice = adfDevice;
     if (partitionIndex == 0xFFFFFFFF) {
@@ -285,39 +292,112 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     }
     else {
         m_partitionIndex = partitionIndex;
-        m_ADFvolume = m_ADFdevice ? adfMount(m_ADFdevice, partitionIndex, isForcedWriteProtect()) : nullptr;
+        m_ADFvolume = m_ADFdevice ? adfVolMount(m_ADFdevice, partitionIndex, isForcedWriteProtect() ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE) : nullptr;
+        // Not a standard AMIGA file system.
+        if (!m_ADFvolume) {
+            // Quick re-parse to get the data we need
+            AdfRDSKblock rdskBlock;
+            if (adfReadRDSKblock(m_ADFdevice, &rdskBlock) == ADF_RC_OK) {
+
+                // Find partition
+                int32_t next = rdskBlock.partitionList;
+                struct AdfPARTblock part;
+                part.blockSize = 0;
+                
+                int partToSearch = partitionIndex + 1;
+                while (next && partToSearch) {                    
+                    partToSearch--;
+                    if (adfReadPARTblock(m_ADFdevice, next, &part) != ADF_RC_OK) {
+                        part.blockSize = 0;
+                        break;
+                    }
+                    next = part.next;
+                }
+
+                if (part.blockSize) {
+
+                    // Lets try PFS3
+                    IPFS3::DriveInfo drive;
+
+                    drive.numHeads = rdskBlock.heads;
+                    drive.numCylinders = rdskBlock.cylinders;
+                    drive.cylBlocks = rdskBlock.cylBlocks;
+                    drive.sectorSize = rdskBlock.blockSize;
+
+                    IPFS3::PartitionInfo pinfo;
+                    pinfo.sectorsPerBlock = part.sectorsPerBlock;
+                    pinfo.blocksPerTrack = part.blocksPerTrack;
+                    pinfo.blockSize = part.blockSize;
+                    pinfo.lowCyl = part.lowCyl;
+                    pinfo.highCyl = part.highCyl;
+                    pinfo.mask = part.mask;
+                    pinfo.numBuffer = part.numBuffer;
+
+                    m_pfs3 = IPFS3::createInstance(drive, pinfo,
+                        [this](uint32_t physicalSector, uint32_t readSize, void* data)->bool {
+                            // READ SECTOR
+                            return m_io->readData(physicalSector, readSize, data);
+                        },
+                        [this](uint32_t physicalSector, uint32_t readSize, const void* data)->bool {
+                            // WRITE SECTOR
+                            return m_io->writeData(physicalSector, readSize, data);
+                        },
+                        [this](const std::string& message) {
+                            std::string mp;
+                            wideToAnsi(getMountPoint(), mp);
+                            std::string caption = "DiskFlashback - PFS3 Error on " + mp;
+                            MessageBoxA(GetDesktopWindow(), message.c_str(), caption.c_str(), MB_OK | MB_ICONERROR);
+                        }
+                    );
+                    if (!m_pfs3->available()) {
+                        delete m_pfs3;
+                        m_pfs3 = nullptr;
+                    }
+                }
+            }
+        }
     }   
 
     // Hook up ADF_operations
-    m_amigaFS->setCurrentVolume(m_ADFvolume);
+    m_amigaFS->setCurrentVolume(m_ADFvolume); 
+    m_amigaPFS3->setCurrentVolume(m_pfs3);
     m_amigaFS->resetFileSystem();
-    setSystemRecognisedSectorFormat(m_ADFvolume != nullptr);
-    setActiveFileSystem(adfDevice ? m_amigaFS : nullptr);
+    m_amigaPFS3->resetFileSystem();
+    setSystemRecognisedSectorFormat((m_ADFvolume != nullptr) || (m_pfs3 != nullptr));
+    if (m_pfs3) setActiveFileSystem(m_amigaPFS3); else
+        setActiveFileSystem(adfDevice ? m_amigaFS : nullptr);
     m_registry->setupDriveIcon(true, getMountPoint()[0], 1, m_io->isPhysicalDisk());
     m_registry->mountDismount(true, getMountPoint()[0], m_io);
     SHChangeNotify(SHCNE_DRIVEREMOVED, SHCNF_PATH, getMountPoint().c_str(), NULL);
     SHChangeNotify(SHCNE_DRIVEADD, SHCNF_PATH, getMountPoint().c_str(), NULL);
     m_tempUnmount = false;
 
-    if (showExplorer && m_ADFvolume) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
+    if (showExplorer && (m_ADFvolume || m_pfs3)) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
 
-    return m_ADFvolume != nullptr;
+    return (m_ADFvolume != nullptr) || (m_pfs3 != nullptr);
 }
 
 // Refresh the auto rename
 void MountedVolume::refreshRenameSettings() {
     if (m_amigaFS) m_amigaFS->changeAutoRename(m_manager->autoRename());
+    if (m_amigaPFS3) m_amigaPFS3->changeAutoRename(m_manager->autoRename());
 }
 
 
 void MountedVolume::unmountFileSystem() {
     std::wstring path = getMountPoint();
     if (m_ADFvolume) {
-        adfUnMount(m_ADFvolume);
+        adfVolUnMount(m_ADFvolume);
         m_ADFvolume = nullptr;
+    }
+    if (m_pfs3) {
+        delete m_pfs3;
+        m_pfs3 = nullptr;
     }
     m_amigaFS->setCurrentVolume(nullptr);
     m_amigaFS->resetFileSystem();
+    m_amigaPFS3->setCurrentVolume(nullptr);
+    m_amigaPFS3->resetFileSystem();
     m_IBMFS->setCurrentVolume(nullptr);
     setActiveFileSystem(nullptr);
     m_ADFdevice = nullptr;

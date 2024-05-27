@@ -17,6 +17,43 @@
 #include "amiga_sectors.h"
 #include "ibm_sectors.h"
 #include <stdio.h>
+#include <Commctrl.h>
+#pragma comment(lib, "Comctl32.lib")
+
+
+ // Quick access to TaskDialog. icons are TD_ERROR_ICON, TD_WARNING_ICON, TD_INFORMATION_ICON, TD_SHIELD_ICON
+int TaskDialogMessage(HWND parent, HINSTANCE hInstance, const std::wstring& caption, const std::wstring& heading, const std::wstring& message, const std::vector<std::wstring>& buttons, PCWSTR iconType) {
+    std::vector<TASKDIALOG_BUTTON> btns;
+    for (const std::wstring& s : buttons) {
+        TASKDIALOG_BUTTON b;
+        b.nButtonID = btns.size();
+        b.pszButtonText = (WCHAR*)s.c_str();
+        btns.push_back(b);
+    }
+
+    TASKDIALOGCONFIG config;
+    memset(&config, 0, sizeof(config));
+    config.cbSize = sizeof(config);
+    config.hwndParent = parent;
+    config.hInstance = hInstance;
+    config.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_USE_COMMAND_LINKS | TDF_SIZE_TO_CONTENT;
+    if (config.hwndParent) config.dwFlags |= TDF_POSITION_RELATIVE_TO_WINDOW;
+    config.pszMainIcon = TD_ERROR_ICON;
+    config.pszWindowTitle = caption.c_str();
+    config.pszMainInstruction = heading.c_str();
+    config.pszContent = message.c_str();
+    config.cButtons = btns.size();
+    config.nDefaultButton = -1;
+    config.pButtons = btns.data();
+
+    int button = -1;
+
+    if (TaskDialogIndirect(&config, &button, NULL, NULL) == S_OK) {
+        if ((button >= 0) && (button < buttons.size())) return button;
+        return -1;
+    }
+    else return -1;
+}
 
 // Jump back in!
 VOID CALLBACK MotorMonitor(_In_ PVOID   lpParameter, _In_ BOOLEAN TimerOrWaitFired) {
@@ -38,6 +75,7 @@ bool SectorCacheMFM::initDrive() {
     m_diskType = SectorType::stUnknown;
     m_motorTurnOnTime = 0;
     m_diskInDrive = false;
+    m_alwaysIgnore = false;
 
     if (!restoreDrive()) 
         return false;
@@ -89,6 +127,7 @@ void SectorCacheMFM::identifyFileSystem() {
         m_totalCylinders[i] = 0;
         m_numHeads[i] = 2;
     }
+    m_alwaysIgnore = false;
     std::lock_guard<std::mutex> bridgeLock(m_motorTimerProtect);
     m_diskType = SectorType::stUnknown;
     cylinderSeek(0, false);
@@ -128,7 +167,9 @@ bool SectorCacheMFM::diskRemovedWarning() {
     while (!isDiskInDrive()) {
         if (GetTickCount64() - t > 1000) {
             if (!shouldPrompt()) return false;
-            if (MessageBox(GetDesktopWindow(), L"WARNING: Not all data has been written to disk!\nYou MUST re-insert the disk into drive and press retry.", L"FLOPPY DISK REMOVED", MB_ICONSTOP | MB_RETRYCANCEL) != IDRETRY)
+
+            if (TaskDialogMessage(GetDesktopWindow(), GetModuleHandle(NULL), L"Floppy Disk Removed", L"WARNING: Not all data has been written to disk!", L"You MUST re-insert the disk into drive and press retry.",
+                {L"Retry", L"Cancel"}, TD_WARNING_ICON) != 0)
                 return false;
             t = GetTickCount64();
         }
@@ -186,7 +227,7 @@ void SectorCacheMFM::motorMonitor() {
         if ((m_motorTurnOnTime) && (GetTickCount64() - m_motorTurnOnTime > MOTOR_IDLE_TIMEOUT)) {
             flushPendingWrites();
             motorEnable(false, false);
-            m_ignoreErrors = false;
+            if (!m_alwaysIgnore) m_ignoreErrors = false;
             m_blockWriting = false;
             m_motorTurnOnTime = 0;
         }
@@ -272,7 +313,7 @@ SectorCacheMFM::~SectorCacheMFM() {
 }
 
 // Get size of the disk in bytes
-uint32_t SectorCacheMFM::getDiskDataSize() {
+uint64_t SectorCacheMFM::getDiskDataSize() {
     if (!available()) return 0;
     if (m_totalCylinders[0]) return m_bytesPerSector[0] * m_sectorsPerTrack[0] * m_numHeads[0] * m_totalCylinders[0];
     return m_bytesPerSector[0] * m_sectorsPerTrack[0] * m_numHeads[0] * 82;
@@ -317,15 +358,17 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
             if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
             if (!shouldPrompt()) return false;
 
-            switch (MessageBox(GetDesktopWindow(), L"There have been some errors reading data from the disk.\nWhat would you like to do?", L"Disk Errors Detected", MB_SETFOREGROUND | MB_SYSTEMMODAL | MB_ICONQUESTION | MB_ABORTRETRYIGNORE)) {
-            case IDRETRY:
-            case IDTRYAGAIN: break;
-            case IDIGNORE:
+            switch (TaskDialogMessage(GetDesktopWindow(), GetModuleHandle(NULL), L"Disk Errors Detected", L"Disk read errors were detected.", L"What would you like to do?",
+                { L"Retry", L"Ignore", L"Always Ignore", L"Abort" }, TD_WARNING_ICON)) {
+            case 0: break;
+            case 1: m_ignoreErrors = true;
+                break;
+            case 2: m_alwaysIgnore = true;
                 m_ignoreErrors = true;
                 break;
-            default:
+            default: 
                 return false;
-            }
+            }           
         }
 
         // If this hits, then do a re-seek.  Sometimes it helps
@@ -666,12 +709,14 @@ bool SectorCacheMFM::flushPendingWrites() {
                         }
                         else
                             if (!shouldPrompt()) return false; else
-                            switch (MessageBox(GetDesktopWindow(), L"Disk writing is taking too long.\nWhat would you like to do?", L"Disk Writing Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION)) {
-                            case IDABORT:
+
+                            switch (TaskDialogMessage(GetDesktopWindow(), GetModuleHandle(NULL), L"Disk Writing Timeout", L"Disk writing is taking too long", L"What would you like to do?",
+                                    {L"Abort", L"Retry", L"Cancel"}, TD_WARNING_ICON))  {
+                            case 0:
                                 m_blockWriting = true;
                                 removeFailedWritesFromCache();
                                 return false;
-                            case IDRETRY:
+                            case 1:
                                 doRetry = true;
                                 break;
                             default:
@@ -697,10 +742,21 @@ bool SectorCacheMFM::flushPendingWrites() {
                                 }
                             }
                             else
-                                if (!shouldPrompt()) return false; else
-                                if (MessageBox(GetDesktopWindow(), L"Disk verifying is taking too long.\nWhat would you like to do?", L"Disk Verifying Timeout", MB_ABORTRETRYIGNORE | MB_ICONQUESTION) != IDRETRY) {
-                                    removeFailedWritesFromCache();
-                                    return false;
+                                if (!shouldPrompt()) return false; else {
+                                    if (m_alwaysIgnore) {
+                                        removeFailedWritesFromCache();
+                                        return false;
+                                    }
+                                    switch (TaskDialogMessage(GetDesktopWindow(), GetModuleHandle(NULL), L"Disk Verifying Timeout", L"Disk verifying is taking too long.", L"What would you like to do?",
+                                        { L"Retry", L"Ignore", L"Always Ignore", L"Abort" }, TD_WARNING_ICON)) {
+                                    case 0: break;                                   
+                                    case 2:
+                                        m_alwaysIgnore = true;
+                                        removeFailedWritesFromCache();
+                                        return false;
+                                    default:  removeFailedWritesFromCache();
+                                        return false;
+                                    }
                                 }
                             // Wait and try again
                             Sleep(100);

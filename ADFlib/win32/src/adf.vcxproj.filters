@@ -10,9 +10,6 @@
     <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_dump.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_flop.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -49,7 +46,13 @@
     <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_vol.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\generic\adf_nativ.c">
+    <ClCompile Include="..\..\src\adf_dev_driver_dump.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\adf_dev_driver_ramdisk.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\adf_dev_drivers.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -64,9 +67,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_cache.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_dump.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_dev_flop.h">
@@ -123,18 +123,24 @@
     <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\defendian.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\hd_blk.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\prefix.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\adf_nativ.h">
+    <ClInclude Include="..\..\src\adf_byteorder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <CustomBuild Include="D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\src\CMakeLists.txt" />
+    <ClInclude Include="..\..\src\adf_dev_driver_dump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\adf_dev_driver_nativ.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\adf_dev_driver_ramdisk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\adf_dev_drivers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -143,5 +149,8 @@
     <Filter Include="Source Files">
       <UniqueIdentifier>{1F23464E-435D-3575-A761-FA8C5E26B8DC}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\src\CMakeLists.txt" />
   </ItemGroup>
 </Project>

@@ -53,6 +53,8 @@ private:
     uint32_t m_serialNumber[2] = { 0x554E4B4E, 0 };
     uint32_t m_numHeads[2] = { 2, 2 };
 
+    bool m_alwaysIgnore = false;
+
     // Tracks that need committing to disk
     // NOTE: Using MAP not UNORDERED_MAP. This *should* make the disk head stepping fairly sequential and faster
     std::map<uint32_t, uint32_t> m_tracksToFlush; // mapping of track -> number of hits
@@ -113,7 +115,7 @@ public:
     ~SectorCacheMFM();
 
     // Fetch the size of the disk file
-    virtual uint32_t getDiskDataSize() override final;
+    virtual uint64_t getDiskDataSize() override final;
 
     // Used to set what file is currently being accessed - to help dokan know we're busy
     virtual void setActiveFileIO(PDOKAN_FILE_INFO dokanfileinfo) override final;

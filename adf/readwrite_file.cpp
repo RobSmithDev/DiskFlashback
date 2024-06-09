@@ -189,8 +189,10 @@ void SectorRW_File::quickClose() {
 
 
 // Fetch the size of the disk file
-uint32_t SectorRW_File::getDiskDataSize() {
-    return GetFileSize(m_file, NULL);
+uint64_t SectorRW_File::getDiskDataSize() {
+    LARGE_INTEGER i;
+    GetFileSizeEx(m_file, &i);
+    return i.QuadPart;
 };
 
 bool SectorRW_File::isDiskPresent() {
@@ -210,9 +212,12 @@ bool SectorRW_File::internalReadData(const uint32_t sectorNumber, const uint32_t
     DWORD read = 0;
 
     switch (m_mode) {
-    case SectorMode::smNormal:
-        if (SetFilePointer(m_file, sectorNumber * sectorSize, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;
-        if (!ReadFile(m_file, data, sectorSize, &read, NULL)) return false;
+    case SectorMode::smNormal: {
+            LARGE_INTEGER pos;
+            pos.QuadPart = (uint64_t)sectorNumber * (uint64_t)sectorSize;
+            if (SetFilePointerEx(m_file, pos, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) return false;
+            if (!ReadFile(m_file, data, sectorSize, &read, NULL)) return false;
+        }
         return (read == sectorSize);
 
     case SectorMode::smMSA: 

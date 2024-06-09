@@ -32,6 +32,7 @@
 #define MENUID_MOUNTDISK        2
 #define MENUID_ABOUT            3
 #define MENUID_DONATE           4
+#define MENUID_RETRODIR         5
 #define MENUID_QUIT             10
 #define MENUID_ENABLED          20
 #define MENUID_CONFIGURE        21
@@ -155,6 +156,8 @@ void CTrayMenu::setupMenu() {
 
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates Now");
+    AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_RETRODIR, L"&Visit Retro.Directory...");
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hUpdates, MF_STRING, MENUID_DONATE, L"&Donate...");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_ABOUT, L"&About...");
@@ -399,21 +402,15 @@ void CTrayMenu::runCreateImage(bool isHD, uint32_t option) {
 
 void CTrayMenu::installAmigaFS(bool isHD, SectorCacheEngine* fle) {
     // Prepare the ADF library
-    adfEnvInitDefault();
-    adfSetEnvFct((AdfLogFct)Error, (AdfLogFct)Warning, (AdfLogFct)Verbose, NULL);
-    struct AdfNativeFunctions native;
-    native.adfInitDevice = adfInitDevice;
-    native.adfReleaseDevice = adfReleaseDevice;
-    native.adfNativeReadSector = adfNativeReadSector;
-    native.adfNativeWriteSector = adfNativeWriteSector;
-    native.adfIsDevNative = adfIsDevNative;
-    adfSetNative(&native);
-    AdfDevice* dev = adfOpenDev((char*)fle, false);
+    adfPrepNativeDriver();
+    AdfDevice* dev = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)fle, ADF_ACCESS_MODE_READWRITE);
+    if (!dev) return;
+    adfDevMount(dev);
     dev->cylinders = fle->totalNumTracks() / 2;
     dev->heads = 2;
     dev->sectors = fle->numSectorsPerTrack();
     adfCreateFlop(dev, "empty", 0);
-    adfUnMountDev(dev);
+    adfDevUnMount(dev);
     fle->flushWriteCache();
     adfEnvCleanUp();
 }
@@ -465,6 +462,10 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     case MENUID_DONATE:
         ShellExecute(m_window.hwnd(), L"open", L"https://ko-fi.com/robsmithdev", NULL, NULL, SW_SHOW);
         break;
+
+    case MENUID_RETRODIR:
+        ShellExecute(m_window.hwnd(), L"open", L"https://retro.directory", NULL, NULL, SW_SHOW);
+        break;
     case MENUID_ABOUT: {
         DWORD v = getAppVersion();
             std::wstring msg = std::wstring(APPLICATION_NAME_L) + L" V" + std::to_wstring(v >> 24) + L"." + std::to_wstring((v >> 16) & 0xFF) + L"." + std::to_wstring((v >> 8) & 0xFF) + L"." + std::to_wstring(v & 0xFF) + L"\r\n";
@@ -476,6 +477,7 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
             msg += L"\x2022 FatFS (FAT12/16 File System)\r\n";
             msg += L"\x2022 xDMS (DMS Decompression)\r\n";
             msg += L"\x2022 FloppyBridge (Floppy Drive Access)";
+            msg += L"\x2022 pfs3aio (PFS File System) by Michiel Pelt";
             MessageBox(m_window.hwnd(), msg.c_str(), L"About DiskFlashback", MB_OK | MB_ICONINFORMATION);
         }
         break;

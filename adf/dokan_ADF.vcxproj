@@ -129,7 +129,7 @@
     <LinkIncremental>true</LinkIncremental>
     <TargetName>DiskFlashback</TargetName>
     <RunCodeAnalysis>false</RunCodeAnalysis>
-    <IncludePath>$(IncludePath);D:\Virtual Floppy Drive\dokany-master\FloppyDrive</IncludePath>
+    <IncludePath>$(IncludePath);$(SolutionDir)FloppyDrive</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <LinkIncremental>true</LinkIncremental>
@@ -157,7 +157,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>DiskFlashback</TargetName>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);D:\Virtual Floppy Drive\dokany-master\FloppyDrive</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)FloppyDrive</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <LinkIncremental>false</LinkIncremental>
@@ -177,7 +177,7 @@
       <PreprocessorDefinitions>UNDER_DOS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_ENABLE_ATOMIC_ALIGNMENT_FIX;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../../;../../sys;spdlog/include;</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -283,7 +283,7 @@
       <PreprocessorDefinitions>UNDER_DOS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_ENABLE_ATOMIC_ALIGNMENT_FIX;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../../;../../sys;spdlog/include;</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -344,6 +344,8 @@
     <ClCompile Include="..\fatfs\source\ff.c" />
     <ClCompile Include="..\fatfs\source\ffsystem.c" />
     <ClCompile Include="..\fatfs\source\ffunicode.c" />
+    <ClCompile Include="adf_nativedriver.cpp" />
+    <ClCompile Include="amiga_operations.cpp" />
     <ClCompile Include="amiga_sectors.cpp" />
     <ClCompile Include="dlgConfig.cpp" />
     <ClCompile Include="dlgCopy.cpp" />
@@ -358,6 +360,7 @@
     <ClCompile Include="mfminterface.cpp" />
     <ClCompile Include="MountedVolume.cpp" />
     <ClCompile Include="MountedVolumes.cpp" />
+    <ClCompile Include="pfs3_operations.cpp" />
     <ClCompile Include="pll.cpp" />
     <ClCompile Include="readwrite_dms.cpp" />
     <ClCompile Include="readwrite_file.cpp" />
@@ -381,7 +384,9 @@
     <ClInclude Include="..\fatfs\source\diskio.h" />
     <ClInclude Include="..\fatfs\source\ff.h" />
     <ClInclude Include="..\fatfs\source\ffconf.h" />
+    <ClInclude Include="adf_nativedriver.h" />
     <ClInclude Include="ADF_operations.h" />
+    <ClInclude Include="amiga_operations.h" />
     <ClInclude Include="amiga_sectors.h" />
     <ClInclude Include="dlgConfig.h" />
     <ClInclude Include="dlgCopy.h" />
@@ -397,6 +402,7 @@
     <ClInclude Include="mfminterface.h" />
     <ClInclude Include="MountedVolume.h" />
     <ClInclude Include="MountedVolumes.h" />
+    <ClInclude Include="pfs3_operations.h" />
     <ClInclude Include="pll.h" />
     <ClInclude Include="readwrite_dms.h" />
     <ClInclude Include="readwrite_file.h" />
@@ -424,6 +430,9 @@
     </ProjectReference>
     <ProjectReference Include="..\ADFlib\win32\src\adf.vcxproj">
       <Project>{70b5fad1-b4b3-3df0-a4ce-3f0ac4343ecd}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\PFS3lib\PFS3lib.vcxproj">
+      <Project>{88eb11ff-f83d-46c4-b52f-ab025a979d06}</Project>
     </ProjectReference>
     <ProjectReference Include="C:\Users\Rob\OneDrive\Original Layout\Documents\Programming\Embedded\ReadFloppyDisk.sketch\bridge\FloppyDriveBridge\windows\FloppyBridge.vcxproj">
       <Project>{ebf9eb12-0bf9-4299-a86f-c36236eaba45}</Project>

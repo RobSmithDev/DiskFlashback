@@ -22,6 +22,8 @@
 #include "fatfs/source/ff.h"
 #include "dlgConfig.h"
 
+
+
 class VolumeManager {
 private:
 	// Full path to main exe name (this program)
@@ -113,14 +115,5 @@ public:
 };
 
 
-
-// ADFLib Native Functions
-RETCODE adfInitDevice(struct AdfDevice* const dev, const char* const name, const BOOL ro);
-RETCODE adfReleaseDevice(struct AdfDevice* const dev);
-RETCODE adfNativeReadSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, uint8_t* const buf);
-RETCODE adfNativeWriteSector(struct AdfDevice* const dev, const uint32_t n, const unsigned size, const uint8_t* const buf);
-BOOL adfIsDevNative(const char* const devName);
-void Warning(char* msg);
-void Error(char* msg);
-void Verbose(char* msg);
+void adfPrepNativeDriver();
 void setFatFSSectorCache(SectorCacheEngine* _fatfsSectorCache);

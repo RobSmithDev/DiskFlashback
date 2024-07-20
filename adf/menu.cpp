@@ -205,20 +205,22 @@ void CTrayMenu::checkForUpdates(bool force) {
     if ((address) && (address->h_addrtype == AF_INET)) {
         if (address->h_addr_list[0] != 0) {
             in_addr add = *((in_addr*)address->h_addr_list[0]);
+            if (add.S_un.S_un_b.s_b1 < 20) {   // If I get to version 20 I'll be amazed!
 
-            DWORD netVersion = (add.S_un.S_un_b.s_b1 << 24) | (add.S_un.S_un_b.s_b2 << 16) | (add.S_un.S_un_b.s_b3 << 8) | add.S_un.S_un_b.s_b4;
-            DWORD appVersion = getAppVersion();
-         
-            if (appVersion < netVersion) {
-                // Do popup for updates available
-                m_notify.uFlags |= NIF_INFO;
-                m_notify.dwInfoFlags = NIIF_INFO;
-                m_lastBalloonIsUpdate = true;
-                wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
-                wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
+                DWORD netVersion = (add.S_un.S_un_b.s_b1 << 24) | (add.S_un.S_un_b.s_b2 << 16) | (add.S_un.S_un_b.s_b3 << 8) | add.S_un.S_un_b.s_b4;
+                DWORD appVersion = getAppVersion();
 
-                Shell_NotifyIcon(NIM_MODIFY, &m_notify);
-                m_notify.uFlags &= ~NIF_INFO;
+                if (appVersion < netVersion) {
+                    // Do popup for updates available
+                    m_notify.uFlags |= NIF_INFO;
+                    m_notify.dwInfoFlags = NIIF_INFO;
+                    m_lastBalloonIsUpdate = true;
+                    wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                    wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
+
+                    Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+                    m_notify.uFlags &= ~NIF_INFO;
+                }
             }
         }
     }   
@@ -258,7 +260,7 @@ void CTrayMenu::handleCopyToDisk() {
     dlg.hwndOwner = m_window.hwnd();
     std::wstring filter;
     std::wstring defaultFormat;
-    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st;\0All Files(*.*)\0*.*\0\0";
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.ima;*.st;\0All Files(*.*)\0*.*\0\0";
     dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
     dlg.lpstrTitle = L"Select disk image to copy to floppy";
     dlg.lpstrFile = filename;
@@ -476,7 +478,7 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
             msg += L"\x2022 ADFLib (OFS/FFS File System)\r\n";
             msg += L"\x2022 FatFS (FAT12/16 File System)\r\n";
             msg += L"\x2022 xDMS (DMS Decompression)\r\n";
-            msg += L"\x2022 FloppyBridge (Floppy Drive Access)";
+            msg += L"\x2022 FloppyBridge (Floppy Drive Access)\r\n";
             msg += L"\x2022 pfs3aio (PFS File System) by Michiel Pelt";
             MessageBox(m_window.hwnd(), msg.c_str(), L"About DiskFlashback", MB_OK | MB_ICONINFORMATION);
         }

@@ -55,6 +55,8 @@ private:
 	// Active threads we're keeping track of
 	std::vector<std::thread> m_threads;
 
+	// Special version to call adfDevMount that monitors the cylinder count for weirdness
+	void adfDevMountCylinders();
 
 	// General cleanup and monitoring to see if file systems have dropped out
 	void checkRunningFileSystems();
@@ -91,6 +93,9 @@ public:
 
 	// Start a file mount
 	bool mountFile(const std::wstring& filename);
+
+	// Mount a raw volume
+	bool mountRaw(const std::wstring& physicalDrive, bool readOnly);
 
 	// Start a drive mount
 	bool mountDrive(const std::wstring& floppyProfile);

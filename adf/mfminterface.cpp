@@ -57,8 +57,12 @@ int TaskDialogMessage(HWND parent, HINSTANCE hInstance, const std::wstring& capt
 
 // Jump back in!
 VOID CALLBACK MotorMonitor(_In_ PVOID   lpParameter, _In_ BOOLEAN TimerOrWaitFired) {
-    SectorCacheMFM* callback = (SectorCacheMFM*)lpParameter;
-    callback->motorMonitor();
+    static std::mutex busy;
+    if (busy.try_lock()) {
+        SectorCacheMFM* callback = (SectorCacheMFM*)lpParameter;
+        callback->motorMonitor();
+        busy.unlock();
+    }
 }
 
 void SectorCacheMFM::releaseDrive() {
@@ -447,9 +451,9 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         getTrackDetails_AMIGA(isHD(), m_sectorsPerTrack[0], m_bytesPerSector[0]);
         DecodedTrack trAmiga;
         findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trAmiga);
-        DecodedTrack trIBM;
+        DecodedTrack trIBM, trAltIBM;
         bool nonStandard = false;
-        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trIBM, nonStandard);
+        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trIBM, trAltIBM, nonStandard);
         uint32_t serialNumber;
         uint32_t sectorsPerTrack;
         uint32_t bytesPerSector;
@@ -470,7 +474,7 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
                     m_diskType = SectorType::stHybrid;
                 }
                 else
-                    if (nonStandard || (numHeads < 2)) m_diskType = SectorType::stAtari;
+                    if (nonStandard /*|| (numHeads < 2)*/) m_diskType = SectorType::stAtari;
                 uint32_t i = (m_diskType == SectorType::stHybrid) ? 1 : 0;
                 m_sectorsPerTrack[i] = sectorsPerTrack;
                 m_bytesPerSector[i] = bytesPerSector;
@@ -488,27 +492,29 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         }
     }
 
+    DecodedTrack trDummy;
     if (m_diskType == SectorType::stHybrid) {
+
         if (m_numHeads[1] == 2) {  // Has 2 sides? Treat everything as normal
             findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
-            findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track]);
+            findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track], trDummy);
         }
         else // Atari is single sided. Amiga is ALWAYS double sided
             if (fileSystem == 1) {
                 findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track * 2, m_sectorsPerTrack[0], m_trackCache[0][track * 2]);
-                findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track]);
+                findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track], trDummy);
             }
             else {
                 findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
                 if ((track & 1) == 0)
-                    findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track >> 1]);
+                    findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track >> 1], trDummy);
             }
     }
     else
         if (m_diskType == SectorType::stAmiga)
             findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
     if ((m_diskType == SectorType::stAtari) || (m_diskType == SectorType::stIBM))
-        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);    
+        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track], trDummy);
 
     return true;
 }

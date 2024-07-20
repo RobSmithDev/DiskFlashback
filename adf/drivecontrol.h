@@ -55,6 +55,7 @@
 #define COMMANDLINE_CONTROL					L"CONTROL"
 #define COMMANDLINE_MOUNTDRIVE              L"BRIDGE"
 #define COMMANDLINE_MOUNTFILE				L"FILE"
+#define COMMANDLINE_MOUNTRAW                L"RAW"
 
 
 

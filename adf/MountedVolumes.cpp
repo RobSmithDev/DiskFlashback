@@ -298,6 +298,21 @@ void VolumeManager::unmountPhysicalFileSystems() {
     }
 }
 
+// Special version to call adfDevMount that monitors the cylinder count for weirdness
+void VolumeManager::adfDevMountCylinders() {
+    if (!m_adfDevice) return;
+
+    ADF_RETCODE code = adfDevMount(m_adfDevice);
+    if ((code != ADF_RC_OK) && ((m_adfDevice->devType == ADF_DEVTYPE_FLOPDD) || (m_adfDevice->devType == ADF_DEVTYPE_FLOPHD))) {
+        while (m_adfDevice->cylinders > 80) {
+            m_adfDevice->cylinders--;
+            code = adfDevMount(m_adfDevice);
+            if (code == ADF_RC_OK) return;
+        }
+    }
+}
+
+
 
 // Notification received that the current disk changed
 void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {    
@@ -328,11 +343,11 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
         switch (diskFormat) {
             case SectorType::stAmiga:   
                 m_adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)m_io, m_forceReadOnly ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE);
-                if (m_adfDevice) adfDevMount(m_adfDevice);
+                if (m_adfDevice) adfDevMountCylinders();
                 break;
             case SectorType::stHybrid:
                 m_adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)m_io, m_forceReadOnly ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE); 
-                if (m_adfDevice) adfDevMount(m_adfDevice);
+                if (m_adfDevice) adfDevMountCylinders();
                 m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
                 if (m_fatDevice) {
                     memset(m_fatDevice, 0, sizeof(FATFS));
@@ -401,6 +416,28 @@ void VolumeManager::refreshWindowTitle() {
 void VolumeManager::triggerRemount() {
     if (m_io)
         PostMessage(m_window.hwnd(), WM_DISKCHANGE, m_io->isDiskPresent() ? 1 : 0, (LPARAM)m_io->getSystemType());
+}
+
+// Mount a raw volume
+bool VolumeManager::mountRaw(const std::wstring& physicalDrive, bool readOnly) {
+    // Open the file
+    HANDLE fle = CreateFile(physicalDrive.c_str(), GENERIC_READ | (m_forceReadOnly ? 0 : GENERIC_WRITE), 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, 0);
+    if ((fle == INVALID_HANDLE_VALUE) && (!m_forceReadOnly)) {
+        // Try read only
+        fle = CreateFile(physicalDrive.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, 0);
+        m_forceReadOnly = true;
+    }
+    if (fle == INVALID_HANDLE_VALUE) return false;
+
+    // Read the first 4 bytes to help identify the type of file
+    char buffer[600] = { 0 };
+    DWORD read = 0;
+    if ((!ReadFile(fle, buffer, 512, &read, NULL)) || (read != 512)) {
+        CloseHandle(fle);
+        return false;
+    }
+
+    m_mountMode = COMMANDLINE_MOUNTFILE;
 }
 
 // Start a file mount
@@ -686,6 +723,13 @@ bool VolumeManager::run(bool triggerExplorer) {
         handleRemoteRequest(volume, REMOTECTRL_COPYTOADF, GetDesktopWindow());
         return 0;       
     });
+
+    // Allow these messages from less privilaged applications
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_COPYDATA, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_USER, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_AUTORENAME, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_COPYTOFILE, MSGFLT_ALLOW, NULL);
+
 
     // Not quite Highlander, as there There must always be one (at least one!)
     m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, findEmptyLetter(m_firstDriveLetter), m_forceReadOnly));

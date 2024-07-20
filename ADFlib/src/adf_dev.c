@@ -382,7 +382,7 @@ static ADF_RETCODE adfDevSetCalculatedGeometry_ ( struct AdfDevice * const dev )
         dev->heads     = 2;
         dev->sectors   = 22;
         dev->cylinders = dev->size / ( dev->heads * dev->sectors * 512 );
-        if ( dev->cylinders != 80 ) {
+        if (dev->cylinders < 80 || dev->cylinders > 83) {
             adfEnv.eFct ( "adfDevSetCalculatedGeometry_: invalid size %u", dev->size );
             return ADF_RC_ERROR;
         }

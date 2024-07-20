@@ -81,12 +81,14 @@ SectorRW_DMS::SectorRW_DMS(HANDLE fle) : SectorCacheEngine(512 * 84 * 2 * 2 * 11
 // DMS sometimes needs to be extracted in order!?
 bool SectorRW_DMS::unpackCylinders(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t* text) {
     DWORD read;    
+    m_totalTracks = 0;
 
     // Run until we run out of data
-    for (size_t c = 0; c < 80; c++) {
-        m_totalTracks = (uint32_t)((c + 1) * 2);
-        if (!ReadFile(fle, b1, THLEN, &read, NULL)) return false;
-        if (read != THLEN) return false;
+    for (size_t c = 0; c < 81; c++) {
+        if (!ReadFile(fle, b1, THLEN, &read, NULL)) 
+            return false;
+        if (read != THLEN) 
+            return false;
 
         if ((b1[0] != 'T') || (b1[1] != 'R')) return false;
         USHORT hcrc = (USHORT)((b1[THLEN - 2] << 8) | b1[THLEN - 1]);
@@ -100,16 +102,19 @@ bool SectorRW_DMS::unpackCylinders(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t
         USHORT cmode = b1[13];		                        /*  compression mode used  */
         USHORT usum = (USHORT)((b1[14] << 8) | b1[15]);	/*  Track Data CheckSum AFTER unpacking  */
 
-        if ((pklen1 > TRACK_BUFFER_LEN) || (pklen2 > TRACK_BUFFER_LEN) || (unpklen > TRACK_BUFFER_LEN)) return false;
+        if ((pklen1 > TRACK_BUFFER_LEN) || (pklen2 > TRACK_BUFFER_LEN) || (unpklen > TRACK_BUFFER_LEN)) 
+            return false;
         
         // Skip fake boot block advert
-        if (((number == 0) && (unpklen == 1024)) || (number >= 80)) {
+        if (((number == 0) && (unpklen == 1024)) || (number >= 83)) {
            //
         }
         else {
             // Read the buffer
-            if (!ReadFile(fle, b1, pklen1, &read, NULL)) return false;
-            if (read != pklen1) return false;
+            if (!ReadFile(fle, b1, pklen1, &read, NULL)) 
+                return false;
+            if (read != pklen1) 
+                return false;
 
             // Check track CRC
             if (CreateCRC(b1, (ULONG)pklen1) == dcrc) {
@@ -135,6 +140,10 @@ bool SectorRW_DMS::unpackCylinders(HANDLE fle, uint8_t* b1, uint8_t* b2, uint8_t
                     }
                 }
             }
+            else {
+
+            }
+            m_totalTracks = max(m_totalTracks, (uint32_t)((number + 1) * 2));
         }
     } 
     return true;

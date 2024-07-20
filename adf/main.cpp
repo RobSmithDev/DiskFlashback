@@ -29,6 +29,8 @@
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
+// RAW M 0 "\\.\PhysicalDrive3"
+
 // Command line is:
 //   COMMANDLINE_ constant
 //   DRIVELETTER
@@ -155,6 +157,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
         VolumeManager* vol = new VolumeManager(hInstance, exeName, driveLetter, readOnly);
 
+        if (std::wstring(argv[0]) == COMMANDLINE_MOUNTRAW) {
+            if (!vol->mountRaw(argv[3], readOnly)) {
+                delete vol;
+                return RETURNCODE_MOUNTFAIL;
+            }
+        } else
         if (std::wstring(argv[0]) == COMMANDLINE_MOUNTFILE) {
             if (!vol->mountFile(argv[3])) {
                 delete vol;

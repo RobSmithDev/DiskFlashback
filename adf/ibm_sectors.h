@@ -28,8 +28,8 @@ bool getTrackDetails_IBM(const DecodedTrack* decodedTrack, uint32_t& serialNumbe
 
 // Searches for sectors - you can re-call this and it will update decodedTrack rather than replace it
 // nonstandardTimings is set to true if this uses non-standard timings like those used by Atari etc
-void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, bool& nonstandardTimings);
-void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack);
+void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, DecodedTrack& altDecodedTrack, bool& nonstandardTimings);
+void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, DecodedTrack& altDecodedTrack);
 
 // Encode the track supplied into a raw MFM bit-stream
 uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, const bool forceAtariTiming, DecodedTrack* decodedTrack, const uint32_t trackNumber, uint32_t mfmBufferSizeBytes, void* trackData);

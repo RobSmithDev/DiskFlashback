@@ -185,7 +185,7 @@ void extractMFMDecodeRaw(const unsigned char* inTrack, const uint32_t dataLength
 
 // Searches for sectors - you can re-call this and it will update decodedTrack rather than replace it
 // nonstandardTimings is set to true if this uses non-standard timings like those used by Atari etc
-void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, bool& nonstandardTimings) {
+void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, DecodedTrack& altDecodedTrack, bool& nonstandardTimings) {
 	const uint32_t cylinder = trackNumber / 2;
 	const bool upperSide = trackNumber & 1;
 
@@ -209,6 +209,8 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 	uint32_t gapTotal = 0;
 	uint32_t numGaps = 0;
 
+	uint32_t unknownNumber = 100;
+
 	// run the entire track length with some space to wrap around
 	for (uint32_t bit = 0; bit < dataLengthInBits; bit++) {
 		const uint32_t realBitPos = bit % dataLengthInBits;
@@ -217,7 +219,8 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 		decoded <<= 1ULL;   // shift off one bit to make room for the new bit
 		if (track[trackBytePos] & (1 << trackBitPos)) decoded |= 1;
 
-		if (decoded == MFM_SYNC_SECTOR_HEADER) {
+		switch (decoded) {
+		case MFM_SYNC_SECTOR_HEADER: {
 			// Grab sector header
 			if (sectorEndPoint) {
 				uint32_t markerStart = bit + 1 - 64;
@@ -245,70 +248,65 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 
 			lastSectorNumber = sector.header.sector;			
 		}
-		else
-			if (decoded == MFM_SYNC_SECTOR_DATA) {
-				if (!headerFound) {
-					// Sector header was missing. We'll "guess" one - not ideal!
-					lastSectorNumber++;
-					memset(&sector.header, 0, sizeof(sector.header));
-					sector.header.sector = (uint8_t)lastSectorNumber;
-					sector.header.length = sectorSize;
-					sector.header.cylinder = cylinder;
-					sector.header.head = upperSide ? 1 : 0;
-					sector.headerErrors = 0xF0;
-					//headerFound = !beMoreStrict;
-				}
-				if (headerFound) {
-					const uint32_t sectorDataSize = 1 << (7 + sector.header.length);
-					if (sector.data.data.size() != sectorDataSize) sector.data.data.resize(sectorDataSize);
-					uint32_t bitStart = bit + 1 - 64;
-					// Extract the header section
-					extractMFMDecodeRaw(track, dataLengthInBits, bitStart, 4, (uint8_t*)&sector.data.dataMark);
-					// Extract the sector data
-					bitStart += 4 * 8 * 2;
-					extractMFMDecodeRaw(track, dataLengthInBits, bitStart, (uint32_t)sector.data.data.size(), (uint8_t*)&sector.data.data[0]);
-					// Extract the sector CRC
-					bitStart += sectorDataSize * 8 * 2;
-					extractMFMDecodeRaw(track, dataLengthInBits, bitStart, 2, (uint8_t*)&sector.data.crc);
-					// Validate
-					uint16_t crc = crc16((char*)&sector.data.dataMark, 4);
-					crc = crc16((char*)sector.data.data.data(), (uint32_t)sector.data.data.size(), crc);
-					sector.dataValid = crc == wordSwap(*(uint16_t*)sector.data.crc);
-
-					// Standardize the sector
-					DecodedSector sec;
-					sec.data = sector.data.data;
-					sec.numErrors = sector.headerErrors + sector.dataValid ? 0 : 1;
-
-					// See if this already exists 
-					auto it = decodedTrack.sectors.find(sector.header.sector-1);
-					if (it == decodedTrack.sectors.end()) {
-						if (sector.header.sector <= 22)
-							decodedTrack.sectors.insert(std::make_pair(sector.header.sector-1, sec));
-					}
-					else {
-						// Does exist. Keep the better copy
-						if (it->second.numErrors > sec.numErrors) {
-							it->second.data = sec.data;
-							it->second.numErrors = sec.numErrors;
-						}						
-					}
-
-					// Reset for next sector
-					sector.headerErrors = 0xFFFF;
-					sector.dataValid = false;
-					headerFound = false;
-					sectorEndPoint = bitStart + (4 * 8);  // mark the end of the sector
-				}
+		break;
+		case MFM_SYNC_SECTOR_DATA: {
+			bool isAltSector = false;
+			if ((!headerFound) && (lastSectorNumber>=0))  {
+				// Sector header was missing. We'll "guess" one - not ideal!
+				lastSectorNumber = -1; 
+				isAltSector = true;
 			}
-			else
-				if (decoded == MFM_SYNC_TRACK_HEADER) {
-					// Reset here, not reqally required, but why not!
-					headerFound = false;
-					sector.headerErrors = 0xFFFF;
-					sector.dataValid = false;
-					lastSectorNumber = -1;
+			if (headerFound || isAltSector) {
+				const uint32_t sectorDataSize = 1 << (7 + sector.header.length);
+				if (sector.data.data.size() != sectorDataSize) sector.data.data.resize(sectorDataSize);
+				uint32_t bitStart = bit + 1 - 64;
+				// Extract the header section
+				extractMFMDecodeRaw(track, dataLengthInBits, bitStart, 4, (uint8_t*)&sector.data.dataMark);
+				// Extract the sector data
+				bitStart += 4 * 8 * 2;
+				extractMFMDecodeRaw(track, dataLengthInBits, bitStart, (uint32_t)sector.data.data.size(), (uint8_t*)&sector.data.data[0]);
+				// Extract the sector CRC
+				bitStart += sectorDataSize * 8 * 2;
+				extractMFMDecodeRaw(track, dataLengthInBits, bitStart, 2, (uint8_t*)&sector.data.crc);
+				// Validate
+				uint16_t crc = crc16((char*)&sector.data.dataMark, 4);
+				crc = crc16((char*)sector.data.data.data(), (uint32_t)sector.data.data.size(), crc);
+				sector.dataValid = crc == wordSwap(*(uint16_t*)sector.data.crc);
+
+				// Standardize the sector
+				DecodedSector sec;
+				sec.data = sector.data.data;
+				sec.numErrors = sector.headerErrors + sector.dataValid ? 0 : 1;
+
+				DecodedTrack& target = isAltSector ? altDecodedTrack : decodedTrack;
+
+				// See if this already exists 
+				auto it = target.sectors.find(sector.header.sector - 1);
+				if (it == target.sectors.end()) {
+					if (sector.header.sector <= 22)
+						target.sectors.insert(std::make_pair(sector.header.sector - 1, sec));
 				}
+				else {
+					// Does exist. Keep the better copy
+					if (it->second.numErrors > sec.numErrors) {
+						it->second.data = sec.data;
+						it->second.numErrors = sec.numErrors;
+					}
+				}
+
+				// Reset for next sector
+				sector.dataValid = false;
+				headerFound = false;
+				sectorEndPoint = bitStart + (4 * 8);  // mark the end of the sector
+			}
+		} break;
+		case MFM_SYNC_TRACK_HEADER:
+			// Reset here, not reqally required, but why not!
+			headerFound = false;
+			sector.dataValid = false;
+			lastSectorNumber = -1;
+			break;
+		}
 	}
 
 	// Work out the average gap size
@@ -342,9 +340,9 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 	}
 }
 // Find sectors (one less parameter)
-void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack) {
+void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, DecodedTrack& altDecodedTrack) {
 	bool tmp;
-	findSectors_IBM(track, dataLengthInBits, isHD, trackNumber, expectedNumSectors, decodedTrack, tmp);
+	findSectors_IBM(track, dataLengthInBits, isHD, trackNumber, expectedNumSectors, decodedTrack, altDecodedTrack, tmp);
 }
 
 // The fill is 0x4E, which endoded as MFM is

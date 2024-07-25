@@ -76,6 +76,14 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 97
     END
+
+    IDD_CLEAN, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 322
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 91
+    END
 END
 #endif    // APSTUDIO_INVOKED
 
@@ -138,6 +146,20 @@ BEGIN
     COMBOBOX        IDC_LETTER,55,59,155,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 END
 
+IDD_CLEAN DIALOGEX 0, 0, 329, 98
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Floppy Drive Cleaner"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Start",ID_START,216,77,50,14
+    PUSHBUTTON      "Cancel",ID_CANCEL,272,77,50,14
+    LTEXT           "This feature allows you to use a special cleaning disk to clean the drive.",IDC_STATIC,7,7,229,8
+    LTEXT           "Please apply suitable cleaning liquid (eg: isopropanol) to cleaning disk and insert into drive.",IDC_STATIC,7,37,290,8
+    LTEXT           "Don't have one? For 3.25"" disks you can",IDC_STATIC,7,19,130,8
+    LTEXT           "make your own!",IDC_MAKEYOUROWN,138,19,52,8
+    CONTROL         "",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_BORDER,7,61,315,8
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -168,6 +190,11 @@ BEGIN
     0, 0, 0, 0,
     0, 0, 0, 0,
     0, 0, 0, 0
+END
+
+IDD_CLEAN AFX_DIALOG_LAYOUT
+BEGIN
+    0
 END
 
 

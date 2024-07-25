@@ -104,7 +104,14 @@ SectorCacheEngine::~SectorCacheEngine() {
     resetCache();
 }
 
+bool SectorCacheEngine::hybridReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) { 
+    std::lock_guard lock(m_multithreadLock);
+    return internalHybridReadData(sectorNumber, sectorSize, data); 
+};
+
 bool SectorCacheEngine::readData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) {
+    std::lock_guard lock(m_multithreadLock);
+
     if (readCache(sectorNumber, sectorSize, data)) return true;
 
     if (internalReadData(sectorNumber, sectorSize, data)) {
@@ -116,6 +123,8 @@ bool SectorCacheEngine::readData(const uint32_t sectorNumber, const uint32_t sec
 }
 
 bool SectorCacheEngine::writeData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data) {
+    std::lock_guard lock(m_multithreadLock);
+
     if (internalWriteData(sectorNumber, sectorSize, data)) {
         writeCache(sectorNumber, sectorSize, data);
         return true;

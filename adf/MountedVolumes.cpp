@@ -438,6 +438,7 @@ bool VolumeManager::mountRaw(const std::wstring& physicalDrive, bool readOnly) {
     }
 
     m_mountMode = COMMANDLINE_MOUNTFILE;
+    return false;
 }
 
 // Start a file mount
@@ -473,7 +474,7 @@ bool VolumeManager::mountFile(const std::wstring& filename) {
         return true;
     }
     else {
-        buffer[4] = '\0';
+        buffer[3] = '\0';
         if (strcmp(buffer, "SCP") == 0) {
             // Assume its some kind of image file
             m_io = new SCPFile(fle, [this](bool diskInserted, SectorType diskFormat) {

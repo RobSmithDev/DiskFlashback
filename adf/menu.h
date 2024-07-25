@@ -34,6 +34,7 @@ class SectorCacheEngine;
 
 class CTrayMenu {
 private:   
+    enum class LastBalloonType {lblUpdate, lblReminder, lblDefault};
     AppConfig m_config;
     HINSTANCE m_hInstance;
     CMessageWindow m_window;
@@ -46,7 +47,7 @@ private:
     HMENU m_hUpdates = 0;
     HMENU m_hCopy = 0;
     PROCESS_INFORMATION m_floppyPi;
-    bool m_lastBalloonIsUpdate = false;
+    LastBalloonType m_lastBalloonType = LastBalloonType::lblDefault;
     bool m_didNotifyFail = false;
     HANDLE m_processUsingDrive = 0;
     DWORD m_timeoutBeforeRestart = 10;

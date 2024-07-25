@@ -214,7 +214,7 @@ void CTrayMenu::checkForUpdates(bool force) {
                     // Do popup for updates available
                     m_notify.uFlags |= NIF_INFO;
                     m_notify.dwInfoFlags = NIIF_INFO;
-                    m_lastBalloonIsUpdate = true;
+                    m_lastBalloonType = LastBalloonType::lblUpdate;
                     wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
                     wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
 
@@ -271,7 +271,7 @@ void CTrayMenu::handleCopyToDisk() {
                 COPYDATASTRUCT str;
                 std::wstring command = d.first.substr(0, 1) + filename;
                 str.lpData = (PVOID) command.c_str();
-                str.cbData = command.length() * 2;
+                str.cbData = (DWORD)(command.length() * 2);
                 str.dwData = REMOTECTRL_COPYTODISK;
                 LRESULT res = SendMessage(d.second.hWnd, WM_COPYDATA, (WPARAM)m_window.hwnd(), (LPARAM)&str);
                 return;
@@ -549,9 +549,11 @@ void CTrayMenu::doContextMenu(POINT pt) {
 void CTrayMenu::handleMenuInput(UINT uID, UINT iMouseMsg) {
     switch (iMouseMsg) {
     case NIN_BALLOONUSERCLICK:
-        if (m_lastBalloonIsUpdate)
-            ShellExecute(m_window.hwnd(), L"open", L"https://robsmithdev.co.uk/diskflashback", NULL, NULL, SW_SHOW);
-        else doConfig();
+        switch (m_lastBalloonType) {
+        case LastBalloonType::lblDefault: doConfig(); break;
+        case LastBalloonType::lblUpdate: ShellExecute(m_window.hwnd(), L"open", L"https://robsmithdev.co.uk/diskflashback", NULL, NULL, SW_SHOW); break;
+        case LastBalloonType::lblReminder: ShellExecute(m_window.hwnd(), L"open", L"https://robsmithdev.co.uk/diskflashback_intro", NULL, NULL, SW_SHOW); break;
+        }
         break;
     case WM_CONTEXTMENU: {
         RECT r;
@@ -647,7 +649,7 @@ void CTrayMenu::monitorPhysicalDrive() {
                     else {
                         wcscpy_s(m_notify.szInfo, L"Unable to start physical drive.\r\nThe device COM port could not be found.");
                     }
-                    m_lastBalloonIsUpdate = false;
+                    m_lastBalloonType = LastBalloonType::lblDefault;
                     // Do popup for updates available
                     m_notify.uFlags |= NIF_INFO;
                     m_notify.dwInfoFlags = NIIF_ERROR;
@@ -775,8 +777,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
 
                 if (closePhysicalDrive(true, driveType)) {
                     m_didNotifyFail = true;
-                    WCHAR name[1024];
-                    m_lastBalloonIsUpdate = false;
+                    WCHAR name[1024];                    
 
                     HANDLE tmp = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, (DWORD)lParam);
                     if (tmp) {
@@ -796,6 +797,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
                     m_notify.uFlags |= NIF_INFO;
                     m_notify.dwInfoFlags = NIIF_INFO;
                     wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                    m_lastBalloonType = LastBalloonType::lblDefault;
                     Shell_NotifyIcon(NIM_MODIFY, &m_notify);
                     m_notify.uFlags &= ~NIF_INFO;
 
@@ -812,6 +814,18 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
                 }
             }
         }
+        return 0;
+    });
+
+    // Just to popup a message
+    m_window.setMessageHandler(WM_POPUP_INFO, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        m_lastBalloonType = LastBalloonType::lblReminder;
+        wcscpy_s(m_notify.szInfo, L"DiskFlashback is already running.\r\n\r\nUse the icon in the task bar to control it. Click this for help...");
+        m_notify.uFlags |= NIF_INFO;
+        m_notify.dwInfoFlags = NIIF_INFO;
+        wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+        Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+        m_notify.uFlags &= ~NIF_INFO;
         return 0;
     });
     

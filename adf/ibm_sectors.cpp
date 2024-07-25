@@ -185,7 +185,7 @@ void extractMFMDecodeRaw(const unsigned char* inTrack, const uint32_t dataLength
 
 // Searches for sectors - you can re-call this and it will update decodedTrack rather than replace it
 // nonstandardTimings is set to true if this uses non-standard timings like those used by Atari etc
-void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, DecodedTrack& altDecodedTrack, bool& nonstandardTimings) {
+void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, bool& nonstandardTimings) {
 	const uint32_t cylinder = trackNumber / 2;
 	const bool upperSide = trackNumber & 1;
 
@@ -199,7 +199,6 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 	bool headerFound = false;
 	sector.headerErrors = 0xFFFF;
 	sector.dataValid = false;
-	int8_t lastSectorNumber = -1;
 	uint8_t sectorSize = 2; // default - 512
 	nonstandardTimings = false;
 
@@ -209,7 +208,7 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 	uint32_t gapTotal = 0;
 	uint32_t numGaps = 0;
 
-	uint32_t unknownNumber = 100;
+	uint32_t unknownNumber = 0;
 
 	// run the entire track length with some space to wrap around
 	for (uint32_t bit = 0; bit < dataLengthInBits; bit++) {
@@ -245,18 +244,11 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 			if (!sector.headerErrors) sectorSize = sector.header.length;
 			if (sector.header.cylinder != cylinder) sector.headerErrors++;
 			if (sector.header.head != (upperSide ? 1 : 0)) sector.headerErrors++;
-
-			lastSectorNumber = sector.header.sector;			
 		}
 		break;
+		case MFM_SYNC_DELETED_SECTOR_DATA:
 		case MFM_SYNC_SECTOR_DATA: {
-			bool isAltSector = false;
-			if ((!headerFound) && (lastSectorNumber>=0))  {
-				// Sector header was missing. We'll "guess" one - not ideal!
-				lastSectorNumber = -1; 
-				isAltSector = true;
-			}
-			if (headerFound || isAltSector) {
+			if (headerFound) {
 				const uint32_t sectorDataSize = 1 << (7 + sector.header.length);
 				if (sector.data.data.size() != sectorDataSize) sector.data.data.resize(sectorDataSize);
 				uint32_t bitStart = bit + 1 - 64;
@@ -278,13 +270,11 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 				sec.data = sector.data.data;
 				sec.numErrors = sector.headerErrors + sector.dataValid ? 0 : 1;
 
-				DecodedTrack& target = isAltSector ? altDecodedTrack : decodedTrack;
-
 				// See if this already exists 
-				auto it = target.sectors.find(sector.header.sector - 1);
-				if (it == target.sectors.end()) {
+				auto it = decodedTrack.sectors.find(sector.header.sector - 1);
+				if (it == decodedTrack.sectors.end()) {
 					if (sector.header.sector <= 22)
-						target.sectors.insert(std::make_pair(sector.header.sector - 1, sec));
+						decodedTrack.sectors.insert(std::make_pair(sector.header.sector - 1, sec));
 				}
 				else {
 					// Does exist. Keep the better copy
@@ -304,7 +294,6 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 			// Reset here, not reqally required, but why not!
 			headerFound = false;
 			sector.dataValid = false;
-			lastSectorNumber = -1;
 			break;
 		}
 	}
@@ -340,9 +329,9 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 	}
 }
 // Find sectors (one less parameter)
-void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, DecodedTrack& altDecodedTrack) {
+void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack) {
 	bool tmp;
-	findSectors_IBM(track, dataLengthInBits, isHD, trackNumber, expectedNumSectors, decodedTrack, altDecodedTrack, tmp);
+	findSectors_IBM(track, dataLengthInBits, isHD, trackNumber, expectedNumSectors, decodedTrack, tmp);
 }
 
 // The fill is 0x4E, which endoded as MFM is

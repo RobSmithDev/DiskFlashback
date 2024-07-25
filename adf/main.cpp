@@ -102,7 +102,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
     if (argc < 3) {
-        if (FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE)) return 0;
+        HWND existingApp = FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE);
+        if (existingApp) {
+            if (argc < 1) PostMessage(existingApp, WM_POPUP_INFO, 0, 0);
+            return 0;
+        }
         CTrayMenu menu(hInstance, exeName, isSilentStart);
         menu.run();
         return 0;

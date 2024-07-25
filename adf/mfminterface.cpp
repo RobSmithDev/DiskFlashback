@@ -378,14 +378,15 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
         // If this hits, then do a re-seek.  Sometimes it helps
         if (retries == MAX_RETRIES / 2) {
             motorInUse(upperSurface);
+            if (isPhysicalDisk()) {
+                if (cylinder < 40)
+                    cylinderSeek(79, upperSurface);
+                else
+                    cylinderSeek(0, upperSurface);
 
-            if (cylinder < 40)
-                cylinderSeek(79, upperSurface);
-            else
-                cylinderSeek(0, upperSurface);
-
-            // Wait for the seek, or it will get removed! 
-            Sleep(300);
+                // Wait for the seek, or it will get removed! 
+                Sleep(300);
+            }
         }
 
         // If we get here then this sector isn't in the cache (or has errors), so we'll read and update ALL sectors for this cylinder
@@ -431,7 +432,7 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         motorInUse(track % m_numHeads[fileSystem]);
         // Try both methods
         if (fileSystem == 1) {  // Hybrid file system
-            bitsReceived = mfmRead(track * 2, retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
+            bitsReceived = mfmRead(track * ((m_numHeads[fileSystem]==1) ? 2 : 1), retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
         } else bitsReceived = mfmRead(track, retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
         if (!bitsReceived) bitsReceived = mfmRead(track / m_numHeads[fileSystem], track % m_numHeads[fileSystem], retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
 
@@ -451,9 +452,9 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         getTrackDetails_AMIGA(isHD(), m_sectorsPerTrack[0], m_bytesPerSector[0]);
         DecodedTrack trAmiga;
         findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trAmiga);
-        DecodedTrack trIBM, trAltIBM;
+        DecodedTrack trIBM;
         bool nonStandard = false;
-        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trIBM, trAltIBM, nonStandard);
+        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trIBM, nonStandard);
         uint32_t serialNumber;
         uint32_t sectorsPerTrack;
         uint32_t bytesPerSector;
@@ -491,30 +492,28 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
             }
         }
     }
-
-    DecodedTrack trDummy;
     if (m_diskType == SectorType::stHybrid) {
 
         if (m_numHeads[1] == 2) {  // Has 2 sides? Treat everything as normal
             findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
-            findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track], trDummy);
+            findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track]);
         }
         else // Atari is single sided. Amiga is ALWAYS double sided
             if (fileSystem == 1) {
                 findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track * 2, m_sectorsPerTrack[0], m_trackCache[0][track * 2]);
-                findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track], trDummy);
+                findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track]);
             }
             else {
                 findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
                 if ((track & 1) == 0)
-                    findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track >> 1], trDummy);
+                    findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track >> 1]);
             }
     }
     else
         if (m_diskType == SectorType::stAmiga)
             findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
     if ((m_diskType == SectorType::stAtari) || (m_diskType == SectorType::stIBM))
-        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track], trDummy);
+        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
 
     return true;
 }
@@ -669,15 +668,17 @@ bool SectorCacheMFM::flushPendingWrites() {
         for (;;) {
             // Handle a re-seek - might clean the head
             if (retries == MAX_RETRIES / 2) {
-                motorInUse(upperSurface);
+                if (isPhysicalDisk()) {
+                    motorInUse(upperSurface);
 
-                if (cylinder < 40)
-                    cylinderSeek(79, upperSurface);
-                else
-                    cylinderSeek(0, upperSurface);
+                    if (cylinder < 40)
+                        cylinderSeek(79, upperSurface);
+                    else
+                        cylinderSeek(0, upperSurface);
 
-                // Wait for the seek, or it will get removed! 
-                Sleep(300);
+                    // Wait for the seek, or it will get removed! 
+                    Sleep(300);
+                }
                 cylinderSeek(cylinder, upperSurface);
                 retries = 0;
             }
@@ -701,7 +702,9 @@ bool SectorCacheMFM::flushPendingWrites() {
                         if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
                         resetDrive(cylinder);
                         m_motorTurnOnTime = 0;
-                        Sleep(200);
+                        
+                        if (isPhysicalDisk()) Sleep(200);
+
                         if (!isDiskInDrive()) {
                             if (diskRemovedWarning()) {
                                 doRetry = true;
@@ -765,7 +768,7 @@ bool SectorCacheMFM::flushPendingWrites() {
                                     }
                                 }
                             // Wait and try again
-                            Sleep(100);
+                            if (isPhysicalDisk()) Sleep(100);
                         }
                         else break;
                     }

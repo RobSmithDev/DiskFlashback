@@ -111,6 +111,9 @@
     <ClCompile Include="amiga_operations.cpp">
       <Filter>Interfaces\amiga</Filter>
     </ClCompile>
+    <ClCompile Include="dlgClean.cpp">
+      <Filter>Dialogs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -236,6 +239,9 @@
     </ClInclude>
     <ClInclude Include="amiga_operations.h">
       <Filter>Interfaces\amiga</Filter>
+    </ClInclude>
+    <ClInclude Include="dlgClean.h">
+      <Filter>Dialogs</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

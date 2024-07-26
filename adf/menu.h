@@ -40,12 +40,12 @@ private:
     CMessageWindow m_window;
     NOTIFYICONDATA m_notify;
     HMENU m_hMenu = 0;
+    HMENU m_hPhysicalDrive = 0;
     HMENU m_hDriveMenu = 0;
     HMENU m_hCreateList = 0;
     HMENU m_hCreateListDD = 0;
     HMENU m_hCreateListHD = 0;
     HMENU m_hUpdates = 0;
-    HMENU m_hCopy = 0;
     PROCESS_INFORMATION m_floppyPi;
     LastBalloonType m_lastBalloonType = LastBalloonType::lblDefault;
     bool m_didNotifyFail = false;
@@ -107,6 +107,27 @@ private:
 
     // Trigger copy image to disk
     void handleCopyToDisk();
+
+    // Handles triggering the drive cleaner
+    void handleCleanDisk();
+
+    // Finds any .lnk files in the startup folder for this user that would start "diskflashback.exe"
+    void findStartupShellLinksForProgram(std::vector<std::wstring>& fullPaths);
+
+    // Deletes any links in the users startup folder that would start this with windows
+    void deleteAutoStartLinks();
+
+    // Creates a startup link for this program so it starts from windows
+    void createStartupLink();
+
+    // Returns TRUE if this is scheduled to start with windows for the current user
+    bool isAutoStartWithWindows();
+
+    // Modified from https://learn.microsoft.com/en-us/windows/win32/shell/links?redirectedfrom=MSDN#Shellink_Creating_Shortcut
+    bool isLinkDiskFlashback(const std::wstring& filename);
+
+    // Find the windows start menu startup folder for the current user
+    bool getWindowsProgramStartupFolder(std::wstring& path);
 
 public:
     CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSilentStart);

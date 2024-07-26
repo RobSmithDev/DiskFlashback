@@ -20,6 +20,7 @@
 const WCHAR* ShellRegistery::DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"amiga.fd",L"ibmpc",L"atarist"};
 const int    ShellRegistery::DiskImageIcon[MAX_DISK_IMAGE_FILES] = { 1, 0, 3 };
 
+#define REG_DRIVE_KEYNAME_CLEAN  L"DiskFlashback.Clean"
 #define REG_DRIVE_KEYNAME_FORMAT  L"DiskFlashback.Format"
 #define REG_DRIVE_KEYNAME_EJECT  L"DiskFlashback.Eject"
 #define REG_DRIVE_KEYNAME_COPY  L"DiskFlashback.Copy"
@@ -91,9 +92,10 @@ void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t ico
 		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, tmp.c_str(), (DWORD)(tmp.length() * 2));
 
 		addDriveAction(driveLetter, REG_DRIVE_KEYNAME_EJECT, L"&Eject", 0, L"EJECT");
-		if (isPhysicalDisk)
+		if (isPhysicalDisk) {
+			addDriveAction(driveLetter, REG_DRIVE_KEYNAME_CLEAN, L"C&lean Drive...", 0, L"CLEAN");
 			addDriveAction(driveLetter, REG_DRIVE_KEYNAME_FORMAT, L"Form&at...", 0, L"FORMAT");
-
+		}
 	}
 	else {
 		RegDeleteKey(HKEY_CURRENT_USER, path);
@@ -101,6 +103,7 @@ void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t ico
 		path[wcslen(path) - 12] = L'\0';
 		RegDeleteKey(HKEY_CURRENT_USER, path);
 
+		removeDriveAction(driveLetter, REG_DRIVE_KEYNAME_CLEAN);
 		removeDriveAction(driveLetter, REG_DRIVE_KEYNAME_FORMAT);
 		removeDriveAction(driveLetter, REG_DRIVE_KEYNAME_EJECT);
 	}

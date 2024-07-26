@@ -27,12 +27,17 @@
 #include "floppybridge_lib.h"
 #include "psapi.h"
 #include "shellMenus.h"
+#include <ShlObj.h>
+#include <ShlGuid.h>
+#include <strsafe.h>
 
 #define MENUID_CREATEDISK       1
 #define MENUID_MOUNTDISK        2
 #define MENUID_ABOUT            3
 #define MENUID_DONATE           4
 #define MENUID_RETRODIR         5
+#define MENUID_CLEAN            6
+#define MENUID_AUTOSTART        7
 #define MENUID_QUIT             10
 #define MENUID_ENABLED          20
 #define MENUID_CONFIGURE        21
@@ -114,6 +119,108 @@ void CTrayMenu::setupIcon() {
     Shell_NotifyIcon(NIM_SETVERSION, &m_notify);
 }
 
+
+// Modified from https://learn.microsoft.com/en-us/windows/win32/shell/links?redirectedfrom=MSDN#Shellink_Creating_Shortcut
+bool CTrayMenu::isLinkDiskFlashback(const std::wstring& filename) {
+    HRESULT hres;
+    IShellLink* psl;
+    WCHAR szGotPath[MAX_PATH];
+    WIN32_FIND_DATA wfd;
+    bool ret = false;
+
+    hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&psl);
+    if (SUCCEEDED(hres)) {
+        IPersistFile* ppf;
+        hres = psl->QueryInterface(IID_IPersistFile, (void**)&ppf);
+        if (SUCCEEDED(hres)) {
+            hres = ppf->Load(filename.c_str(), STGM_READ);
+            if (SUCCEEDED(hres)) {
+                hres = psl->Resolve(m_window.hwnd(), 0);
+                if (SUCCEEDED(hres)) {
+                    hres = psl->GetPath(szGotPath, MAX_PATH, (WIN32_FIND_DATA*)&wfd, SLGP_RAWPATH);
+                    if (SUCCEEDED(hres)) {
+                        std::wstring filePath = szGotPath;
+                        for (WCHAR& c : filePath) c = towupper(c);
+                        ret = (filePath.length() >= 18) && (filePath.substr(filePath.length() - 18) == L"\\DISKFLASHBACK.EXE");
+                    }
+                }
+            }
+            ppf->Release();
+        }
+        psl->Release();
+    }
+    return ret;
+}
+
+// Find the windows start menu startup folder for the current user
+bool CTrayMenu::getWindowsProgramStartupFolder(std::wstring& path) {
+    WCHAR buffer[MAX_PATH];
+    if (!SHGetSpecialFolderPath(m_window.hwnd(), buffer, CSIDL_STARTUP, TRUE)) return false;
+    path = buffer;
+    if ((path.length()) && (path[path.length() - 1] != L'\\')) path += L"\\";
+    return true;
+}
+
+// Finds any .lnk files in the startup folder for this user that would start "diskflashback.exe"
+void CTrayMenu::findStartupShellLinksForProgram(std::vector<std::wstring>& fullPaths) {
+    std::wstring path;
+    if (!getWindowsProgramStartupFolder(path)) return;
+    std::wstring wildCard = path + L"*.lnk";
+    WIN32_FIND_DATA response;
+    HANDLE findHandle = FindFirstFile(wildCard.c_str(), &response);
+    if (findHandle != INVALID_HANDLE_VALUE) {
+        do {
+            if (!(response.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) 
+                if (isLinkDiskFlashback(path + response.cFileName)) 
+                    fullPaths.push_back(path + response.cFileName);
+        } while (FindNextFile(findHandle, &response));
+
+        FindClose(findHandle);
+    }
+}
+
+// Deletes any links in the users startup folder that would start this with windows
+void CTrayMenu::deleteAutoStartLinks() {
+    std::vector<std::wstring> links;
+    findStartupShellLinksForProgram(links);
+    for (const std::wstring& link : links) DeleteFile(link.c_str());
+}
+
+// Creates a startup link for this program so it starts from windows
+void CTrayMenu::createStartupLink() {
+    deleteAutoStartLinks();
+    std::wstring path;
+    if (!getWindowsProgramStartupFolder(path)) return;
+    path += L"DiskFlashback.lnk";
+
+    WCHAR buffer[MAX_PATH];
+    GetModuleFileName(NULL, buffer, MAX_PATH);
+    if (GetLastError() != ERROR_SUCCESS) return;
+
+    IShellLink* psl;
+    HRESULT hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&psl);
+    if (SUCCEEDED(hres)) {
+        IPersistFile* ppf;
+        psl->SetPath(buffer);
+        psl->SetDescription(L"DiskFlashback Virtual Floppy Disk Menu");
+        hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
+        if (SUCCEEDED(hres)) {
+            hres = ppf->Save(path.c_str(), TRUE);
+            ppf->Release();
+        }
+        psl->Release();
+    }
+}
+
+// Returns TRUE if this is scheduled to start with windows for the current user
+bool CTrayMenu::isAutoStartWithWindows() {
+    std::vector<std::wstring> links;
+    findStartupShellLinksForProgram(links);
+    return !links.empty();
+}
+
+
+
 // Prepare the menu
 void CTrayMenu::setupMenu() {
     m_hMenu = CreatePopupMenu();
@@ -122,7 +229,7 @@ void CTrayMenu::setupMenu() {
     m_hUpdates = CreatePopupMenu();
     m_hCreateListDD = CreatePopupMenu();
     m_hCreateListHD = CreatePopupMenu();
-    m_hCopy = CreatePopupMenu();
+    m_hPhysicalDrive = CreatePopupMenu();
 
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD    , L"Amiga ADF...");
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD + 1, L"IBM PC...");    
@@ -137,22 +244,29 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListDD, L"Double Density");
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListHD, L"High Density");
 
-    AppendMenu(m_hCopy, MF_STRING, MENUID_COPYTODISK, L"File to Real Disk...");
-    AppendMenu(m_hCopy, MF_STRING, MENUID_COPYTOIMAGE, L"Real Disk to File...");
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_ENABLED, L"Enabled");
+    AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_COPYTODISK, L"Copy File to Disk...");
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_COPYTOIMAGE, L"Copy Disk to File...");
+    AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_CLEAN, L"Clean Drive Heads...");
+    AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_CONFIGURE, L"Configure...");
+
     
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCreateList,    L"Create Disk Image");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_MOUNTDISK,           L"Mount Disk Image...");
-    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCopy,          L"Copy");
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hDriveMenu,     L"Eject");
-    AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
+    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP, (UINT_PTR)m_hPhysicalDrive, L"Physical Drive");
+    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hUpdates,       L"Settings");
     AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
 
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOSTART, L"Start With Windows");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_RENAMEEXT, L"Automatically Swap File Extensions (Amiga)");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE, L"Automatically Check for Updates");
-    AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
-    AppendMenu(m_hUpdates, MF_STRING, MENUID_ENABLED, L"Mount Physical Drive");
-    AppendMenu(m_hUpdates, MF_STRING, MENUID_CONFIGURE, L"Configure Physical Drive...");
+    
 
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates Now");
@@ -163,7 +277,8 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hUpdates, MF_STRING, MENUID_ABOUT, L"&About...");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_QUIT,                L"&Quit");
 
-    CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(m_hUpdates, MENUID_AUTOSTART, MF_BYCOMMAND | isAutoStartWithWindows() ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(m_hPhysicalDrive, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
     CheckMenuItem(m_hUpdates, MENUID_AUTOUPDATE, MF_BYCOMMAND | m_config.checkForUpdates ? MF_CHECKED : MF_UNCHECKED);
     CheckMenuItem(m_hUpdates, MENUID_RENAMEEXT, MF_BYCOMMAND | m_config.autoRename ? MF_CHECKED : MF_UNCHECKED);    
 }
@@ -246,8 +361,19 @@ void CTrayMenu::populateDrives() {
         AppendMenu(m_hDriveMenu, MF_STRING | MF_DISABLED,0, L"no drives mounted");
     }
 
-    EnableMenuItem(m_hCopy, MENUID_COPYTODISK, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
-    EnableMenuItem(m_hCopy, MENUID_COPYTOIMAGE, MF_BYCOMMAND | ((physicalDrive && isMounted ) ? MF_ENABLED : MF_DISABLED));
+    EnableMenuItem(m_hPhysicalDrive, MENUID_COPYTODISK, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
+    EnableMenuItem(m_hPhysicalDrive, MENUID_COPYTOIMAGE, MF_BYCOMMAND | ((physicalDrive && isMounted) ? MF_ENABLED : MF_DISABLED));
+    EnableMenuItem(m_hPhysicalDrive, MENUID_CLEAN, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
+}
+
+// Handles triggering the drive cleaner
+void CTrayMenu::handleCleanDisk() {
+    for (const auto& d : m_drives) {
+        if (d.second.isPhysicalDrive) {
+            PostMessage(d.second.hWnd, WM_USER, REMOTECTRL_CLEAN, (LPARAM)d.first[0]);
+            return;
+        }
+    }
 }
 
 // Trigger copy image to disk
@@ -454,11 +580,19 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     if ((index >= MENUID_IMAGE_HD) && (index < MENUID_IMAGE_HD + 3)) runCreateImage(true, index - MENUID_IMAGE_HD);
 
     switch (index) {
+    case MENUID_AUTOSTART:
+        if (isAutoStartWithWindows()) deleteAutoStartLinks(); else createStartupLink();
+        CheckMenuItem(m_hUpdates, MENUID_AUTOSTART, MF_BYCOMMAND | isAutoStartWithWindows() ? MF_CHECKED : MF_UNCHECKED);
+        break;
+
     case MENUID_COPYTODISK:
         handleCopyToDisk();
         break;
     case MENUID_COPYTOIMAGE:
         handleCopyToImage();
+        break;
+    case MENUID_CLEAN:
+        handleCleanDisk();
         break;
 
     case MENUID_DONATE:
@@ -502,7 +636,7 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     case MENUID_ENABLED: 
         m_config.enabled = !m_config.enabled;
         saveConfiguration(m_config);
-        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);  
+        CheckMenuItem(m_hPhysicalDrive, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
         m_timeoutBeforeRestart = 10; // trigger quick restart
         break;
     case MENUID_CREATEDISK: break;
@@ -725,6 +859,7 @@ void CTrayMenu::cleanupDriveIcons() {
 
 
 CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSilentStart) : m_hInstance(hInstance), m_window(hInstance, APP_TITLE), m_exeName(exeName) {
+    CoInitialize(NULL);
     memset(&m_notify, 0, sizeof(m_notify));
     loadConfiguration(m_config);
     if (!isSilentStart) cleanupDriveIcons();
@@ -757,7 +892,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
         // Turn off the "enabled" option
         m_config.enabled = false;
         saveConfiguration(m_config);
-        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | MF_UNCHECKED);
+        CheckMenuItem(m_hPhysicalDrive, MENUID_ENABLED, MF_BYCOMMAND | MF_UNCHECKED);
         return 0;
         });
 
@@ -868,9 +1003,10 @@ CTrayMenu::~CTrayMenu() {
     DestroyMenu(m_hCreateListDD);
     DestroyMenu(m_hCreateListHD);
     DestroyMenu(m_hUpdates);
-    DestroyMenu(m_hCopy);
+    DestroyMenu(m_hPhysicalDrive);
     if (m_floppyPi.hProcess) CloseHandle(m_floppyPi.hProcess);
     cleanupDriveIcons();
+    CoUninitialize();
 }
 
 // Main loop

@@ -127,6 +127,8 @@ void SectorCacheMFM::setReady() {
 
 // Reads some data to see what kind of disk it is
 void SectorCacheMFM::identifyFileSystem() {
+    if (!m_fileSystemID) return;
+
     for (uint32_t i = 0; i < 2; i++) {
         m_totalCylinders[i] = 0;
         m_numHeads[i] = 2;
@@ -266,6 +268,7 @@ void SectorCacheMFM::motorMonitor() {
     }
 
     if (sendNotify) {
+        if (!m_fileSystemID) return;
         if (m_diskChangeCallback) {
             for (DecodedTrack& trk : m_trackCache[0]) trk.sectors.clear();
             for (DecodedTrack& trk : m_trackCache[1]) trk.sectors.clear();

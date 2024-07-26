@@ -22,8 +22,10 @@
 #include "SignalWnd.h"
 #include "dlgFormat.h"
 #include "dlgCopy.h"
+#include "dlgClean.h"
 #include "menu.h"
 #include "shellMenus.h"
+
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -123,6 +125,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         HWND wnd = VolumeManager::FindControlWindowForDrive(driveLetter);
         std::wstring param = argv[2];
         if (wnd) {
+            if (param == CTRL_PARAM_CLEAN) {
+                std::wstring letter = L" "; letter[0] = driveLetter;
+                std::wstring winname = CLEANWINDOW_TITLE;
+                HWND formatWindow = FindWindow(NULL, winname.c_str());
+                if (formatWindow) {
+                    PostMessage(formatWindow, WM_USER + 20, 0, 0);
+                }
+                else SendMessage(wnd, WM_USER, REMOTECTRL_CLEAN, (LPARAM)driveLetter);
+            }
             if (param == CTRL_PARAM_FORMAT) {
                 std::wstring letter = L" "; letter[0] = driveLetter;
                 std::wstring winname = L"Format Disk Drive " + letter + L":";

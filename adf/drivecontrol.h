@@ -34,8 +34,10 @@
 #define REMOTECTRL_COPYTOADF        6
 #define REMOTECTRL_EJECT            7
 #define REMOTECTRL_EJECT_SILENT     8
+#define REMOTECTRL_CLEAN			9
 
 // These get turned into the above
+#define CTRL_PARAM_CLEAN			L"CLEAN"
 #define CTRL_PARAM_FORMAT			L"FORMAT"
 #define CTRL_PARAM_EJECT			L"EJECT"
 #define CTRL_PARAM_INSTALLBB		L"BB"

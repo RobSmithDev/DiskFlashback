@@ -18,6 +18,8 @@
 #include "ibm_sectors.h"
 #include <stdio.h>
 
+#define REPEAT_COUNT 5
+
 bool SectorRW_FloppyBridge::motorEnable(bool enable, bool upperSide) {
     if (!m_bridge) return false;
     m_bridge->setMotorStatus(upperSide, enable);
@@ -89,6 +91,55 @@ std::wstring SectorRW_FloppyBridge::getDriverName() {
     default: return L"Unknown";
     }
 }
+
+// Runs cleaning on the drive
+bool SectorRW_FloppyBridge::runCleaning(std::function<bool(uint16_t position, uint16_t total)> progress) {
+    if (!m_bridge) return false;
+    uint16_t steps = m_bridge->getMaxCylinder();
+    if (steps > 40) steps /= 10; else steps /= 5;
+
+    const uint32_t progressMax = (m_bridge->getMaxCylinder() / steps) * 2 * REPEAT_COUNT;
+
+    if (!progress(0, progressMax)) return false;
+
+    // Turn on motor
+    m_bridge->setMotorStatus(false, true);
+    uint32_t counter = 0;
+    // Wait for spinup
+    for (counter=0; counter<12; counter++) {
+        Sleep(50);
+        if (!progress(0, progressMax)) {
+            m_bridge->setMotorStatus(false, false);
+            return false;
+        }
+    }
+
+    // Run cleaning cycle
+    counter = 1;
+    for (uint32_t cycle = 0; cycle < REPEAT_COUNT; cycle++) {
+        for (uint32_t cylinder = 0; cylinder < m_bridge->getMaxCylinder() - steps; cylinder += steps) {
+            m_bridge->gotoCylinder(cylinder + steps - 1, false);
+            Sleep(300);
+            if (!progress(++counter, progressMax)) {
+                m_bridge->setMotorStatus(false, false);
+                m_bridge->gotoCylinder(0, false);
+                return false;
+            }
+            m_bridge->gotoCylinder(cylinder, false);
+            Sleep(300);
+            if (!progress(++counter, progressMax)) {
+                m_bridge->setMotorStatus(false, false);
+                m_bridge->gotoCylinder(0, false);
+                return false;
+            }
+        }
+    }
+    progress(progressMax, progressMax);
+    m_bridge->setMotorStatus(false, false);
+    m_bridge->gotoCylinder(0, false);
+    return true;
+}
+
 
 // Constructor
 SectorRW_FloppyBridge::SectorRW_FloppyBridge(const std::string& profile, std::function<void(bool diskInserted, SectorType diskFormat)> diskChangeCallback) : SectorCacheMFM(diskChangeCallback) {

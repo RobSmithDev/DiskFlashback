@@ -20,6 +20,7 @@
 
 
 #define WM_DOQUIT             (WM_USER+10)
+#define COPYDATA_MOUNTRAW_FAILED 100
 
 struct DriveInfo {
     HWND hWnd;

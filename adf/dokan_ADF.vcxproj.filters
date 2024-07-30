@@ -114,6 +114,7 @@
     <ClCompile Include="dlgClean.cpp">
       <Filter>Dialogs</Filter>
     </ClCompile>
+    <ClCompile Include="DriveList.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -243,6 +244,7 @@
     <ClInclude Include="dlgClean.h">
       <Filter>Dialogs</Filter>
     </ClInclude>
+    <ClInclude Include="DriveList.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">

@@ -598,6 +598,7 @@ bool SectorCacheMFM::flushPendingWrites() {
             m_tracksToFlush.clear();
             return false;
         }
+        cylinderSeek(cylinder, upperSurface);
 
         // Assemble and commit an entire track.  First see if any data is missing
         bool fillData = m_trackCache[0][track].sectors.size() < m_sectorsPerTrack[0];
@@ -682,9 +683,9 @@ bool SectorCacheMFM::flushPendingWrites() {
                     // Wait for the seek, or it will get removed! 
                     Sleep(300);
                 }
-                cylinderSeek(cylinder, upperSurface);
                 retries = 0;
             }
+            cylinderSeek(cylinder, upperSurface);
 
             // Commit to disk
             motorInUse(upperSurface);

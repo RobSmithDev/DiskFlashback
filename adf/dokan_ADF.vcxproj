@@ -352,6 +352,7 @@
     <ClCompile Include="dlgCopy.cpp" />
     <ClCompile Include="dlgFormat.cpp" />
     <ClCompile Include="dokaninterface.cpp" />
+    <ClCompile Include="DriveList.cpp" />
     <ClCompile Include="fat_operations.cpp" />
     <ClCompile Include="floppybridge_lib.cpp" />
     <ClCompile Include="ibm_sectors.cpp" />
@@ -395,6 +396,7 @@
     <ClInclude Include="dlgFormat.h" />
     <ClInclude Include="dokaninterface.h" />
     <ClInclude Include="drivecontrol.h" />
+    <ClInclude Include="DriveList.h" />
     <ClInclude Include="fat_operations.h" />
     <ClInclude Include="floppybridge_abstract.h" />
     <ClInclude Include="floppybridge_common.h" />

@@ -12,7 +12,12 @@
  * This file is maintained at https://github.com/RobSmithDev/DiskFlashback
  */
 
+// Prevent WinSock 1 being included
+#ifndef _WINSOCKAPI_
+#define _WINSOCKAPI_   
+#endif
 #include <dokan/dokan.h>
+#include <winsock2.h>
 #include <shellapi.h>
 #include "SignalWnd.h"
 #include "resource.h"
@@ -30,6 +35,7 @@
 #include <ShlObj.h>
 #include <ShlGuid.h>
 #include <strsafe.h>
+#include <WinDNS.h>
 
 #define MENUID_CREATEDISK       1
 #define MENUID_MOUNTDISK        2
@@ -58,6 +64,7 @@
 
 #pragma comment(lib,"Version.lib")
 #pragma comment(lib,"Ws2_32.lib")
+#pragma comment(lib, "Dnsapi.lib")
 
 static const WCHAR* IconHint = L"DiskFlashback - Right Click for Menu";
 
@@ -315,30 +322,46 @@ void CTrayMenu::checkForUpdates(bool force) {
     m_config.lastCheck = getStamp();
     saveConfiguration(m_config);
 
-    // Fetch version from 'A' record in the DNS record
-    hostent* address = gethostbyname("diskflashback.robsmithdev.co.uk");
-    if ((address) && (address->h_addrtype == AF_INET)) {
-        if (address->h_addr_list[0] != 0) {
-            in_addr add = *((in_addr*)address->h_addr_list[0]);
-            if (add.S_un.S_un_b.s_b1 < 20) {   // If I get to version 20 I'll be amazed!
+    DNS_RECORD* dnsRecord;
+    std::wstring versionString;
 
-                DWORD netVersion = (add.S_un.S_un_b.s_b1 << 24) | (add.S_un.S_un_b.s_b2 << 16) | (add.S_un.S_un_b.s_b3 << 8) | add.S_un.S_un_b.s_b4;
-                DWORD appVersion = getAppVersion();
-
-                if (appVersion < netVersion) {
-                    // Do popup for updates available
-                    m_notify.uFlags |= NIF_INFO;
-                    m_notify.dwInfoFlags = NIIF_INFO;
-                    m_lastBalloonType = LastBalloonType::lblUpdate;
-                    wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
-                    wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
-
-                    Shell_NotifyIcon(NIM_MODIFY, &m_notify);
-                    m_notify.uFlags &= ~NIF_INFO;
+    // Look up TXT record 
+    DNS_STATUS error = DnsQuery(L"diskflashback.robsmithdev.co.uk", DNS_TYPE_TEXT, DNS_QUERY_BYPASS_CACHE, NULL, &dnsRecord, NULL);
+    if (!error) {
+        const DNS_RECORD* record = dnsRecord;
+        while (record) {
+            if (record->wType == DNS_TYPE_TEXT) {
+                const DNS_TXT_DATAW* pData = &record->Data.TXT;
+                for (DWORD string=0; string<pData->dwStringCount; string++) {
+                    const std::wstring text = pData->pStringArray[string];
+                    if ((text.length() >= 9) && (text.substr(0, 2) == L"v=")) versionString = text.substr(2);
                 }
             }
+            record = record->pNext;
         }
-    }   
+        DnsRecordListFree(dnsRecord, DnsFreeRecordList);  //DnsFreeRecordListDeep
+    }
+
+    if (!versionString.empty()) {
+        DWORD appVersion = getAppVersion();
+        // A little hacky to convert a.b.c.d into an array
+        sockaddr_in tmp;
+        INT len = sizeof(tmp);
+        if (WSAStringToAddress((wchar_t*)versionString.c_str(), AF_INET, NULL, (sockaddr*)&tmp, &len) == 0) {
+            const in_addr add = tmp.sin_addr;
+            DWORD netVersion = (add.S_un.S_un_b.s_b1 << 24) | (add.S_un.S_un_b.s_b2 << 16) | (add.S_un.S_un_b.s_b3 << 8) | add.S_un.S_un_b.s_b4;
+            if (appVersion < netVersion) {
+                // Do popup for updates available
+                m_notify.uFlags |= NIF_INFO;
+                m_notify.dwInfoFlags = NIIF_INFO;
+                m_lastBalloonType = LastBalloonType::lblUpdate;
+                wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
+                Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+                m_notify.uFlags &= ~NIF_INFO;
+            }
+        }
+    }
 }
 
 // Populate the list of drives
@@ -357,10 +380,7 @@ void CTrayMenu::populateDrives() {
             isMounted = d.second.valid;
         }
     }
-    if (m_drives.size() < 1) {
-        AppendMenu(m_hDriveMenu, MF_STRING | MF_DISABLED,0, L"no drives mounted");
-    }
-
+    if (m_drives.size() < 1) AppendMenu(m_hDriveMenu, MF_STRING | MF_DISABLED,0, L"no drives mounted");
     EnableMenuItem(m_hPhysicalDrive, MENUID_COPYTODISK, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
     EnableMenuItem(m_hPhysicalDrive, MENUID_COPYTOIMAGE, MF_BYCOMMAND | ((physicalDrive && isMounted) ? MF_ENABLED : MF_DISABLED));
     EnableMenuItem(m_hPhysicalDrive, MENUID_CLEAN, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
@@ -877,6 +897,13 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
     m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT {
         setupIcon(); return 0; });
 
+    m_window.setMessageHandler(WM_COPYDATA, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        COPYDATASTRUCT* str = (COPYDATASTRUCT*)lParam;
+        switch (str->dwData) {
+        case COPYDATA_MOUNTRAW_FAILED:;
+        }
+        return 0;
+    });
 
     m_window.setMessageHandler(WM_USER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         handleMenuInput((UINT)wParam, (UINT)lParam); return 0; });

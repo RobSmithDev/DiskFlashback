@@ -541,7 +541,6 @@ NTSTATUS DokanFileSystemAmigaFS::fs_findfiles(const std::wstring& filename, PFil
 
         std::wstring winFilename;
         amigaFilenameToWindowsFilename(filename, e->name, winFilename);
-
         wcscpy_s(findData.cFileName, winFilename.c_str());
         findData.dwFileAttributes = amigaToWindowsAttributes(e->access, e->type);
         findData.nFileSizeHigh = 0;
@@ -582,11 +581,12 @@ NTSTATUS DokanFileSystemAmigaFS::fs_setfileattributes(const std::wstring& filena
         access |= ADF_ACCMASK_W; else  access &= ~ADF_ACCMASK_W;
 
     // Nothing changed? 
+    access &= ~(ADF_ACCMASK_R | ADF_ACCMASK_D);
     if (access == parent.access) return STATUS_SUCCESS;
 
     adfParentDir(m_volume);
 
-    if (adfSetEntryAccess(m_volume, m_volume->curDirPtr, amigafilename.c_str(), access | ADF_ACCMASK_R | ADF_ACCMASK_D) == ADF_RETCODE::ADF_RC_OK) return STATUS_SUCCESS;
+    if (adfSetEntryAccess(m_volume, m_volume->curDirPtr, amigafilename.c_str(), access) == ADF_RETCODE::ADF_RC_OK) return STATUS_SUCCESS;
     return STATUS_DATA_ERROR;
 }
 

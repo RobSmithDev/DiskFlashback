@@ -32,6 +32,7 @@
 #include "menu.h"
 #include "SCPFile.h"
 #include "dlgClean.h"
+#include "DriveList.h"
 
 #define TIMERID_MONITOR_FILESYS 1000
 #define WM_DISKCHANGE (WM_USER + 1)
@@ -421,42 +422,31 @@ void VolumeManager::triggerRemount() {
 
 // Mount a raw volume
 bool VolumeManager::mountRaw(const std::wstring& physicalDrive, bool readOnly) {
-    // Open the file
-    HANDLE fle = CreateFile(physicalDrive.c_str(),0,0, NULL, OPEN_EXISTING, 0, NULL);
-    DWORD written;
+    CDriveList d;
 
-    if (DeviceIoControl(fle, FSCTL_LOCK_VOLUME, NULL, 0, NULL, 0, &written, NULL)) {
-        if (DeviceIoControl(fle, FSCTL_DISMOUNT_VOLUME, NULL, 0, NULL, 0, &written, NULL)) {
-            
-            return true;
+    CDriveList::DeviceList list = d.getDevices();
+    CDriveAccess* drive = nullptr;
+
+    // find the device
+    for (CDriveList::CDevice& dev : list)
+        if (dev.deviceName == physicalDrive) {
+            // Drive found
+            drive = d.connectToDrive(dev, readOnly);
+            break;
         }
-    }
 
-     fle = CreateFile(physicalDrive.c_str(), GENERIC_READ | (m_forceReadOnly ? 0 : GENERIC_WRITE), FILE_SHARE_READ | (m_forceReadOnly ? 0 : FILE_SHARE_WRITE), 
-        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, NULL);
-    if ((fle == INVALID_HANDLE_VALUE) && (!m_forceReadOnly)) {
-        // Try read only
-        fle = CreateFile(physicalDrive.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, 0);
-        m_forceReadOnly = true;
-    }
-    if (fle == INVALID_HANDLE_VALUE) return false;
-
-    // Read the first 4 bytes to help identify the type of file
-    char buffer[600] = { 0 };
-    DWORD read = 0;
-    if ((!ReadFile(fle, buffer, 512, &read, NULL)) || (read != 512)) {
-        CloseHandle(fle);
+    if (!drive) {
+        COPYDATASTRUCT str;
+        str.lpData = (void*)physicalDrive.data();
+        str.cbData = physicalDrive.length() * 2;
+        str.dwData = COPYDATA_MOUNTRAW_FAILED;
+        SendMessage(FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE), WM_COPYDATA, (WPARAM)m_window.hwnd(), (LPARAM)&str);
         return false;
     }
-
-    m_mountMode = COMMANDLINE_MOUNTFILE;
-
-    // Assume its some kind of image file
-    m_io = new SectorRW_File(L"", fle);
-    if (!m_io->available()) return false;
-    fatfsSectorCache = m_io;
-    return true;
-
+    else {
+        m_io = drive;
+        m_mountMode = COMMANDLINE_MOUNTRAW;
+    }
     return true;
 }
 

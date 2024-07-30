@@ -12,6 +12,7 @@ https://robsmithdev.co.uk/diskflashback
 		Added new "Clean Drive Heads" option for Drawbridge, Greaseweazle and Supercard PRO (right click on drive to activate)
 		Re-arranged all physical drive related commands into its own menu
 		Added option to toggle the auto-starting up the system tray icon with Windows
+		Changed how new versions of the application are detected to hopefully get around some previous false positives
 
 	Bug Fixes:
 		Fixed a bug with some DMS files where the total number of cylinders was incorrectly read
@@ -24,6 +25,7 @@ https://robsmithdev.co.uk/diskflashback
 		Fixed issue where re-reading bad Amiga sectors didn't work properly
 		Fixed a strange seek issue when ejecting real floppy disks
 		Fixed issue with some dialogs disappearing behind explorer after message was shown
+		Fixed an issue where changing file attributes (Amiga) caused the Readable/Delete attributes to become unset
 
 1.0.1
 	Fixed disabling "auto-detect com port" being ignored

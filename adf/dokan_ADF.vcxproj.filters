@@ -114,7 +114,12 @@
     <ClCompile Include="dlgClean.cpp">
       <Filter>Dialogs</Filter>
     </ClCompile>
-    <ClCompile Include="DriveList.cpp" />
+    <ClCompile Include="dlgMount.cpp">
+      <Filter>Dialogs</Filter>
+    </ClCompile>
+    <ClCompile Include="DriveList.cpp">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -244,7 +249,12 @@
     <ClInclude Include="dlgClean.h">
       <Filter>Dialogs</Filter>
     </ClInclude>
-    <ClInclude Include="DriveList.h" />
+    <ClInclude Include="dlgMount.h">
+      <Filter>Dialogs</Filter>
+    </ClInclude>
+    <ClInclude Include="DriveList.h">
+      <Filter>Interfaces\Sector Interface</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="res">

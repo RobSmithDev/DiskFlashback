@@ -26,6 +26,7 @@
 #include "menu.h"
 #include "shellMenus.h"
 #include "DriveList.h"
+#include "dlgMount.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -63,6 +64,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     int argc = 0;
     WCHAR exeName[MAX_PATH];
     GetModuleFileName(NULL, exeName, MAX_PATH);
+
+ // DialogMount moo(hInstance, GetDesktopWindow());
+ // std::wstring deviceToConnect; bool readOnly;
+ // moo.doModal(deviceToConnect, readOnly);
+ // return 0;
 
     LPWSTR* argv = nullptr;
     if (wcslen(pCmdLine)) argv = CommandLineToArgvW(pCmdLine, &argc);

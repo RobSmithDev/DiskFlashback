@@ -21,6 +21,12 @@
 #include <ntddscsi.h>
 #include "dokaninterface.h"
 
+#include "adf_nativedriver.h"
+
+#include "ADFlib/src/adflib.h"
+#include "PFS3Lib/pfs3.h"
+
+
 #pragma comment(lib, "Setupapi.lib")
 
 #define CA "Commodore\0Amiga\0"
@@ -497,13 +503,108 @@ bool readIdentity(HANDLE h, CDriveList::CDevice& drive) {
 	return ret;
 }
 
+
+extern IPFS3* createPFS3FromVolume(AdfDevice* device, int partitionIndex, SectorCacheEngine* io, bool readOnly);
+
+// Attempt to work out the file system and volume label
+void identifyPartitionDrive(CDriveList::CDevice& drive, CDriveAccess* io) {
+	if (!io) return;
+	static bool adfSetup = false;
+	if (!adfSetup) {
+		adfSetup = true;
+		adfPrepNativeDriver();
+	}
+
+	AdfDevice* adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)io, AdfAccessMode::ADF_ACCESS_MODE_READONLY);
+	if (!adfDevice) {
+		delete io;
+		return;
+	}
+
+	adfDevMount(adfDevice);
+
+	drive.fileSystem = L"";
+	drive.volumeName = L"";
+
+	// See if theres any partitions
+	for (size_t i = 0; i < adfDevice->nVol; i++) {
+
+		AdfVolume* vol = adfVolMount(adfDevice, i, AdfAccessMode::ADF_ACCESS_MODE_READONLY);
+		if (vol) {
+			if (!drive.fileSystem.empty()) drive.fileSystem += L", ";
+			drive.fileSystem += adfDosFsIsFFS(vol->fs.type) ? L"FFS" : L"OFS";
+			std::wstring diskName;
+
+			struct AdfRootBlock root;
+			if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == ADF_RC_OK) {
+				std::string tmp;
+				tmp.resize(root.nameLen);
+				if (root.nameLen) memcpy_s(&tmp[0], tmp.length(), root.diskName, root.nameLen);
+				ansiToWide(tmp, diskName);
+			}
+			if (vol->volName) {
+				std::wstring vn;
+				ansiToWide(vol->volName, vn);
+				if (diskName.empty()) diskName = vn; else diskName += L" (" + vn + L")";
+			}
+			if (diskName.length()) {
+				if (!drive.volumeName.empty()) drive.volumeName += L", ";
+				drive.volumeName += diskName;
+			}
+
+			adfVolUnMount(vol);
+		}
+		else {
+			IPFS3* pfs3 = createPFS3FromVolume(adfDevice, i, io, true);
+			if (pfs3) {
+				std::wstring filesystemName;
+				IPFS3::PFSVolInfo info;
+				if (pfs3->GetVolInformation(info)) {
+					switch (info.volType) {
+					case IPFS3::DiskType::dt_beta: filesystemName = L"Beta PFS"; break;
+					case IPFS3::DiskType::dt_pfs1: filesystemName = L"PFS"; break;
+					case IPFS3::DiskType::dt_busy: filesystemName = L"Busy"; break;
+					case IPFS3::DiskType::dt_muAF: filesystemName = L"muAF"; break;
+					case IPFS3::DiskType::dt_muPFS: filesystemName = L"muPFS"; break;
+					case IPFS3::DiskType::dt_afs1: filesystemName = L"AFS1"; break;
+					case IPFS3::DiskType::dt_pfs2: filesystemName = L"PFS"; break;
+					case IPFS3::DiskType::dt_pfs3: filesystemName = L"PFS"; break;
+					case IPFS3::DiskType::dt_AFSU: filesystemName = L"AFSU"; break;
+					default: break;
+					}
+					if (filesystemName.length()) {
+						if (!drive.fileSystem.empty()) drive.fileSystem += L", ";
+						drive.fileSystem += filesystemName;
+					}
+
+					if (info.volumeLabel.length()) {
+						if (!drive.volumeName.empty()) drive.volumeName += L", ";
+						std::wstring tmp;
+						ansiToWide(info.volumeLabel, tmp);
+						drive.volumeName += tmp;
+					}
+				}
+				delete pfs3;
+			}
+		}
+	}
+
+	adfDevUnMount(adfDevice);
+	adfDevClose(adfDevice);
+
+	delete io;
+}
+
+
 void CDriveList::refreshList() {
 	m_deviceList.clear();
 	getDeviceList(m_deviceList);
+
+	for (CDevice& dev : m_deviceList) 
+		identifyPartitionDrive(dev, connectToDrive(dev, true));
 }
 
 CDriveList::CDriveList() {
-	refreshList();
 }
 
 int indexOfDrive(const std::wstring& deviceName, const CDriveList::DeviceList& deviceList) {
@@ -737,7 +838,7 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 					dev.size = pi->PartitionLength.QuadPart;
 					makeDriveNameUnique(dev, deviceList);
 					dev.danger = CDriveList::DangerType::dtPartition;
-					dev.partitionNumber = (uint16_t)(i+1);
+					dev.partitionNumber = (uint16_t)(i+1);					
 					deviceList.push_back(dev);
 					partitionsFound++;
 				}
@@ -751,7 +852,7 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 					return;
 				}
 			}
-			if (driveIndex<0) deviceList.push_back(device);
+			if (driveIndex < 0) deviceList.push_back(device);
 			makeDriveNameUnique(device, deviceList);
 		}
 	}	
@@ -827,6 +928,7 @@ void CDriveList::getDeviceList(std::vector<CDevice>& deviceList) {
 	}
 }
 
+
 // Connect to a specific drive
 CDriveAccess* CDriveList::connectToDrive(const CDevice& device, bool forceReadOnly) {
 	CDriveAccess* ret = new CDriveAccess();
@@ -845,6 +947,7 @@ CDriveAccess::~CDriveAccess() {
 void CDriveAccess::closeDrive() {
 	for (HANDLE h : m_lockedVolumes) CloseHandle(h);
 	m_lockedVolumes.clear();
+	if (m_dontFreeHandle) return;
 	if (m_drive != INVALID_HANDLE_VALUE) {
 		CloseHandle(m_drive);
 		m_drive = INVALID_HANDLE_VALUE;
@@ -862,7 +965,7 @@ bool CDriveAccess::openDrive(const CDriveList::CDevice& device, bool readOnly) {
 	if (m_drive == INVALID_HANDLE_VALUE && !m_device.readOnly) {
 		DWORD err = GetLastError();		
 		if (err == ERROR_WRITE_PROTECT || err == ERROR_SHARING_VIOLATION) {
-			m_drive = CreateFile(device.devicePath.c_str(), GENERIC_READ,FILE_SHARE_READ,NULL, OPEN_EXISTING, flags, NULL);
+			m_drive = CreateFile(m_device.devicePath.c_str(), GENERIC_READ,FILE_SHARE_READ,NULL, OPEN_EXISTING, flags, NULL);
 			if (m_drive != INVALID_HANDLE_VALUE) m_device.readOnly = true;
 		}
 	}

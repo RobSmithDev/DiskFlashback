@@ -423,7 +423,7 @@ void VolumeManager::triggerRemount() {
 // Mount a raw volume
 bool VolumeManager::mountRaw(const std::wstring& physicalDrive, bool readOnly) {
     CDriveList d;
-
+    d.refreshList();
     CDriveList::DeviceList list = d.getDevices();
     CDriveAccess* drive = nullptr;
 

@@ -45,11 +45,11 @@ INT_PTR CALLBACK cleanCallback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 }
 
 INT_PTR DialogCLEAN::doModal() {
-	if (!m_bridge) return ID_CANCEL;
+	if (!m_bridge) return ID_CLOSE;
 	if (m_fs) {
 		if (!m_fs->setLocked(true)) {
 			MessageBox(m_dialogBox, L"Unable to start clean. Couldn't lock the drive.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
-			return ID_CANCEL;
+			return ID_CLOSE;
 		}
 		m_fs->temporaryUnmountDrive();
 	}

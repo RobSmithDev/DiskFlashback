@@ -178,7 +178,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../../;../../sys;spdlog/include;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -284,7 +284,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../../;../../sys;spdlog/include;</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -351,6 +351,7 @@
     <ClCompile Include="dlgConfig.cpp" />
     <ClCompile Include="dlgCopy.cpp" />
     <ClCompile Include="dlgFormat.cpp" />
+    <ClCompile Include="dlgMount.cpp" />
     <ClCompile Include="dokaninterface.cpp" />
     <ClCompile Include="DriveList.cpp" />
     <ClCompile Include="fat_operations.cpp" />
@@ -394,6 +395,7 @@
     <ClInclude Include="dlgConfig.h" />
     <ClInclude Include="dlgCopy.h" />
     <ClInclude Include="dlgFormat.h" />
+    <ClInclude Include="dlgMount.h" />
     <ClInclude Include="dokaninterface.h" />
     <ClInclude Include="drivecontrol.h" />
     <ClInclude Include="DriveList.h" />

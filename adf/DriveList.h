@@ -80,6 +80,9 @@ public:
 		std::wstring productRev;
 		std::wstring productSerial;
 		std::wstring deviceName;
+
+		std::wstring volumeName;
+		std::wstring fileSystem;
 	};
 	typedef std::vector<CDevice> DeviceList;
 private:
@@ -107,6 +110,7 @@ private:
 	HANDLE m_drive;
 	std::vector<HANDLE> m_lockedVolumes;
 	bool m_dismounted = false;
+	bool m_dontFreeHandle = false;
 
 	bool openDrive(const CDriveList::CDevice& device, bool readOnly);
 	bool seek(uint64_t offset);
@@ -136,5 +140,4 @@ public:
 	virtual bool available() override;
 	virtual void quickClose() override;
 	void closeDrive();
-	
 };

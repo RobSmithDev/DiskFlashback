@@ -978,6 +978,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
         }
         return 0;
     });
+    
 
     // Just to popup a message
     m_window.setMessageHandler(WM_POPUP_INFO, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
@@ -1010,7 +1011,12 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
         }
         return 0;
      });
-   
+
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_COPYDATA, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_USER, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_DOQUIT, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_PHYSICAL_EJECT, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_REMOTEUSAGE, MSGFLT_ALLOW, NULL);   
 
 #ifdef _DEBUG
     SetTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK, 1000, NULL);

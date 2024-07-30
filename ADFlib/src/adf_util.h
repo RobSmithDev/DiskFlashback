@@ -122,7 +122,7 @@ void dumpBlock ( const uint8_t * const buf );
 
 
 #ifndef HAVE_STRNDUP
-#pragma message "Using the custom strndup()"
+//#pragma message "Using the custom strndup()"
 char * strndup ( const char * const s, size_t n );
 #endif
 

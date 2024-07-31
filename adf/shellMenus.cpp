@@ -59,7 +59,7 @@ void ShellRegistery::removeDriveAction(WCHAR driveLetter, const std::wstring& se
 void ShellRegistery::setupContextForFileType(bool add, const std::wstring& path, uint32_t icon, WCHAR driveLetter) {
 	std::wstring clsRoot = path + L"\\CopyToDisk";
 	if (add) {
-		const std::wstring cmd = L"\"" + m_mainEXE + L"\ " + COMMANDLINE_CONTROL + L" " + driveLetter + L" 2DISK \"%1\"";
+		const std::wstring cmd = L"\"" + m_mainEXE + L"\" " + COMMANDLINE_CONTROL + L" " + driveLetter + L" 2DISK \"%1\"";
 		const std::wstring iconNumber = L"\"" + m_mainEXE + L"\"," + std::to_wstring(icon);
 
 		HKEY key = 0;

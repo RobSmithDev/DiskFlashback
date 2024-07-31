@@ -24,7 +24,6 @@ private:
 	HWND m_listView = 0;
 	HWND m_dialogBox = 0;
 	CDriveList m_driveList;
-	HCURSOR m_hBusy;
 
 	bool m_readOnly = false;
 	std::wstring m_selectedDriveName;
@@ -39,7 +38,7 @@ public:
 	DialogMount(HINSTANCE hInstance, HWND hParent);
 	~DialogMount();
 	
-	bool doModal(std::wstring& deviceToConnect, bool& readOnly);
+	void run(const std::wstring exeName);
 	
 	// Dialog window message handler
 	INT_PTR handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);

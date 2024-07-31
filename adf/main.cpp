@@ -32,8 +32,6 @@
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-// RAW M 0 "\\.\PhysicalDrive3"
-
 // Command line is:
 //   COMMANDLINE_ constant
 //   DRIVELETTER
@@ -65,11 +63,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     WCHAR exeName[MAX_PATH];
     GetModuleFileName(NULL, exeName, MAX_PATH);
 
-  DialogMount moo(hInstance, GetDesktopWindow());
-  std::wstring deviceToConnect; bool readOnly;
-  moo.doModal(deviceToConnect, readOnly);
-  return 0;
-
     LPWSTR* argv = nullptr;
     if (wcslen(pCmdLine)) argv = CommandLineToArgvW(pCmdLine, &argc);
 
@@ -78,6 +71,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     if (argc >= 1) {
         std::wstring txt = argv[0];
         isSilentStart = txt == L"SILENT";
+
+        if (txt == L"HDMOUNT") {
+            DialogMount mounter(hInstance, GetDesktopWindow());
+            mounter.run(exeName);
+            return 0;
+        } 
     }
      
     // See if its just a disk image on the command line
@@ -178,13 +177,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
         VolumeManager* vol = new VolumeManager(hInstance, exeName, driveLetter, readOnly);
 
+        bool showExplorer = false;
         if (std::wstring(argv[0]) == COMMANDLINE_MOUNTRAW) {
             if (!vol->mountRaw(argv[3], readOnly)) {
                 delete vol;
                 return RETURNCODE_MOUNTFAIL;
             }
+            showExplorer = true;
         } else
         if (std::wstring(argv[0]) == COMMANDLINE_MOUNTFILE) {
+            // this never actually ever gets called
             if (!vol->mountFile(argv[3])) {
                 delete vol;
                 return RETURNCODE_MOUNTFAIL;
@@ -200,7 +202,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             else return RETURNCODE_BADARGS;
 
         try {
-            vol->run();
+            vol->run(showExplorer);
         }
         catch (const std::exception& ex) {
             UNREFERENCED_PARAMETER(ex);

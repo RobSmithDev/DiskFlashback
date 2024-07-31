@@ -21,6 +21,7 @@
 
 #define WM_DOQUIT             (WM_USER+10)
 #define COPYDATA_MOUNTRAW_FAILED 100
+#define COPYDATA_MOUNTFILE_FAILED 102
 
 struct DriveInfo {
     HWND hWnd;
@@ -129,6 +130,9 @@ private:
 
     // Find the windows start menu startup folder for the current user
     bool getWindowsProgramStartupFolder(std::wstring& path);
+
+    // Start the MOUNT dialog
+    void runMountDialog();
 
 public:
     CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSilentStart);

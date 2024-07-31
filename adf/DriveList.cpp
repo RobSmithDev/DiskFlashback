@@ -572,11 +572,20 @@ void identifyPartitionDrive(CDriveList::CDevice& drive, CDriveAccess* io) {
 						drive.fileSystem += filesystemName;
 					}
 
+					std::wstring diskName;
 					if (info.volumeLabel.length()) {
-						if (!drive.volumeName.empty()) drive.volumeName += L", ";
 						std::wstring tmp;
 						ansiToWide(info.volumeLabel, tmp);
-						drive.volumeName += tmp;
+						diskName = tmp;
+					}
+					if (adfDevice->volList[i]->volName) {
+						std::wstring vn;
+						ansiToWide(adfDevice->volList[i]->volName, vn);
+						if (diskName.empty()) diskName = vn; else diskName += L" (" + vn + L")";
+					}
+					if (diskName.length()) {
+						if (!drive.volumeName.empty()) drive.volumeName += L", ";
+						drive.volumeName += diskName;
 					}
 				}
 				delete pfs3;
@@ -597,8 +606,11 @@ void CDriveList::refreshList() {
 	m_deviceList.clear();
 	getDeviceList(m_deviceList);
 
-	for (CDevice& dev : m_deviceList) 
-		identifyPartitionDrive(dev, connectToDrive(dev, true));
+	CDevice& dev = m_deviceList[0];
+	identifyPartitionDrive(dev, connectToDrive(dev, true));
+
+	//for (CDevice& dev : m_deviceList) 
+	//	identifyPartitionDrive(dev, connectToDrive(dev, true));
 }
 
 CDriveList::CDriveList() {
@@ -747,15 +759,15 @@ void calculateFieldsFromRDSK(CDriveList::CDevice& device) {
 
 void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplicates, CDriveList::DeviceList& deviceList) {
 	CDriveList::CDevice _device;
-	CDriveList::CDevice& device = _device;
-	device.devicePath = devicePath;
+	CDriveList::CDevice* device = &_device;
+	device->devicePath = devicePath;
 
-	HANDLE hDevice = CreateFile(device.devicePath.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-	if (hDevice == INVALID_HANDLE_VALUE) hDevice = CreateFile(device.devicePath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	HANDLE hDevice = CreateFile(device->devicePath.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	if (hDevice == INVALID_HANDLE_VALUE) hDevice = CreateFile(device->devicePath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 	if (hDevice == INVALID_HANDLE_VALUE) {
-		hDevice = CreateFile(device.devicePath.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+		hDevice = CreateFile(device->devicePath.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 		if (hDevice == INVALID_HANDLE_VALUE) return;
-		device.isAccessible = false;
+		device->isAccessible = false;
 	}
 
 	std::vector<uint8_t> tmpBuffer; tmpBuffer.resize(20000);
@@ -764,31 +776,41 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 	DWORD returnedLength;
 	STORAGE_PROPERTY_QUERY query;
 	query.PropertyId = StorageDeviceProperty;
-	query.QueryType = PropertyStandardQuery;		
+	query.QueryType = PropertyStandardQuery;
 	if (!DeviceIoControl(hDevice, IOCTL_STORAGE_QUERY_PROPERTY, &query, sizeof(STORAGE_PROPERTY_QUERY), &tmpBuffer[0], (DWORD)tmpBuffer.size(), &returnedLength, NULL)) {
 		DWORD err = GetLastError();
 		if (err != ERROR_INVALID_FUNCTION) {
 			CloseHandle(hDevice);
 			return;
 		}
-		device.isRemovable = true;
-		device.deviceName = device.devicePath;
-		device.productId = L"Disk";
-		device.productRev = L"1.0";
-		device.vendorId = L"Unknown";
+		device->isRemovable = true;
+		device->deviceName = device->devicePath;
+		device->productId = L"Disk";
+		device->productRev = L"1.0";
+		device->vendorId = L"Unknown";
 	}
 	else {
-		driveIndex = getStorageProperty(&tmpBuffer[0], returnedLength, device, ignoreDuplicates, deviceList);
+		driveIndex = getStorageProperty(&tmpBuffer[0], returnedLength, *device, ignoreDuplicates, deviceList);
 		if (driveIndex == DEVICE_INDEX_IGNORE) {
 			CloseHandle(hDevice);
 			return;
 		}
-		if (driveIndex != DEVICE_INDEX_ADD) device = deviceList[driveIndex];
-		STORAGE_DEVICE_NUMBER sdn;		
-		if (DeviceIoControl(hDevice, IOCTL_STORAGE_GET_DEVICE_NUMBER, NULL, 0, &sdn, sizeof(sdn), &returnedLength, NULL)) getStorageInfo(device, sdn);
-		readIdentity(INVALID_HANDLE_VALUE, device);
+		if (driveIndex != DEVICE_INDEX_ADD) {
+			// replace it
+			if (device->isAccessible) {
+				deviceList[driveIndex] = _device;
+				device = &deviceList[driveIndex];				
+			}
+			else {
+				CloseHandle(hDevice);
+				return;
+			}
+		}
+		STORAGE_DEVICE_NUMBER sdn;
+		if (DeviceIoControl(hDevice, IOCTL_STORAGE_GET_DEVICE_NUMBER, NULL, 0, &sdn, sizeof(sdn), &returnedLength, NULL)) getStorageInfo(*device, sdn);
+		readIdentity(INVALID_HANDLE_VALUE, *device);
 	}
-	
+
 	bool geometryOK = true;
 	DISK_GEOMETRY dg;
 	if (!DeviceIoControl(hDevice, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0, (void*)&dg, sizeof(dg), &returnedLength, NULL)) {
@@ -801,13 +823,14 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 	}
 	if (!DeviceIoControl(hDevice, IOCTL_DISK_IS_WRITABLE, NULL, 0, NULL, 0, &returnedLength, NULL)) {
 		DWORD err = GetLastError();
-		if (err == ERROR_WRITE_PROTECT) device.readOnly = true;
+		if (err == ERROR_WRITE_PROTECT) device->readOnly = true;
 	}
 
-	if (!device.isAccessible) {
-		device.danger = CDriveList::DangerType::dtBad;
-		device.readOnly = true;
-		makeDriveNameUnique(device, deviceList);
+	if (!device->isAccessible) {
+		device->danger = CDriveList::DangerType::dtBad;
+		device->readOnly = true;
+		makeDriveNameUnique(*device, deviceList);
+		if (driveIndex < 0) deviceList.push_back(*device);
 	}
 	else {
 		bool getDiskLengthOK = true;
@@ -819,31 +842,31 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 			return;
 		}
 
-		device.offset = 0;
-		device.size = 0;
+		device->offset = 0;
+		device->size = 0;
 		if (geometryOK) {
-			device.bytesPerSector = dg.BytesPerSector;
+			device->bytesPerSector = dg.BytesPerSector;
 			if ((dg.BytesPerSector < 512) || (dg.BytesPerSector > 2048)) {
 				CloseHandle(hDevice);
 				return;
 			}
-			device.size = (uint64_t)dg.BytesPerSector * (uint64_t)dg.Cylinders.QuadPart * (uint64_t)dg.TracksPerCylinder * (uint64_t)dg.SectorsPerTrack;
-			device.cylinders = dg.Cylinders.QuadPart > 65535 ? 0 : dg.Cylinders.LowPart;
-			device.sectorsPerTrack = dg.SectorsPerTrack;
-			device.heads = dg.TracksPerCylinder;
+			device->size = (uint64_t)dg.BytesPerSector * (uint64_t)dg.Cylinders.QuadPart * (uint64_t)dg.TracksPerCylinder * (uint64_t)dg.SectorsPerTrack;
+			device->cylinders = dg.Cylinders.QuadPart > 65535 ? 0 : dg.Cylinders.LowPart;
+			device->sectorsPerTrack = dg.SectorsPerTrack;
+			device->heads = dg.TracksPerCylinder;
 		}
 
-		if (getDiskLengthOK && gli.Length.QuadPart) device.size = gli.Length.QuadPart;
+		if (getDiskLengthOK && gli.Length.QuadPart) device->size = gli.Length.QuadPart;
 
 		// CHS stands for Cylinder/Head/Sector
-		if (isCHS(device.identity) && gli.Length.QuadPart == 0) {
+		if (isCHS(device->identity) && gli.Length.QuadPart == 0) {
 			int c, h, s;
-			toCHS(device.identity, -1, &c, &h, &s);
-			device.size = (uint64_t)c * h * s * 512;
-			device.cylinders = c;
-			device.heads = h;
-			device.sectorsPerTrack = s;
-			device.chsDetected = true;
+			toCHS(device->identity, -1, &c, &h, &s);
+			device->size = (uint64_t)c * h * s * 512;
+			device->cylinders = c;
+			device->heads = h;
+			device->sectorsPerTrack = s;
+			device->chsDetected = true;
 		}
 
 		uint32_t partitionsFound = 0;
@@ -864,32 +887,32 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 						emptySpace = true;
 						continue;
 					}
-					if (pi->StartingOffset.QuadPart > usedStart) usedStart = pi->StartingOffset.QuadPart;
+					if (pi->StartingOffset.QuadPart < usedStart) usedStart = pi->StartingOffset.QuadPart;
 					if (pi->RecognizedPartition == 0) continue;
 					nonzeropart++;
 					if (pi->PartitionType != 0x76 && pi->PartitionType != 0x30) continue;
-					CDriveList::CDevice dev = device;
+					CDriveList::CDevice dev = *device;
 					dev.offset = pi->StartingOffset.QuadPart;
 					dev.size = pi->PartitionLength.QuadPart;
 					makeDriveNameUnique(dev, deviceList);
 					dev.danger = CDriveList::DangerType::dtPartition;
-					dev.partitionNumber = (uint16_t)(i+1);					
+					dev.partitionNumber = (uint16_t)(i + 1);
 					deviceList.push_back(dev);
 					partitionsFound++;
 				}
 
 				// Theres empty space at the start of the drive. Commodore spec allows RDSK to appear in the first 64 blocks, so we'll search for them
-				if (emptySpace && (usedStart>=device.bytesPerSector) && (device.bytesPerSector)) {
+				if (emptySpace && (usedStart >= device->bytesPerSector) && (device->bytesPerSector)) {
 					uint32_t pos = 0;
 					std::vector<uint8_t> tmp;
-					tmp.resize(device.bytesPerSector);
-					while (((pos * device.bytesPerSector) + device.bytesPerSector < usedStart) && (pos < 64)) {
+					tmp.resize(device->bytesPerSector);
+					while (((pos * device->bytesPerSector) + device->bytesPerSector < usedStart) && (pos < 64)) {
 						DWORD read;
 						if (ReadFile(hDevice, &tmp[0], tmp.size(), &read, NULL)) {
 							// Block read. See what it starts with
 							if ((tmp[0] == 'R') && (tmp[1] == 'D') && (tmp[2] == 'S') && (tmp[3] == 'K')) {
 								// Potential undiscovered RDSK found!
-								CDriveList::CDevice dev = device;
+								CDriveList::CDevice dev = *device;
 								dev.offset = 0;
 								dev.size = usedStart - dev.offset;  // temporary
 								calculateFieldsFromRDSK(dev);
@@ -905,22 +928,22 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 							}
 						}
 						pos++;
-					}					
+					}
 				}
 			}
 		}
 		if (partitionsFound < 1) {
-			if (device.offset == 0 && device.size) {
-				device.danger = safetyCheck(hDevice, device.devicePath, 0, &tmpBuffer[0], dg.BytesPerSector, device.identity, device.chsDetected);
-				if (device.danger >= CDriveList::DangerType::dtOS) {
+			if (device->offset == 0 && device->size) {
+				device->danger = safetyCheck(hDevice, device->devicePath, 0, &tmpBuffer[0], dg.BytesPerSector, device->identity, device->chsDetected);
+				if (device->danger >= CDriveList::DangerType::dtOS) {
 					CloseHandle(hDevice);
 					return;
 				}
 			}
-			if (driveIndex < 0) deviceList.push_back(device);
-			makeDriveNameUnique(device, deviceList);
+			makeDriveNameUnique(*device, deviceList);
+			if (driveIndex < 0) deviceList.push_back(*device);
 		}
-	}	
+	}
 	CloseHandle(hDevice);
 }
 
@@ -1154,7 +1177,6 @@ bool CDriveAccess::internalWriteData(const uint32_t sectorNumber, const uint32_t
 	if (!WriteFile(m_drive, data, sectorSize, &bytesWritten, NULL)) bytesWritten = 0;
 	return bytesWritten == sectorSize;
 }
-
 
 bool CDriveAccess::isDiskPresent() {
 	return m_drive != INVALID_HANDLE_VALUE;

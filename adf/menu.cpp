@@ -36,6 +36,9 @@
 #include <ShlGuid.h>
 #include <strsafe.h>
 #include <WinDNS.h>
+#include "DriveList.h"
+#include "dlgMount.h"
+
 
 #define MENUID_CREATEDISK       1
 #define MENUID_MOUNTDISK        2
@@ -44,6 +47,7 @@
 #define MENUID_RETRODIR         5
 #define MENUID_CLEAN            6
 #define MENUID_AUTOSTART        7
+#define MENUID_MOUNTHD          8
 #define MENUID_QUIT             10
 #define MENUID_ENABLED          20
 #define MENUID_CONFIGURE        21
@@ -260,15 +264,27 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_CONFIGURE, L"Configure...");
 
-    
+
+    SHSTOCKICONINFO ssii = {};
+    ssii.cbSize = sizeof(ssii);
+    SHGetStockIconInfo(SIID_SHIELD, SHGSI_ICON | SHGSI_SMALLICON, &ssii);
+    ICONINFOEX iconInfo = {};
+    iconInfo.cbSize = sizeof(iconInfo);
+    GetIconInfoEx(ssii.hIcon, &iconInfo);
+    HBITMAP bitmap = (HBITMAP)CopyImage(iconInfo.hbmColor, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+    DestroyIcon(ssii.hIcon);
+
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCreateList,    L"Create Disk Image");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_MOUNTDISK,           L"Mount Disk Image...");
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hDriveMenu,     L"Eject");
     AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
-    AppendMenu(m_hMenu, MF_STRING | MF_POPUP, (UINT_PTR)m_hPhysicalDrive, L"Physical Drive");
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP, (UINT_PTR)m_hPhysicalDrive, L"Floppy Drive");
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP, MENUID_MOUNTHD, L"Mount HD/Memory Card...");
     AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hUpdates,       L"Settings");
     AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
+
+    SetMenuItemBitmaps(m_hMenu, MENUID_MOUNTHD, MF_BYCOMMAND, bitmap, bitmap);
 
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOSTART, L"Start With Windows");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_RENAMEEXT, L"Automatically Swap File Extensions (Amiga)");
@@ -583,6 +599,11 @@ void CTrayMenu::installIBMPCFS(bool isHD, bool isIBMPC, SectorCacheEngine* fle) 
     setFatFSSectorCache(nullptr);
 }
 
+// Start the MOUNT dialog
+void CTrayMenu::runMountDialog() {
+    ShellExecute(m_window.hwnd(), L"runas", m_exeName.c_str(), L"HDMOUNT", NULL, SW_SHOW);
+}
+
 // Handle the menu click result
 void CTrayMenu::handleMenuResult(uint32_t index) {
     if ((index >= MENUID_EJECTSTART) && (index <= MENUID_EJECTSTART+26)) {
@@ -614,7 +635,9 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     case MENUID_CLEAN:
         handleCleanDisk();
         break;
-
+    case MENUID_MOUNTHD:
+        runMountDialog();
+        break;
     case MENUID_DONATE:
         ShellExecute(m_window.hwnd(), L"open", L"https://ko-fi.com/robsmithdev", NULL, NULL, SW_SHOW);
         break;
@@ -828,7 +851,7 @@ void CTrayMenu::monitorPhysicalDrive() {
                 std::wstring driveLetterW; ansiToWide(driveLetter, driveLetterW);
                 std::wstring profileW; ansiToWide(m_config.floppyProfile, profileW);
 
-                std::wstring cmd = L"\"" + m_exeName + L"\" BRIDGE " + driveLetterW + L" 1 \"" + profileW + L"\"";
+                std::wstring cmd = L"\"" + m_exeName + L"\" " + COMMANDLINE_MOUNTDRIVE + L" " + driveLetterW + L" 1 \"" + profileW + L"\"";
                 STARTUPINFO si; ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
 
                 CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &m_floppyPi);
@@ -896,22 +919,14 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
     // Make sure the icon stays even if explorer dies
     m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT {
         setupIcon(); return 0; });
-
-    m_window.setMessageHandler(WM_COPYDATA, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
-        COPYDATASTRUCT* str = (COPYDATASTRUCT*)lParam;
-        switch (str->dwData) {
-        case COPYDATA_MOUNTRAW_FAILED:;
-        }
-        return 0;
-    });
-
+   
     m_window.setMessageHandler(WM_USER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         handleMenuInput((UINT)wParam, (UINT)lParam); return 0; });
 
     m_window.setMessageHandler(WM_DOQUIT, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         if ((wParam == 20) && (lParam == 30)) PostQuitMessage(0);
         return 0;
-        });
+       });
 
 
     m_window.setMessageHandler(WM_PHYSICAL_EJECT, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
@@ -978,7 +993,29 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
         }
         return 0;
     });
-    
+
+    m_window.setMessageHandler(WM_COPYDATA, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        COPYDATASTRUCT* str = (COPYDATASTRUCT*)lParam;
+        switch (str->dwData) {
+        case COPYDATA_MOUNTRAW_FAILED: {
+            // Do popup for updates available
+                std::wstring tmp;
+                tmp.resize(str->cbData >> 1);
+                memcpy_s(&tmp[0], tmp.length() * 2, str->lpData, str->cbData);
+                tmp = L"Error, unable to mount volumes on device " + tmp;
+                wcscpy_s(m_notify.szInfo, tmp.c_str());
+
+                m_notify.uFlags |= NIF_INFO;
+                m_notify.dwInfoFlags = NIIF_INFO;
+                wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                m_lastBalloonType = LastBalloonType::lblDefault;
+                Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+                m_notify.uFlags &= ~NIF_INFO;
+            }
+            break;
+        }
+        return 0;
+    });
 
     // Just to popup a message
     m_window.setMessageHandler(WM_POPUP_INFO, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
@@ -1012,8 +1049,8 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
         return 0;
      });
 
-    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_COPYDATA, MSGFLT_ALLOW, NULL);
     ChangeWindowMessageFilterEx(m_window.hwnd(), WM_USER, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_COPYDATA, MSGFLT_ALLOW, NULL);
     ChangeWindowMessageFilterEx(m_window.hwnd(), WM_DOQUIT, MSGFLT_ALLOW, NULL);
     ChangeWindowMessageFilterEx(m_window.hwnd(), WM_PHYSICAL_EJECT, MSGFLT_ALLOW, NULL);
     ChangeWindowMessageFilterEx(m_window.hwnd(), WM_REMOTEUSAGE, MSGFLT_ALLOW, NULL);   

@@ -17,14 +17,13 @@
 #include "dlgMount.h"
 #include "resource.h"
 #include <CommCtrl.h>
+#include "drivecontrol.h"
 
 
 DialogMount::DialogMount(HINSTANCE hInstance, HWND hParent) : m_hInstance(hInstance), m_hParent(hParent) {
-	m_hBusy = LoadCursor(hInstance, IDC_WAIT);
 }
 
 DialogMount::~DialogMount() {
-	DestroyCursor(m_hBusy);
 }
 
 INT_PTR CALLBACK mountCallback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -33,13 +32,19 @@ INT_PTR CALLBACK mountCallback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 	if (dlg) return dlg->handleDialogProc(hwnd, msg, wParam, lParam); else return FALSE;
 }
 
-bool DialogMount::doModal(std::wstring& deviceToConnect, bool& readOnly) {
+void DialogMount::run(const std::wstring exeName) {
 	if (DialogBoxParam(m_hInstance, MAKEINTRESOURCE(IDD_MOUNTRAW), m_hParent, mountCallback, (LPARAM)this)) {
-		deviceToConnect = m_selectedDriveName;
-		readOnly = m_readOnly;
-		return !deviceToConnect.empty();
+		// Trigger mounting
+		std::wstring cmd = L"\"" + exeName + L"\" " + COMMANDLINE_MOUNTRAW + L" ? " + (m_readOnly ? L"0" : L"1") + L" \"" + m_selectedDriveName + L"\"";
+		PROCESS_INFORMATION pi;
+		STARTUPINFO si;
+		ZeroMemory(&si, sizeof(si));
+		si.cb = sizeof(si);
+		ZeroMemory(&pi, sizeof(pi));
+		CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+		if (pi.hThread) CloseHandle(pi.hThread);
+		if (pi.hProcess) CloseHandle(pi.hProcess);
 	}
-	else return false;
 }
 
 // Init dialog
@@ -55,10 +60,10 @@ void DialogMount::handleInitDialog(HWND hwnd) {
 	col.mask = LVCF_WIDTH | LVCF_TEXT | LVCF_FMT | LVCF_SUBITEM;
 
 	m_listView = GetDlgItem(m_dialogBox, IDC_DRIVELIST);
-	col.cx = 300; col.pszText = (LPWSTR)L"Device Name"; col.iSubItem = 0; ListView_InsertColumn(m_listView, 0, &col);
-	col.cx = 60; col.pszText = (LPWSTR)L"Partition";  col.iSubItem = 1; ListView_InsertColumn(m_listView, 1, &col);
-	col.cx = 80; col.pszText = (LPWSTR)L"File System";  col.iSubItem = 2; ListView_InsertColumn(m_listView, 2, &col);
-	col.cx = 140; col.pszText = (LPWSTR)L"Volume Name";  col.iSubItem = 3; ListView_InsertColumn(m_listView, 3, &col);
+	col.cx = 200; col.pszText = (LPWSTR)L"Device Name"; col.iSubItem = 0; ListView_InsertColumn(m_listView, 0, &col);
+	col.cx = 45; col.pszText = (LPWSTR)L"Partition";  col.iSubItem = 1; ListView_InsertColumn(m_listView, 1, &col);
+	col.cx = 100; col.pszText = (LPWSTR)L"File Systems";  col.iSubItem = 2; ListView_InsertColumn(m_listView, 2, &col);
+	col.cx = 230; col.pszText = (LPWSTR)L"Volume Names";  col.iSubItem = 3; ListView_InsertColumn(m_listView, 3, &col);
 	SendMessage(GetDlgItem(m_dialogBox, IDC_READONLY), BM_SETCHECK, BST_CHECKED, 0);
 
 	ListView_SetExtendedListViewStyle(m_listView, LVS_EX_FULLROWSELECT);
@@ -73,7 +78,8 @@ void DialogMount::handleInitDialog(HWND hwnd) {
 
 // Refresh current selection stuff
 void DialogMount::refreshSelection() {
-	SetCursor(m_hBusy);
+	EnableWindow(m_dialogBox, FALSE);
+	HCURSOR old = SetCursor(LoadCursor(NULL, IDC_WAIT));
 	ListView_DeleteAllItems(m_listView);
 	m_driveList.refreshList();
 	const CDriveList::DeviceList list = m_driveList.getDevices();
@@ -90,11 +96,21 @@ void DialogMount::refreshSelection() {
 			WCHAR tmp[10];
 			swprintf_s(tmp, L"%i", list[index].partitionNumber);
 			ListView_SetItemText(m_listView, index, 1, tmp);
-		} else ListView_SetItemText(m_listView, index, 1, (LPWSTR)L"");
-		ListView_SetItemText(m_listView, index, 2, (LPWSTR)list[index].fileSystem.c_str());
-		ListView_SetItemText(m_listView, index, 3, (LPWSTR)list[index].volumeName.c_str());
+		}
+		else ListView_SetItemText(m_listView, index, 1, (LPWSTR)L"");
+
+		if (list[index].isAccessible) {
+			ListView_SetItemText(m_listView, index, 2, (LPWSTR)list[index].fileSystem.c_str());
+			ListView_SetItemText(m_listView, index, 3, (LPWSTR)list[index].volumeName.c_str());
+		}
+		else {
+			ListView_SetItemText(m_listView, index, 2, (LPWSTR)L"Access Denied");
+			ListView_SetItemText(m_listView, index, 3, (LPWSTR)L"Access Denied");
+		}
 	}
 	EnableWindow(GetDlgItem(m_dialogBox, ID_MOUNT), ListView_GetNextItem(m_listView, -1, LVNI_SELECTED) >= 0);
+	EnableWindow(m_dialogBox, TRUE);
+	SetCursor(old);
 }
 
 void DialogMount::endDialogSuccess() {

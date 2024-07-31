@@ -65,10 +65,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     WCHAR exeName[MAX_PATH];
     GetModuleFileName(NULL, exeName, MAX_PATH);
 
- // DialogMount moo(hInstance, GetDesktopWindow());
- // std::wstring deviceToConnect; bool readOnly;
- // moo.doModal(deviceToConnect, readOnly);
- // return 0;
+  DialogMount moo(hInstance, GetDesktopWindow());
+  std::wstring deviceToConnect; bool readOnly;
+  moo.doModal(deviceToConnect, readOnly);
+  return 0;
 
     LPWSTR* argv = nullptr;
     if (wcslen(pCmdLine)) argv = CommandLineToArgvW(pCmdLine, &argc);

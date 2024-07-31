@@ -509,11 +509,6 @@ extern IPFS3* createPFS3FromVolume(AdfDevice* device, int partitionIndex, Sector
 // Attempt to work out the file system and volume label
 void identifyPartitionDrive(CDriveList::CDevice& drive, CDriveAccess* io) {
 	if (!io) return;
-	static bool adfSetup = false;
-	if (!adfSetup) {
-		adfSetup = true;
-		adfPrepNativeDriver();
-	}
 
 	AdfDevice* adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)io, AdfAccessMode::ADF_ACCESS_MODE_READONLY);
 	if (!adfDevice) {
@@ -597,6 +592,8 @@ void identifyPartitionDrive(CDriveList::CDevice& drive, CDriveAccess* io) {
 
 
 void CDriveList::refreshList() {
+	adfPrepNativeDriver();
+
 	m_deviceList.clear();
 	getDeviceList(m_deviceList);
 
@@ -718,6 +715,36 @@ CDriveList::DangerType safetyCheck(HANDLE h, const std::wstring& name, uint64_t 
 	return CDriveList::DangerType::dtEmptySpace;
 }
 
+// This device starts with an RDSK header, but we don't know its length
+void calculateFieldsFromRDSK(CDriveList::CDevice& device) {
+	CDriveAccess* ret = new CDriveAccess();
+	if (!ret->openDrive(device, true, false)) {
+		delete ret;
+		return;
+	}
+
+	AdfDevice* adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)ret, AdfAccessMode::ADF_ACCESS_MODE_READONLY);
+	if (!adfDevice) {
+		delete ret;
+		return;
+	}
+
+	if (adfDevMount(adfDevice) != ADF_RC_OK) {
+		delete ret;
+		return;
+	}
+
+	// Look through the partitions to find the last block
+	device.size = 0;
+	for (int part = 0; part < adfDevice->nVol; part++) {
+		if (adfDevice->volList[part]->lastBlock > device.size) device.size = adfDevice->volList[part]->lastBlock;
+	}
+	device.size *= device.bytesPerSector;
+	adfDevUnMount(adfDevice);
+
+	delete ret;
+}
+
 void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplicates, CDriveList::DeviceList& deviceList) {
 	CDriveList::CDevice _device;
 	CDriveList::CDevice& device = _device;
@@ -827,9 +854,17 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 				int nonzeropart = 0;
 				int gotpart = 0;
 				int safepart = 0;
+
+				bool emptySpace = false;
+				uint64_t usedStart = -1;
+
 				for (DWORD i = 0; i < dli->PartitionCount; i++) {
 					const PARTITION_INFORMATION* pi = &dli->PartitionEntry[i];
-					if (pi->PartitionType == PARTITION_ENTRY_UNUSED) continue;
+					if (pi->PartitionType == PARTITION_ENTRY_UNUSED) {
+						emptySpace = true;
+						continue;
+					}
+					if (pi->StartingOffset.QuadPart > usedStart) usedStart = pi->StartingOffset.QuadPart;
 					if (pi->RecognizedPartition == 0) continue;
 					nonzeropart++;
 					if (pi->PartitionType != 0x76 && pi->PartitionType != 0x30) continue;
@@ -841,6 +876,36 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 					dev.partitionNumber = (uint16_t)(i+1);					
 					deviceList.push_back(dev);
 					partitionsFound++;
+				}
+
+				// Theres empty space at the start of the drive. Commodore spec allows RDSK to appear in the first 64 blocks, so we'll search for them
+				if (emptySpace && (usedStart>=device.bytesPerSector) && (device.bytesPerSector)) {
+					uint32_t pos = 0;
+					std::vector<uint8_t> tmp;
+					tmp.resize(device.bytesPerSector);
+					while (((pos * device.bytesPerSector) + device.bytesPerSector < usedStart) && (pos < 64)) {
+						DWORD read;
+						if (ReadFile(hDevice, &tmp[0], tmp.size(), &read, NULL)) {
+							// Block read. See what it starts with
+							if ((tmp[0] == 'R') && (tmp[1] == 'D') && (tmp[2] == 'S') && (tmp[3] == 'K')) {
+								// Potential undiscovered RDSK found!
+								CDriveList::CDevice dev = device;
+								dev.offset = 0;
+								dev.size = usedStart - dev.offset;  // temporary
+								calculateFieldsFromRDSK(dev);
+								dev.danger = CDriveList::DangerType::dtRDB;
+								makeDriveNameUnique(dev, deviceList);
+
+								// Validate that it doesnt overlap with anything already discovered, and then add it
+								if (dev.offset + dev.size <= usedStart) {
+									deviceList.push_back(dev);
+									partitionsFound++;
+								}
+								break;
+							}
+						}
+						pos++;
+					}					
 				}
 			}
 		}
@@ -932,7 +997,7 @@ void CDriveList::getDeviceList(std::vector<CDevice>& deviceList) {
 // Connect to a specific drive
 CDriveAccess* CDriveList::connectToDrive(const CDevice& device, bool forceReadOnly) {
 	CDriveAccess* ret = new CDriveAccess();
-	if (ret->openDrive(device, forceReadOnly)) return ret;
+	if (ret->openDrive(device, forceReadOnly, true)) return ret;
 	delete ret;
 	return nullptr;
 }
@@ -954,7 +1019,7 @@ void CDriveAccess::closeDrive() {
 	}
 }
 
-bool CDriveAccess::openDrive(const CDriveList::CDevice& device, bool readOnly) {
+bool CDriveAccess::openDrive(const CDriveList::CDevice& device, bool readOnly, bool lockDrive) {
 	closeDrive();
 	m_device = device;
 
@@ -981,6 +1046,8 @@ bool CDriveAccess::openDrive(const CDriveList::CDevice& device, bool readOnly) {
 			return false;
 		}
 	}
+
+	if (!lockDrive) return true;
 
 	// Next up, attempt to lock the drive
 	DWORD written;

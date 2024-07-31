@@ -93,7 +93,7 @@ static struct AdfDevice *
         }
 
         if ( strncmp ( (char *) &rdsk, "RDSK", 4 ) == 0 ) {
-            rc = adfReadRDSKblock ( dev, &rdsk );
+            rc = adfReadRDSKblock ( dev, 0, &rdsk );
             if ( rc == ADF_RC_OK ) {
                 /* rigid block loaded -> check geometry */
                 //if ( ! adfDevIsRDSKGeometryValid_ ( dev, &rdsk ) ) {
@@ -286,18 +286,26 @@ ADF_RETCODE adfDevMount ( struct AdfDevice * const dev )
     case ADF_DEVTYPE_HARDDISK:
     case ADF_DEVTYPE_HARDFILE: {
         uint8_t buf[512];
-        rc = adfDevReadBlock ( dev, 0, 512, buf );
-        if ( rc != ADF_RC_OK ) {
-            adfEnv.eFct ( "adfMountDev : reading block 0 of %s failed", dev->name );
-            return rc;
+        // RDSK can be in the first 64 blocks
+        bool mounted = false;
+        for (uint32_t offset = 0; offset <= 63; offset++) {
+            rc = adfDevReadBlock(dev, offset, 512, buf);
+            if (rc != ADF_RC_OK) {
+                adfEnv.eFct("adfMountDev : reading block %i of %s failed", offset, dev->name);
+                return rc;
+            }
+            if (strncmp("RDSK", (char*)buf, 4) == 0) {
+                dev->devType = ADF_DEVTYPE_HARDDISK;
+                rc = adfMountHd(dev, offset);
+                if (rc == ADF_RC_OK) {
+                    mounted = true;
+                    break;
+                }
+            }
         }
-
-        if ( strncmp ( "RDSK", (char *) buf, 4 ) == 0 ) {
-            dev->devType = ADF_DEVTYPE_HARDDISK;
-            rc = adfMountHd ( dev );
-        } else {
+        if (!mounted) {
             dev->devType = ADF_DEVTYPE_HARDFILE;
-            rc = adfMountHdFile ( dev );
+            rc = adfMountHdFile(dev);
         }
 
         if ( rc != ADF_RC_OK )

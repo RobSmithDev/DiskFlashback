@@ -33,7 +33,7 @@
 #include "adf_blk_hd.h"
 #include "adf_prefix.h"
 
-ADF_RETCODE adfMountHd ( struct AdfDevice * const dev );
+ADF_RETCODE adfMountHd ( struct AdfDevice * const dev, const int32_t rdskBlock);
 ADF_RETCODE adfMountHdFile ( struct AdfDevice * const dev );
 
 ADF_RETCODE adfCreateHdHeader ( struct AdfDevice * const               dev,
@@ -50,6 +50,7 @@ ADF_PREFIX ADF_RETCODE adfCreateHdFile ( struct AdfDevice * const dev,
                                          const uint8_t            volType );
 
 ADF_PREFIX ADF_RETCODE adfReadRDSKblock ( struct AdfDevice * const    dev,
+                                const int32_t rdskBlockIndex,
                                struct AdfRDSKblock * const blk );
 
 ADF_RETCODE adfWriteRDSKblock ( struct AdfDevice * const    dev,

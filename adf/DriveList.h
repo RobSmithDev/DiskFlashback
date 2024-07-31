@@ -112,7 +112,6 @@ private:
 	bool m_dismounted = false;
 	bool m_dontFreeHandle = false;
 
-	bool openDrive(const CDriveList::CDevice& device, bool readOnly);
 	bool seek(uint64_t offset);
 
 	virtual bool internalReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) override;
@@ -121,6 +120,7 @@ private:
 public:
 	CDriveAccess();
 	~CDriveAccess();
+	bool openDrive(const CDriveList::CDevice& device, bool readOnly, bool lockDrive);
 
 	uint32_t getSectorSize() const { return m_device.bytesPerSector; };
 

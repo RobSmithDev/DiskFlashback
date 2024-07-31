@@ -30,10 +30,14 @@ void Verbose(const char* const format, ...) {
 #endif
 }
 
+static bool adfDriverSetup = false;
+
 void adfPrepNativeDriver() {
+    if (adfDriverSetup) return;
     adfEnvInitDefault();
     adfEnvSetFct((AdfLogFct)Error, (AdfLogFct)Warning, (AdfLogFct)Verbose, NULL);
     adfAddDeviceDriver(&adfDeviceDriverDiskFlashback);
+    adfDriverSetup = true;
 }
 
 int adfDevType(struct AdfDevice* dev)

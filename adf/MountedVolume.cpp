@@ -279,7 +279,14 @@ void MountedVolume::setSystemRecognisedSectorFormat(bool wasRecognised) {
 
 IPFS3* createPFS3FromVolume(AdfDevice* device, int partitionIndex, SectorCacheEngine* io, bool readOnly) {
     AdfRDSKblock rdskBlock;
-    if (adfReadRDSKblock(device, &rdskBlock) != ADF_RC_OK) return nullptr;
+    bool blockFound = false;
+    // RDSK could be in the first 64
+    for (int32_t offset = 0; offset < 64; offset++)
+        if (adfReadRDSKblock(device, offset, &rdskBlock) == ADF_RC_OK) {
+            blockFound = true;
+            break;
+        }
+    if (!blockFound) return nullptr;
 
     // Find partition
     int32_t next = rdskBlock.partitionList;

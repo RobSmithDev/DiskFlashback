@@ -18,6 +18,7 @@
 #include "resource.h"
 #include <CommCtrl.h>
 #include "drivecontrol.h"
+#include <Dbt.h>
 
 
 DialogMount::DialogMount(HINSTANCE hInstance, HWND hParent) : m_hInstance(hInstance), m_hParent(hParent) {
@@ -149,6 +150,14 @@ INT_PTR DialogMount::handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
 			KillTimer(m_dialogBox, wParam);
 			refreshSelection();
 		}
+		break;
+
+	case WM_DEVICECHANGE:
+		if ((wParam == DBT_DEVICEARRIVAL) || (wParam == DBT_DEVNODES_CHANGED) || (wParam == DBT_DEVICEREMOVEPENDING) || (wParam == DBT_DEVICEREMOVECOMPLETE)) {
+			KillTimer(m_dialogBox, 100);
+			SetTimer(m_dialogBox, 100, 250, NULL);
+			refreshSelection();
+		}			
 		break;
 
 	case WM_COMMAND:

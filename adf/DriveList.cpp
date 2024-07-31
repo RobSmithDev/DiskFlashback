@@ -606,11 +606,8 @@ void CDriveList::refreshList() {
 	m_deviceList.clear();
 	getDeviceList(m_deviceList);
 
-	CDevice& dev = m_deviceList[0];
-	identifyPartitionDrive(dev, connectToDrive(dev, true));
-
-	//for (CDevice& dev : m_deviceList) 
-	//	identifyPartitionDrive(dev, connectToDrive(dev, true));
+	for (CDevice& dev : m_deviceList) 
+		identifyPartitionDrive(dev, connectToDrive(dev, true));
 }
 
 CDriveList::CDriveList() {
@@ -880,7 +877,8 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 
 				bool emptySpace = false;
 				uint64_t usedStart = -1;
-
+				CDriveList::CDevice devCopy = *device;
+				
 				for (DWORD i = 0; i < dli->PartitionCount; i++) {
 					const PARTITION_INFORMATION* pi = &dli->PartitionEntry[i];
 					if (pi->PartitionType == PARTITION_ENTRY_UNUSED) {
@@ -891,7 +889,7 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 					if (pi->RecognizedPartition == 0) continue;
 					nonzeropart++;
 					if (pi->PartitionType != 0x76 && pi->PartitionType != 0x30) continue;
-					CDriveList::CDevice dev = *device;
+					CDriveList::CDevice dev = devCopy;
 					dev.offset = pi->StartingOffset.QuadPart;
 					dev.size = pi->PartitionLength.QuadPart;
 					makeDriveNameUnique(dev, deviceList);
@@ -905,6 +903,8 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 				if (emptySpace && (usedStart >= device->bytesPerSector) && (device->bytesPerSector)) {
 					uint32_t pos = 0;
 					std::vector<uint8_t> tmp;
+					
+					CDriveList::CDevice devCopy = *device;
 					tmp.resize(device->bytesPerSector);
 					while (((pos * device->bytesPerSector) + device->bytesPerSector < usedStart) && (pos < 64)) {
 						DWORD read;
@@ -912,7 +912,7 @@ void getDevicePropertyFromName(const std::wstring& devicePath, bool ignoreDuplic
 							// Block read. See what it starts with
 							if ((tmp[0] == 'R') && (tmp[1] == 'D') && (tmp[2] == 'S') && (tmp[3] == 'K')) {
 								// Potential undiscovered RDSK found!
-								CDriveList::CDevice dev = *device;
+								CDriveList::CDevice dev = devCopy;
 								dev.offset = 0;
 								dev.size = usedStart - dev.offset;  // temporary
 								calculateFieldsFromRDSK(dev);

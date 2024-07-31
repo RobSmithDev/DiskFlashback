@@ -358,6 +358,8 @@ void CTrayMenu::checkForUpdates(bool force) {
         DnsRecordListFree(dnsRecord, DnsFreeRecordList);  //DnsFreeRecordListDeep
     }
 
+    bool updateYes = false;
+
     if (!versionString.empty()) {
         DWORD appVersion = getAppVersion();
         // A little hacky to convert a.b.c.d into an array
@@ -375,8 +377,33 @@ void CTrayMenu::checkForUpdates(bool force) {
                 wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
                 Shell_NotifyIcon(NIM_MODIFY, &m_notify);
                 m_notify.uFlags &= ~NIF_INFO;
+                updateYes = true;
             }
         }
+        else error = true;
+    }
+    else error = true;
+
+    if (force) {
+        if (error) {
+            m_notify.uFlags |= NIF_INFO;
+            m_notify.dwInfoFlags = NIIF_ERROR;
+            m_lastBalloonType = LastBalloonType::lblUpdate;
+            wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+            wcscpy_s(m_notify.szInfo, L"Unable to check for updates. Please check your Internet connection.");
+            Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+            m_notify.uFlags &= ~NIF_INFO;
+        } else
+        if (!updateYes) {
+            // Do popup for updates available
+            m_notify.uFlags |= NIF_INFO;
+            m_notify.dwInfoFlags = NIIF_INFO;
+            m_lastBalloonType = LastBalloonType::lblUpdate;
+            wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+            wcscpy_s(m_notify.szInfo, L"You are already running the latest version of " APPLICATION_NAME_L);
+            Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+            m_notify.uFlags &= ~NIF_INFO;
+        }  
     }
 }
 

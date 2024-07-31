@@ -82,7 +82,12 @@ void DialogCLEAN::handleInitDialog(HWND hwnd) {
 		RECT r;
 		GetWindowRect(m_hParent, &r);
 		SetWindowPos(hwnd, m_hParent, r.left + 70, r.top + 70, 0, 0, SWP_NOSIZE);
-	}	
+	}
+	else {
+		RECT r;
+		GetWindowRect(hwnd, &r);
+		SetWindowPos(hwnd, m_hParent, (GetSystemMetrics(SM_CXSCREEN) - (r.right - r.left)) / 2, (GetSystemMetrics(SM_CYSCREEN) - (r.bottom - r.top)) / 2, 0, 0, SWP_NOSIZE);
+	}
 
 	BringWindowToTop(hwnd);
 	SetForegroundWindow(hwnd);

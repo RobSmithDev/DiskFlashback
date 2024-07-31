@@ -32,14 +32,6 @@
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-// Command line is:
-//   COMMANDLINE_ constant
-//   DRIVELETTER
-//   If MOUNT:
-//            0=Read Only, 1=Read/Write
-//   If CONTROL:
-//          one of the CTRL_PARAM_ values
-//   Mount File/Drive Params (if mount)
 
 // Trigger the applet loading if this is called for some other reason
 void startTrayIcon(const std::wstring& exe) {

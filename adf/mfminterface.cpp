@@ -343,6 +343,8 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
 
     checkFlushPendingWrites();
 
+    if (!isDiskInDrive()) return false;
+
     // Retry several times
     uint32_t retries = 0;
     for (;;) {
@@ -375,11 +377,15 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
                 break;
             default: 
                 return false;
-            }           
+            }    
+
+            // Re-check disk is actually inserted!
+            if (!isDiskInDrive()) return false;
         }
 
         // If this hits, then do a re-seek.  Sometimes it helps
         if (retries == MAX_RETRIES / 2) {
+            if (!isDiskInDrive()) return false;
             motorInUse(upperSurface);
             if (isPhysicalDisk()) {
                 if (cylinder < 40)
@@ -390,6 +396,7 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
                 // Wait for the seek, or it will get removed! 
                 Sleep(300);
             }
+            if (!isDiskInDrive()) return false;
         }
 
         // If we get here then this sector isn't in the cache (or has errors), so we'll read and update ALL sectors for this cylinder

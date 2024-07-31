@@ -2,23 +2,25 @@
 A Windows package to use Floppy Disk Images Files & Real Floppy Disks in Windows, directly.
 
 ## Why?
-Most of the USB floppy drives are terrible. And modifying a drive for DrawBridge removes the IBM/PC floppy disk support in Windows. Plus I was getting annoyed having to boot WinUAE just to copy a file to an ADF (or disk). So I built this - And all the silly playground arguments from childhood now behind us I gave a little love to the Atari ST too (untested, I don't have one!)...
+I wanted to be able to access my Amiga and other systems floppy disks without having to boot an emulator. I wanted to be able to open a disk image file (like ADF, IMG etc) in Windows in the easiest way possible, as well as be able to use a real floppy drive too and see whats on it.
+So I decided to build this - which allows you to view and edit the contents of real disks (floppy and hard drive) and disk image files directly from Windows Explorer, and yes, you can even read non-PC floppy and hard disks in real time too (hardware required for floppy disks).
 Checkout https://robsmithdev.co.uk/diskflashback for more details!
 
 ## Features
-- Mount ADF, DMS*, IMG, IMA, ST, MSA*, HDA, HDF and SCP* disk and hard drive files as virtual drives (* are read only)
-- Supports AmigaDOS OFS/FFS DD & HD Disks
+- Mount ADF, DMS*, IMG, IMA, ST, MSA*, HDA, HDF and SCP* files as virtual drives (* read only)
+- Supports AmigaDOS OFS/FFS/PFS File Systems for Floppy & Hard Disks
 - Supports IBM/PC FAT12/16 DD 720k & HD 1.44Mb Disks
 - Supports Atari ST FAT12/16 GemDOS Single and Double Sided normal & extended Disks
-- Supports Dual Format Amiga/Atari floppy disks and mounts them as two drives! (read only)
-- Use your DrawBridge, Greaseweazle or SupercardPRO board as a real floppy drive with direct access to files
-- Can create new disk images of any of the above formats.
-- Rip real floppy disks to the above formats
+- Supports Dual/Tripple Format Amiga/Atari floppy disks and mounts them as two drives! (read only)
+- Mount your DrawBridge, Greaseweazle or SupercardPro as a real floppy drive in Windows
+- Mount your real Amiga Hard Disks/Memory Cards as drives
+- Create blank disk images for the above formats.
+- Rip real floppy disks to file (sector based files only)
 - Write disk images to real floppy disks
-- Install boot blocks on Amiga floppy disks
-- Optionally silently swap file extensions (eg: mod.thismusic to thismusic.mod)
-
-
+- Install boot blocks on Amiga disks
+- Format floppy disks in a range of formats
+- Optionally silently swap Amiga file extensions (eg: mod.thismusic to thismusic.mod)
+- Provides a simple floppy drive head cleaner function
 
 ## How does it work?
 DiskFlashback is powered by:

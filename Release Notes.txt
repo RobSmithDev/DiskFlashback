@@ -8,7 +8,7 @@ https://robsmithdev.co.uk/diskflashback
 	Small speed up for DrawBridge reading too!
 	Sped up disk writing as well!
 	Added special message for people just trying to run the DiskFlashback EXE and wondering why it doesn't do anything
-	Added new "Clean Drive Heads" option for Drawbridge, Greaseweazle and Supercard PRO
+	Added new "Clean Drive Heads" option for real floppy drives (cleaning disk required)
 	Re-arranged all physical drive related commands into its own menu
 	Added option to toggle the auto-starting up the system tray icon with Windows
 	Changed how new versions of the application are detected to hopefully get around some previous false positives
@@ -20,7 +20,7 @@ https://robsmithdev.co.uk/diskflashback
 	Fixed issues with SuperCard PRO board not seeking to the correct track [FloppyBridge]
 	Fixed an issue where some SCP files wouldn't load at all
 	Fixed some issues with some dual-format disk images not showing both parts
-	Fixed issues with Tr-format disks
+	Fixed issues with Tri-format disks (they're actually dual-format really)
 	Fixed an issue with dual-format disks where number of heads was incorrectly used for PC/Atari side
 	Fixed issue where re-reading bad Amiga sectors didn't work properly
 	Fixed a strange seek issue when ejecting real floppy disks

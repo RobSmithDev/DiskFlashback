@@ -17,7 +17,7 @@
 #include "sectorCache.h"
 #include "dokaninterface.h"
 
-const WCHAR* ShellRegistery::DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"amiga.fd",L"ibmpc",L"atarist"};
+const WCHAR* ShellRegistery::DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"amiga.fd",L"ibmpc",L"atarist",L"msx"};
 const int    ShellRegistery::DiskImageIcon[MAX_DISK_IMAGE_FILES] = { 1, 0, 3 };
 
 #define REG_DRIVE_KEYNAME_CLEAN  L"DiskFlashback.Clean"
@@ -111,7 +111,7 @@ void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t ico
 
 void ShellRegistery::mountDismount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource) {
 	const bool physicalDisk = sectorSource ? sectorSource->isPhysicalDisk() : false;
-	const bool copyToADF = sectorSource ? sectorSource->allowCopyToFile() : false;
+	const bool copyToFile = sectorSource ? sectorSource->allowCopyToFile() : false;
 	setupFiletypeContextMenu(physicalDisk, driveLetter);
 
 	removeDriveAction(driveLetter, REG_DRIVE_KEYNAME_BB);
@@ -119,16 +119,11 @@ void ShellRegistery::mountDismount(bool mounted, WCHAR driveLetter, SectorCacheE
 
 	if (mounted) {		
 		
-		if (copyToADF) {
-			switch (sectorSource->getSystemType()) {
-			case SectorType::stAmiga: addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to .ADF...", 0, L"BACKUP"); break;
-			case SectorType::stIBM: addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to .IMG...", 0, L"BACKUP"); break;
-			case SectorType::stAtari: addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to .ST...", 0, L"BACKUP"); break;
-			}
-		}
+		if (copyToFile) 
+			if ((sectorSource->getSystemType() != SectorType::stUnknown) && (sectorSource->getSystemType() != SectorType::stHybrid)) 
+				addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to File...", 0, L"BACKUP");
 
-		if ((sectorSource->getSystemType() == SectorType::stAmiga) && (!sectorSource->isDiskWriteProtected())) {
+		if ((sectorSource->getSystemType() == SectorType::stAmiga) && (!sectorSource->isDiskWriteProtected())) 
 			addDriveAction(driveLetter, REG_DRIVE_KEYNAME_BB, L"&Install Bootblock...", 0, L"BB");
-		}		
 	}
 }

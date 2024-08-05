@@ -224,7 +224,7 @@ void findSectors_IBM(const uint8_t* track, const uint32_t dataLengthInBits, cons
 			if (sectorEndPoint) {
 				uint32_t markerStart = bit + 1 - 64;
 				uint32_t bytesBetweenSectors = (markerStart - sectorEndPoint) / 16;
-				bytesBetweenSectors = max(0, bytesBetweenSectors - (12 * 2));   // these would be the SYNC AA or 55
+				bytesBetweenSectors = max(0, (int32_t)bytesBetweenSectors - (12 * 2));   // these would be the SYNC AA or 55
 				if (bytesBetweenSectors > 200) bytesBetweenSectors = 200; // shouldnt get this high
 				// For a PC disk this should be around 84
 				gapTotal += bytesBetweenSectors;
@@ -453,7 +453,7 @@ uint32_t encodeSectorsIntoMFM_IBM(const bool isHD, bool forceAtariTiming, Decode
 		header.cylinder = cylinder;
 		header.head = upperSide ? 1 : 0;
 		header.sector = sec + 1;
-		header.length = (unsigned char)(max(0,log2(sector.data.size()) - 7));
+		header.length = (unsigned char)(max(0,(int)log2(sector.data.size()) - 7));
 		*((uint16_t*)header.crc) = wordSwap(crc16((char*)&header, sizeof(header) - 2));
 
 		mem += writeMarkerMFM(mem, MFM_SYNC_SECTOR_HEADER, lastByte, memOverflow);

@@ -57,7 +57,7 @@ INT_PTR DialogCOPY::doModal(bool fileSystemRecognised) {
 			m_fileExtension = L"adf";
 			break;
 		case SectorType::stIBM:
-			dlg.lpstrFilter = L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0All Files(*.*)\0*.*\0\0";
+			dlg.lpstrFilter = L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0MSX Disk Files (*.dsk)\0*.dsk\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"img";
 			break;
 		case SectorType::stAtari:
@@ -68,9 +68,7 @@ INT_PTR DialogCOPY::doModal(bool fileSystemRecognised) {
 			return 0; // not supported
 		}
 
-		m_titleExtension = m_fileExtension;
-		for (WCHAR& c : m_titleExtension) c = towupper(c);
-		std::wstring title = L"Save Disk to " + m_titleExtension + L" File...";
+		std::wstring title = L"Save Disk to...";
 
 		dlg.Flags = OFN_CREATEPROMPT | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT | OFN_HIDEREADONLY | OFN_NOREADONLYRETURN | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
 		dlg.lpstrDefExt = m_fileExtension.c_str();

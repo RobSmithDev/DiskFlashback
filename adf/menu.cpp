@@ -449,7 +449,7 @@ void CTrayMenu::handleCopyToDisk() {
     dlg.hwndOwner = m_window.hwnd();
     std::wstring filter;
     std::wstring defaultFormat;
-    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.ima;*.st;\0All Files(*.*)\0*.*\0\0";
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.ima;*.st;*.dsk\0All Files(*.*)\0*.*\0\0";
     dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
     dlg.lpstrTitle = L"Select disk image to copy to floppy";
     dlg.lpstrFile = filename;
@@ -792,7 +792,7 @@ void CTrayMenu::mountDisk() {
     dlg.hwndOwner = m_window.hwnd();
     std::wstring filter;
     std::wstring defaultFormat;
-    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st;*.scp\0All Files(*.*)\0*.*\0\0";
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st;*.scp;*.dsk\0All Files(*.*)\0*.*\0\0";
     dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
     dlg.lpstrTitle = L"Select disk image to mount";
     dlg.lpstrFile = filename;

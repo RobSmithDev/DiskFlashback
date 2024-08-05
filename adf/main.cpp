@@ -80,7 +80,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                 std::wstring ext = txt.substr(pos + 1);
                 for (WCHAR& c : ext) c = towupper(c);
                 // Disk image file
-                if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"MSA") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP")) {
+                if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"MSA") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP") || (ext == L"DSK")) {
                     VolumeManager* vol = new VolumeManager(hInstance, exeName, '?', false);
                     if (!vol->mountFile(txt)) {
                         delete vol;

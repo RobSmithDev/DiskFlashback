@@ -7,10 +7,11 @@ So I decided to build this - which allows you to view and edit the contents of r
 Checkout https://robsmithdev.co.uk/diskflashback for more details!
 
 ## Features
-- Mount ADF, DMS*, IMG, IMA, ST, MSA*, HDA, HDF and SCP* files as virtual drives (* read only)
+- Mount ADF, DMS*, IMG, IMA, ST, MSA*, HDA, HDF, DSK (MSX) and SCP* files as virtual drives (* read only)
 - Supports AmigaDOS OFS/FFS/PFS File Systems for Floppy & Hard Disks
 - Supports IBM/PC FAT12/16 DD 720k & HD 1.44Mb Disks
 - Supports Atari ST FAT12/16 GemDOS Single and Double Sided normal & extended Disks
+- Supports MSX FAT12 File system (some characters will be incorrect)
 - Supports Dual/Tripple Format Amiga/Atari floppy disks and mounts them as two drives! (read only)
 - Mount your DrawBridge, Greaseweazle or SupercardPro as a real floppy drive in Windows
 - Mount your real Amiga Hard Disks/Memory Cards as drives

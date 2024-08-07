@@ -2,8 +2,35 @@ DiskFlashback Release Notes
 ---------------------------
 https://robsmithdev.co.uk/diskflashback
 
-1.0.1.0
-	Fixed disabling "auto-detect com port" beign ignored
+1.0.2
+	Sped up the Greaseweazle track reading speed by almost double
+	Sped up the Supercard PRO track reading speed by almost double
+	Small speed up for DrawBridge reading too!
+	Sped up disk writing as well!
+	Added special message for people just trying to run the DiskFlashback EXE and wondering why it doesn't do anything
+	Added new "Clean Drive Heads" option for real floppy drives (cleaning disk required)
+	Re-arranged all physical drive related commands into its own menu
+	Added option to toggle the auto-starting up the system tray icon with Windows
+	Changed how new versions of the application are detected to hopefully get around some previous false positives
+	Mount physical Amiga HD/Memory Card disks as drive letters (OFS/FFS/PFS only)
+	Can now detect Amiga hard disk partitions  when RDSK block is not on the first block (can be upto 64 blocks in)
+	Better / quicker cooldown if disk is removed from physical drive while its being read
+	Added support for DSK (MSX) files as they're basically FAT12 PC disks
+	Fixed a bug with some DMS files where the total number of cylinders was incorrectly read
+	Fixed potential re-entry bug from aborting some operations and turning off the drive motor
+	Fixed issues with SuperCard PRO board not seeking to the correct track [FloppyBridge]
+	Fixed an issue where some SCP files wouldn't load at all
+	Fixed some issues with some dual-format disk images not showing both parts
+	Fixed issues with Tri-format disks (they're actually dual-format really)
+	Fixed an issue with dual-format disks where number of heads was incorrectly used for PC/Atari side
+	Fixed issue where re-reading bad Amiga sectors didn't work properly
+	Fixed a strange seek issue when ejecting real floppy disks
+	Fixed issue with some dialogs disappearing behind explorer after message was shown
+	Fixed an issue where changing file attributes (Amiga) caused the Readable/Delete attributes to become unset
+	EXEs etc are now digitally signed
+
+1.0.1
+	Fixed disabling "auto-detect com port" being ignored
 	Better support for hard disk image files larger than 4G (some partitions got ignored before)
 	Upgraded to use the new ADFLib v0.9
 	Changed error handling when reading from disks to include the Always Ignore option

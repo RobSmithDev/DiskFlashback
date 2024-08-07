@@ -57,7 +57,7 @@ INT_PTR DialogCOPY::doModal(bool fileSystemRecognised) {
 			m_fileExtension = L"adf";
 			break;
 		case SectorType::stIBM:
-			dlg.lpstrFilter = L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0All Files(*.*)\0*.*\0\0";
+			dlg.lpstrFilter = L"IBM Disk Files (*.img, *.ima)\0*.img;*.ima\0MSX Disk Files (*.dsk)\0*.dsk\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"img";
 			break;
 		case SectorType::stAtari:
@@ -68,9 +68,7 @@ INT_PTR DialogCOPY::doModal(bool fileSystemRecognised) {
 			return 0; // not supported
 		}
 
-		m_titleExtension = m_fileExtension;
-		for (WCHAR& c : m_titleExtension) c = towupper(c);
-		std::wstring title = L"Save Disk to " + m_titleExtension + L" File...";
+		std::wstring title = L"Save Disk to...";
 
 		dlg.Flags = OFN_CREATEPROMPT | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT | OFN_HIDEREADONLY | OFN_NOREADONLYRETURN | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST;
 		dlg.lpstrDefExt = m_fileExtension.c_str();
@@ -80,7 +78,7 @@ INT_PTR DialogCOPY::doModal(bool fileSystemRecognised) {
 		if (!GetSaveFileName(&dlg))  return 0;
 
 		if (!fileSystemRecognised) 
-			if (MessageBox(m_hParent, L"WARNING: The filesystem of the current disk was not recognised. This may not backup correctly.\r\n\r\nDo you want to continue?", title.c_str(), MB_YESNO | MB_ICONQUESTION) != IDYES) return 0;
+			if (MessageBox(m_dialogBox, L"WARNING: The filesystem of the current disk was not recognised. This may not backup correctly.\r\n\r\nDo you want to continue?", title.c_str(), MB_YESNO | MB_ICONQUESTION) != IDYES) return 0;
 
 		m_filename = filename;
 	}
@@ -93,15 +91,15 @@ INT_PTR DialogCOPY::doModal(bool fileSystemRecognised) {
 		}
 
 		std::wstring msg = L"All data on disk in drive "+m_fs->getMountPoint().substr(0,2) + L" will be overwritten.\nAre you sure you want to continue?";
-		if (MessageBox(m_hParent, msg.c_str(), L"Copy file to Disk", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return 0;
+		if (MessageBox(m_dialogBox, msg.c_str(), L"Copy file to Disk", MB_OKCANCEL | MB_ICONQUESTION) != IDOK) return 0;
 	}
 
 	if (!m_io->isDiskPresent()) {
-		MessageBox(m_hParent, L"There is no disk in the drive. Copy aborted.", L"Drive empty", MB_OK | MB_ICONINFORMATION);
+		MessageBox(m_dialogBox, L"There is no disk in the drive. Copy aborted.", L"Drive empty", MB_OK | MB_ICONINFORMATION);
 		return false;
 	}
 	if ((!m_backup) && (m_io->isDiskWriteProtected())) {
-		MessageBox(m_hParent, L"Disk in drive is write protected. Copy aborted.", L"Write Protected", MB_OK | MB_ICONINFORMATION);
+		MessageBox(m_dialogBox, L"Disk in drive is write protected. Copy aborted.", L"Write Protected", MB_OK | MB_ICONINFORMATION);
 		return false;
 	}
 
@@ -215,7 +213,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 
 				if (!WriteFile(fle, sectorData, m_io->sectorSize(), &written, NULL)) {
 					free(sectorData);
-					MessageBox(m_hParent, L"Error writing to file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
+					MessageBox(m_dialogBox, L"Error writing to file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
 					return false;
 				}
 				if (m_abortCopy) {
@@ -249,13 +247,13 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 		// Is the actual disk HD?
 		if (target->numSectorsPerTrack() > 11) {
 			if (!isHD) {
-				if (MessageBox(m_hParent, L"Inserted disk was detected as High Density.\nSelected file is Double Density.\nAttempt to force writing as Double Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
+				if (MessageBox(m_dialogBox, L"Inserted disk was detected as High Density.\nSelected file is Double Density.\nAttempt to force writing as Double Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
 				target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmDDOnly);
 			}
 		}
 		else {
 			if (isHD) {
-				if (MessageBox(m_hParent, L"Inserted disk was detected as Double Density.\nSelected file is High Density.\nAttempt to force writing as High Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
+				if (MessageBox(m_dialogBox, L"Inserted disk was detected as Double Density.\nSelected file is High Density.\nAttempt to force writing as High Density? (not recommended)", m_windowCaption.c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK) return false;
 				target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmHDOnly);
 			}
 		}		
@@ -273,7 +271,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 		for (uint32_t track = 0; track < totalTracks; track++) {
 			for (uint32_t sec = 0; sec < secPerTrack; sec++) {
 				if (!source->readData(i++, source->sectorSize(), sectorData)) {
-					MessageBox(m_hParent, L"Error reading from input file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
+					MessageBox(m_dialogBox, L"Error reading from input file. Copy aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONEXCLAMATION);
 					target->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
 					free(sectorData);
 					return false;
@@ -317,11 +315,11 @@ void DialogCOPY::doCopy() {
 			SectorCacheEngine* source = nullptr;
 			if (m_backup) {
 				fle = CreateFile(m_filename.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-				if (fle == INVALID_HANDLE_VALUE) MessageBox(m_hParent, L"Unable to write to file. Disk copy aborted.", m_windowCaption.c_str(), MB_ICONSTOP | MB_OK);
+				if (fle == INVALID_HANDLE_VALUE) MessageBox(m_dialogBox, L"Unable to write to file. Disk copy aborted.", m_windowCaption.c_str(), MB_ICONSTOP | MB_OK);
 			}
 			else {
 				fle = CreateFile(m_filename.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-				if (fle == INVALID_HANDLE_VALUE) MessageBox(m_hParent, L"Unable to open input file. Disk copy aborted.", m_windowCaption.c_str(), MB_ICONSTOP | MB_OK); else {
+				if (fle == INVALID_HANDLE_VALUE) MessageBox(m_dialogBox, L"Unable to open input file. Disk copy aborted.", m_windowCaption.c_str(), MB_ICONSTOP | MB_OK); else {
 					char buf[5] = { 0 };
 					DWORD read;
 					if (!ReadFile(fle, buf, 4, &read, NULL)) read = 0;

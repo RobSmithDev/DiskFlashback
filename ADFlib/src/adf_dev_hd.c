@@ -171,7 +171,7 @@ ADF_RETCODE adfMountHdFile ( struct AdfDevice * const dev )
  *
  * fills geometry fields and volumes list (dev->nVol and dev->volList[])
  */
-ADF_RETCODE adfMountHd ( struct AdfDevice * const dev )
+ADF_RETCODE adfMountHd ( struct AdfDevice * const dev, const int32_t rdskBlock )
 {
     struct AdfRDSKblock rdsk;
     struct AdfPARTblock part;
@@ -181,7 +181,7 @@ ADF_RETCODE adfMountHd ( struct AdfDevice * const dev )
     struct AdfVolume * vol;
     unsigned len;
 
-    ADF_RETCODE rc = adfReadRDSKblock ( dev, &rdsk );
+    ADF_RETCODE rc = adfReadRDSKblock ( dev, rdskBlock , &rdsk );
     if ( rc != ADF_RC_OK )
         return rc;
 
@@ -505,11 +505,12 @@ ADF_RETCODE adfCreateHdFile ( struct AdfDevice * const dev,
  *
  */
 ADF_RETCODE adfReadRDSKblock ( struct AdfDevice * const    dev,
+                               const int32_t rdskBlockIndex, 
                                struct AdfRDSKblock * const blk )
 {
     uint8_t buf[256];
 
-    ADF_RETCODE rc = adfDevReadBlock ( dev, 0, 256, buf );
+    ADF_RETCODE rc = adfDevReadBlock ( dev, rdskBlockIndex, 256, buf );
     if ( rc != ADF_RC_OK )
        return rc;
 

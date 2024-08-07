@@ -64,6 +64,9 @@ public:
     // Returns the name of the driver providing access
     virtual std::wstring getDriverName() override;
 
+    // Runs cleaning on the drive
+    bool runCleaning(std::function<bool(uint16_t position, uint16_t total)> progress);
+
     // Rapid shutdown
     virtual void quickClose() override;
 };

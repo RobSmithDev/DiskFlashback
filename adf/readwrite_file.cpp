@@ -89,7 +89,7 @@ SectorRW_File::SectorRW_File(const std::wstring& filename, HANDLE fle) : SectorC
         for (WCHAR& c : ext) c = towupper(c);
 
         // See what type of file it is
-        if ((ext == L"IMG") || (ext == L"IMA")) {
+        if ((ext == L"IMG") || (ext == L"IMA") || (ext == L"DSK")) {
             m_fileType = SectorType::stIBM;
             m_serialNumber = 0x494D4130;
         }

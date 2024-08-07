@@ -26,10 +26,10 @@
 
 #ifndef ADF_PREFIX_H
 #define ADF_PREFIX_H
-
 //#ifdef WIN32DLL
 //#ifdef _WIN32
 #ifdef BUILD_DLL
+
 
 /* define declaration prefix for exporting symbols compiling a DLL library,
    and importing when compiling a client code

@@ -23,6 +23,7 @@ private:
 	const std::function<bool(uint32_t physicalSector, uint32_t readSize, void* data)> m_readSector;
 	const std::function<bool(uint32_t physicalSector, uint32_t readSize, const void* data)> m_writeSector;
 	const std::function<void(const std::string& message)> m_pfsError;
+	bool m_readOnly;
 
 	globaldata* g = nullptr;
 
@@ -35,7 +36,8 @@ public:
 	PFS3(const struct DriveInfo& drive, const struct PartitionInfo& partition,
 		const std::function<bool(uint32_t physicalSector, uint32_t readSize, void* data)> readSector,
 		const std::function<bool(uint32_t physicalSector, uint32_t readSize, const void* data)> writeSector,
-		const std::function<void(const std::string& message)> pfsError);
+		const std::function<void(const std::string& message)> pfsError,
+		const bool readOnly);
 	~PFS3();
 
 	// Is it available?
@@ -100,8 +102,8 @@ public:
 	virtual Error Dir(const std::string& path, std::function<void(const FileInformation& fileDir)> onFileDir) override;
 };
 
-IPFS3* IPFS3::createInstance(const struct DriveInfo& drive, const struct PartitionInfo& partition, const std::function<bool(uint32_t physicalSector, uint32_t readSize, void* data)> readSector, const std::function<bool(uint32_t physicalSector, uint32_t readSize, const void* data)> writeSector, const std::function<void(const std::string& message)> pfsError) {
-	return new PFS3(drive, partition, readSector, writeSector, pfsError);
+IPFS3* IPFS3::createInstance(const struct DriveInfo& drive, const struct PartitionInfo& partition, const std::function<bool(uint32_t physicalSector, uint32_t readSize, void* data)> readSector, const std::function<bool(uint32_t physicalSector, uint32_t readSize, const void* data)> writeSector, const std::function<void(const std::string& message)> pfsError, const bool readOnly) {
+	return new PFS3(drive, partition, readSector, writeSector, pfsError, readOnly);
 }
 
 
@@ -156,14 +158,16 @@ LONG _NormalErrorMsg(CONST_STRPTR melding, APTR arg, ULONG notargets, globaldata
 PFS3::PFS3(const struct PFS3::DriveInfo& drive, const struct PartitionInfo& partition, 
 		const std::function<bool(uint32_t physicalSector, uint32_t readSize, void* data) > readSector,
 		const std::function<bool(uint32_t physicalSector, uint32_t readSize, const void* data) > writeSector,
-		const std::function<void(const std::string& message)> pfsError
+		const std::function<void(const std::string& message)> pfsError,
+		const bool readOnly
 	)
-	: m_readSector(readSector), m_writeSector(writeSector), m_pfsError(pfsError), IPFS3() {
+	: m_readSector(readSector), m_writeSector(writeSector), m_pfsError(pfsError), IPFS3(), m_readOnly(readOnly) {
 
 	g = (globaldata*)malloc(sizeof(globaldata));
 	if (!g) return;
 	memset(g, 0, sizeof(globaldata));
 
+	g->softprotect = readOnly ? 1 : 0;
 	g->dosenvec.de_SizeBlock = partition.blockSize;
 	g->dosenvec.de_SectorPerBlock = partition.sectorsPerBlock;
 	g->dosenvec.de_BlocksPerTrack = partition.blocksPerTrack;
@@ -189,6 +193,7 @@ PFS3::PFS3(const struct PFS3::DriveInfo& drive, const struct PartitionInfo& part
 	};
 
 	g->writeSector = [this](uint32_t logicalSector, void* data) {
+		if (m_readOnly) return false;
 		// TODO: Handle g->blocksize not being 512
 		if (!m_writeSector) return false;
 		return m_writeSector(g->firstblocknative + logicalSector, g->blocksize, data);

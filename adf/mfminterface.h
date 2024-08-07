@@ -54,6 +54,7 @@ private:
     uint32_t m_numHeads[2] = { 2, 2 };
 
     bool m_alwaysIgnore = false;
+    bool m_fileSystemID = true;
 
     // Tracks that need committing to disk
     // NOTE: Using MAP not UNORDERED_MAP. This *should* make the disk head stepping fairly sequential and faster
@@ -149,6 +150,9 @@ public:
 
     // trigger new disk detection
     void triggerNewDiskMount();
+
+    // Enable or disable file system identification
+    void enableFilesystemID(bool enable) { m_fileSystemID = enable; };
 
     // Return TRUE if you can export this to disk image
     virtual bool allowCopyToFile() override final;

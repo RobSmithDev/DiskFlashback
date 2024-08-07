@@ -12,7 +12,12 @@
  * This file is maintained at https://github.com/RobSmithDev/DiskFlashback
  */
 
+// Prevent WinSock 1 being included
+#ifndef _WINSOCKAPI_
+#define _WINSOCKAPI_   
+#endif
 #include <dokan/dokan.h>
+#include <winsock2.h>
 #include <shellapi.h>
 #include "SignalWnd.h"
 #include "resource.h"
@@ -27,12 +32,22 @@
 #include "floppybridge_lib.h"
 #include "psapi.h"
 #include "shellMenus.h"
+#include <ShlObj.h>
+#include <ShlGuid.h>
+#include <strsafe.h>
+#include <WinDNS.h>
+#include "DriveList.h"
+#include "dlgMount.h"
+
 
 #define MENUID_CREATEDISK       1
 #define MENUID_MOUNTDISK        2
 #define MENUID_ABOUT            3
 #define MENUID_DONATE           4
 #define MENUID_RETRODIR         5
+#define MENUID_CLEAN            6
+#define MENUID_AUTOSTART        7
+#define MENUID_MOUNTHD          8
 #define MENUID_QUIT             10
 #define MENUID_ENABLED          20
 #define MENUID_CONFIGURE        21
@@ -53,6 +68,7 @@
 
 #pragma comment(lib,"Version.lib")
 #pragma comment(lib,"Ws2_32.lib")
+#pragma comment(lib, "Dnsapi.lib")
 
 static const WCHAR* IconHint = L"DiskFlashback - Right Click for Menu";
 
@@ -114,6 +130,108 @@ void CTrayMenu::setupIcon() {
     Shell_NotifyIcon(NIM_SETVERSION, &m_notify);
 }
 
+
+// Modified from https://learn.microsoft.com/en-us/windows/win32/shell/links?redirectedfrom=MSDN#Shellink_Creating_Shortcut
+bool CTrayMenu::isLinkDiskFlashback(const std::wstring& filename) {
+    HRESULT hres;
+    IShellLink* psl;
+    WCHAR szGotPath[MAX_PATH];
+    WIN32_FIND_DATA wfd;
+    bool ret = false;
+
+    hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&psl);
+    if (SUCCEEDED(hres)) {
+        IPersistFile* ppf;
+        hres = psl->QueryInterface(IID_IPersistFile, (void**)&ppf);
+        if (SUCCEEDED(hres)) {
+            hres = ppf->Load(filename.c_str(), STGM_READ);
+            if (SUCCEEDED(hres)) {
+                hres = psl->Resolve(m_window.hwnd(), 0);
+                if (SUCCEEDED(hres)) {
+                    hres = psl->GetPath(szGotPath, MAX_PATH, (WIN32_FIND_DATA*)&wfd, SLGP_RAWPATH);
+                    if (SUCCEEDED(hres)) {
+                        std::wstring filePath = szGotPath;
+                        for (WCHAR& c : filePath) c = towupper(c);
+                        ret = (filePath.length() >= 18) && (filePath.substr(filePath.length() - 18) == L"\\DISKFLASHBACK.EXE");
+                    }
+                }
+            }
+            ppf->Release();
+        }
+        psl->Release();
+    }
+    return ret;
+}
+
+// Find the windows start menu startup folder for the current user
+bool CTrayMenu::getWindowsProgramStartupFolder(std::wstring& path) {
+    WCHAR buffer[MAX_PATH];
+    if (!SHGetSpecialFolderPath(m_window.hwnd(), buffer, CSIDL_STARTUP, TRUE)) return false;
+    path = buffer;
+    if ((path.length()) && (path[path.length() - 1] != L'\\')) path += L"\\";
+    return true;
+}
+
+// Finds any .lnk files in the startup folder for this user that would start "diskflashback.exe"
+void CTrayMenu::findStartupShellLinksForProgram(std::vector<std::wstring>& fullPaths) {
+    std::wstring path;
+    if (!getWindowsProgramStartupFolder(path)) return;
+    std::wstring wildCard = path + L"*.lnk";
+    WIN32_FIND_DATA response;
+    HANDLE findHandle = FindFirstFile(wildCard.c_str(), &response);
+    if (findHandle != INVALID_HANDLE_VALUE) {
+        do {
+            if (!(response.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) 
+                if (isLinkDiskFlashback(path + response.cFileName)) 
+                    fullPaths.push_back(path + response.cFileName);
+        } while (FindNextFile(findHandle, &response));
+
+        FindClose(findHandle);
+    }
+}
+
+// Deletes any links in the users startup folder that would start this with windows
+void CTrayMenu::deleteAutoStartLinks() {
+    std::vector<std::wstring> links;
+    findStartupShellLinksForProgram(links);
+    for (const std::wstring& link : links) DeleteFile(link.c_str());
+}
+
+// Creates a startup link for this program so it starts from windows
+void CTrayMenu::createStartupLink() {
+    deleteAutoStartLinks();
+    std::wstring path;
+    if (!getWindowsProgramStartupFolder(path)) return;
+    path += L"DiskFlashback.lnk";
+
+    WCHAR buffer[MAX_PATH];
+    GetModuleFileName(NULL, buffer, MAX_PATH);
+    if (GetLastError() != ERROR_SUCCESS) return;
+
+    IShellLink* psl;
+    HRESULT hres = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&psl);
+    if (SUCCEEDED(hres)) {
+        IPersistFile* ppf;
+        psl->SetPath(buffer);
+        psl->SetDescription(L"DiskFlashback Virtual Floppy Disk Menu");
+        hres = psl->QueryInterface(IID_IPersistFile, (LPVOID*)&ppf);
+        if (SUCCEEDED(hres)) {
+            hres = ppf->Save(path.c_str(), TRUE);
+            ppf->Release();
+        }
+        psl->Release();
+    }
+}
+
+// Returns TRUE if this is scheduled to start with windows for the current user
+bool CTrayMenu::isAutoStartWithWindows() {
+    std::vector<std::wstring> links;
+    findStartupShellLinksForProgram(links);
+    return !links.empty();
+}
+
+
+
 // Prepare the menu
 void CTrayMenu::setupMenu() {
     m_hMenu = CreatePopupMenu();
@@ -122,7 +240,7 @@ void CTrayMenu::setupMenu() {
     m_hUpdates = CreatePopupMenu();
     m_hCreateListDD = CreatePopupMenu();
     m_hCreateListHD = CreatePopupMenu();
-    m_hCopy = CreatePopupMenu();
+    m_hPhysicalDrive = CreatePopupMenu();
 
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD    , L"Amiga ADF...");
     AppendMenu(m_hCreateListDD, MF_STRING, MENUID_IMAGE_DD + 1, L"IBM PC...");    
@@ -137,22 +255,41 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListDD, L"Double Density");
     AppendMenu(m_hCreateList, MF_STRING | MF_POPUP, (UINT_PTR)m_hCreateListHD, L"High Density");
 
-    AppendMenu(m_hCopy, MF_STRING, MENUID_COPYTODISK, L"File to Real Disk...");
-    AppendMenu(m_hCopy, MF_STRING, MENUID_COPYTOIMAGE, L"Real Disk to File...");
-    
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_ENABLED, L"Enabled");
+    AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_COPYTODISK, L"Copy File to Disk...");
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_COPYTOIMAGE, L"Copy Disk to File...");
+    AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_CLEAN, L"Clean Drive Heads...");
+    AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_CONFIGURE, L"Configure...");
+
+
+    SHSTOCKICONINFO ssii = {};
+    ssii.cbSize = sizeof(ssii);
+    SHGetStockIconInfo(SIID_SHIELD, SHGSI_ICON | SHGSI_SMALLICON, &ssii);
+    ICONINFOEX iconInfo = {};
+    iconInfo.cbSize = sizeof(iconInfo);
+    GetIconInfoEx(ssii.hIcon, &iconInfo);
+    HBITMAP bitmap = (HBITMAP)CopyImage(iconInfo.hbmColor, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+    DestroyIcon(ssii.hIcon);
+
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCreateList,    L"Create Disk Image");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_MOUNTDISK,           L"Mount Disk Image...");
-    AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hCopy,          L"Copy");
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hDriveMenu,     L"Eject");
-    AppendMenu(m_hMenu, MF_SEPARATOR,           0,                          NULL);
+    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP, (UINT_PTR)m_hPhysicalDrive, L"Floppy Drive");
+    AppendMenu(m_hMenu, MF_STRING | MF_POPUP, MENUID_MOUNTHD, L"Mount HD/Memory Card...");
+    AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hMenu, MF_STRING | MF_POPUP,   (UINT_PTR)m_hUpdates,       L"Settings");
     AppendMenu(m_hMenu, MF_SEPARATOR, 0, NULL);
 
+    SetMenuItemBitmaps(m_hMenu, MENUID_MOUNTHD, MF_BYCOMMAND, bitmap, bitmap);
+
+    AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOSTART, L"Start With Windows");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_RENAMEEXT, L"Automatically Swap File Extensions (Amiga)");
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE, L"Automatically Check for Updates");
-    AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
-    AppendMenu(m_hUpdates, MF_STRING, MENUID_ENABLED, L"Mount Physical Drive");
-    AppendMenu(m_hUpdates, MF_STRING, MENUID_CONFIGURE, L"Configure Physical Drive...");
+    
 
     AppendMenu(m_hUpdates, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hUpdates, MF_STRING, MENUID_AUTOUPDATE + 1, L"Check for Updates Now");
@@ -163,7 +300,8 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hUpdates, MF_STRING, MENUID_ABOUT, L"&About...");
     AppendMenu(m_hMenu, MF_STRING,              MENUID_QUIT,                L"&Quit");
 
-    CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(m_hUpdates, MENUID_AUTOSTART, MF_BYCOMMAND | isAutoStartWithWindows() ? MF_CHECKED : MF_UNCHECKED);
+    CheckMenuItem(m_hPhysicalDrive, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
     CheckMenuItem(m_hUpdates, MENUID_AUTOUPDATE, MF_BYCOMMAND | m_config.checkForUpdates ? MF_CHECKED : MF_UNCHECKED);
     CheckMenuItem(m_hUpdates, MENUID_RENAMEEXT, MF_BYCOMMAND | m_config.autoRename ? MF_CHECKED : MF_UNCHECKED);    
 }
@@ -200,28 +338,73 @@ void CTrayMenu::checkForUpdates(bool force) {
     m_config.lastCheck = getStamp();
     saveConfiguration(m_config);
 
-    // Fetch version from 'A' record in the DNS record
-    hostent* address = gethostbyname("diskflashback.robsmithdev.co.uk");
-    if ((address) && (address->h_addrtype == AF_INET)) {
-        if (address->h_addr_list[0] != 0) {
-            in_addr add = *((in_addr*)address->h_addr_list[0]);
+    DNS_RECORD* dnsRecord;
+    std::wstring versionString;
 
+    // Look up TXT record 
+    DNS_STATUS error = DnsQuery(L"diskflashback.robsmithdev.co.uk", DNS_TYPE_TEXT, DNS_QUERY_BYPASS_CACHE, NULL, &dnsRecord, NULL);
+    if (!error) {
+        const DNS_RECORD* record = dnsRecord;
+        while (record) {
+            if (record->wType == DNS_TYPE_TEXT) {
+                const DNS_TXT_DATAW* pData = &record->Data.TXT;
+                for (DWORD string=0; string<pData->dwStringCount; string++) {
+                    const std::wstring text = pData->pStringArray[string];
+                    if ((text.length() >= 9) && (text.substr(0, 2) == L"v=")) versionString = text.substr(2);
+                }
+            }
+            record = record->pNext;
+        }
+        DnsRecordListFree(dnsRecord, DnsFreeRecordList);  //DnsFreeRecordListDeep
+    }
+
+    bool updateYes = false;
+
+    if (!versionString.empty()) {
+        DWORD appVersion = getAppVersion();
+        // A little hacky to convert a.b.c.d into an array
+        sockaddr_in tmp;
+        INT len = sizeof(tmp);
+        if (WSAStringToAddress((wchar_t*)versionString.c_str(), AF_INET, NULL, (sockaddr*)&tmp, &len) == 0) {
+            const in_addr add = tmp.sin_addr;
             DWORD netVersion = (add.S_un.S_un_b.s_b1 << 24) | (add.S_un.S_un_b.s_b2 << 16) | (add.S_un.S_un_b.s_b3 << 8) | add.S_un.S_un_b.s_b4;
-            DWORD appVersion = getAppVersion();
-         
             if (appVersion < netVersion) {
                 // Do popup for updates available
                 m_notify.uFlags |= NIF_INFO;
                 m_notify.dwInfoFlags = NIIF_INFO;
-                m_lastBalloonIsUpdate = true;
+                m_lastBalloonType = LastBalloonType::lblUpdate;
                 wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
                 wcscpy_s(m_notify.szInfo, L"An update is available for " APPLICATION_NAME_L "\nClick to download");
-
                 Shell_NotifyIcon(NIM_MODIFY, &m_notify);
                 m_notify.uFlags &= ~NIF_INFO;
+                updateYes = true;
             }
         }
-    }   
+        else error = true;
+    }
+    else error = true;
+
+    if (force) {
+        if (error) {
+            m_notify.uFlags |= NIF_INFO;
+            m_notify.dwInfoFlags = NIIF_ERROR;
+            m_lastBalloonType = LastBalloonType::lblUpdate;
+            wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+            wcscpy_s(m_notify.szInfo, L"Unable to check for updates. Please check your Internet connection.");
+            Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+            m_notify.uFlags &= ~NIF_INFO;
+        } else
+        if (!updateYes) {
+            // Do popup for updates available
+            m_notify.uFlags |= NIF_INFO;
+            m_notify.dwInfoFlags = NIIF_INFO;
+            m_lastBalloonType = LastBalloonType::lblUpdate;
+            wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+            wcscpy_s(m_notify.szInfo, L"You are already running the latest version of " APPLICATION_NAME_L);
+            Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+            m_notify.uFlags &= ~NIF_INFO;
+        }  
+    }
 }
 
 // Populate the list of drives
@@ -240,12 +423,20 @@ void CTrayMenu::populateDrives() {
             isMounted = d.second.valid;
         }
     }
-    if (m_drives.size() < 1) {
-        AppendMenu(m_hDriveMenu, MF_STRING | MF_DISABLED,0, L"no drives mounted");
-    }
+    if (m_drives.size() < 1) AppendMenu(m_hDriveMenu, MF_STRING | MF_DISABLED,0, L"no drives mounted");
+    EnableMenuItem(m_hPhysicalDrive, MENUID_COPYTODISK, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
+    EnableMenuItem(m_hPhysicalDrive, MENUID_COPYTOIMAGE, MF_BYCOMMAND | ((physicalDrive && isMounted) ? MF_ENABLED : MF_DISABLED));
+    EnableMenuItem(m_hPhysicalDrive, MENUID_CLEAN, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
+}
 
-    EnableMenuItem(m_hCopy, MENUID_COPYTODISK, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
-    EnableMenuItem(m_hCopy, MENUID_COPYTOIMAGE, MF_BYCOMMAND | ((physicalDrive && isMounted ) ? MF_ENABLED : MF_DISABLED));
+// Handles triggering the drive cleaner
+void CTrayMenu::handleCleanDisk() {
+    for (const auto& d : m_drives) {
+        if (d.second.isPhysicalDrive) {
+            PostMessage(d.second.hWnd, WM_USER, REMOTECTRL_CLEAN, (LPARAM)d.first[0]);
+            return;
+        }
+    }
 }
 
 // Trigger copy image to disk
@@ -258,7 +449,7 @@ void CTrayMenu::handleCopyToDisk() {
     dlg.hwndOwner = m_window.hwnd();
     std::wstring filter;
     std::wstring defaultFormat;
-    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st;\0All Files(*.*)\0*.*\0\0";
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.ima;*.st;*.dsk\0All Files(*.*)\0*.*\0\0";
     dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
     dlg.lpstrTitle = L"Select disk image to copy to floppy";
     dlg.lpstrFile = filename;
@@ -269,7 +460,7 @@ void CTrayMenu::handleCopyToDisk() {
                 COPYDATASTRUCT str;
                 std::wstring command = d.first.substr(0, 1) + filename;
                 str.lpData = (PVOID) command.c_str();
-                str.cbData = command.length() * 2;
+                str.cbData = (DWORD)(command.length() * 2);
                 str.dwData = REMOTECTRL_COPYTODISK;
                 LRESULT res = SendMessage(d.second.hWnd, WM_COPYDATA, (WPARAM)m_window.hwnd(), (LPARAM)&str);
                 return;
@@ -435,6 +626,11 @@ void CTrayMenu::installIBMPCFS(bool isHD, bool isIBMPC, SectorCacheEngine* fle) 
     setFatFSSectorCache(nullptr);
 }
 
+// Start the MOUNT dialog
+void CTrayMenu::runMountDialog() {
+    ShellExecute(m_window.hwnd(), L"runas", m_exeName.c_str(), L"HDMOUNT", NULL, SW_SHOW);
+}
+
 // Handle the menu click result
 void CTrayMenu::handleMenuResult(uint32_t index) {
     if ((index >= MENUID_EJECTSTART) && (index <= MENUID_EJECTSTART+26)) {
@@ -452,13 +648,23 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     if ((index >= MENUID_IMAGE_HD) && (index < MENUID_IMAGE_HD + 3)) runCreateImage(true, index - MENUID_IMAGE_HD);
 
     switch (index) {
+    case MENUID_AUTOSTART:
+        if (isAutoStartWithWindows()) deleteAutoStartLinks(); else createStartupLink();
+        CheckMenuItem(m_hUpdates, MENUID_AUTOSTART, MF_BYCOMMAND | isAutoStartWithWindows() ? MF_CHECKED : MF_UNCHECKED);
+        break;
+
     case MENUID_COPYTODISK:
         handleCopyToDisk();
         break;
     case MENUID_COPYTOIMAGE:
         handleCopyToImage();
         break;
-
+    case MENUID_CLEAN:
+        handleCleanDisk();
+        break;
+    case MENUID_MOUNTHD:
+        runMountDialog();
+        break;
     case MENUID_DONATE:
         ShellExecute(m_window.hwnd(), L"open", L"https://ko-fi.com/robsmithdev", NULL, NULL, SW_SHOW);
         break;
@@ -476,7 +682,7 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
             msg += L"\x2022 ADFLib (OFS/FFS File System)\r\n";
             msg += L"\x2022 FatFS (FAT12/16 File System)\r\n";
             msg += L"\x2022 xDMS (DMS Decompression)\r\n";
-            msg += L"\x2022 FloppyBridge (Floppy Drive Access)";
+            msg += L"\x2022 FloppyBridge (Floppy Drive Access)\r\n";
             msg += L"\x2022 pfs3aio (PFS File System) by Michiel Pelt";
             MessageBox(m_window.hwnd(), msg.c_str(), L"About DiskFlashback", MB_OK | MB_ICONINFORMATION);
         }
@@ -500,7 +706,7 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
     case MENUID_ENABLED: 
         m_config.enabled = !m_config.enabled;
         saveConfiguration(m_config);
-        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);  
+        CheckMenuItem(m_hPhysicalDrive, MENUID_ENABLED, MF_BYCOMMAND | m_config.enabled ? MF_CHECKED : MF_UNCHECKED);
         m_timeoutBeforeRestart = 10; // trigger quick restart
         break;
     case MENUID_CREATEDISK: break;
@@ -547,9 +753,11 @@ void CTrayMenu::doContextMenu(POINT pt) {
 void CTrayMenu::handleMenuInput(UINT uID, UINT iMouseMsg) {
     switch (iMouseMsg) {
     case NIN_BALLOONUSERCLICK:
-        if (m_lastBalloonIsUpdate)
-            ShellExecute(m_window.hwnd(), L"open", L"https://robsmithdev.co.uk/diskflashback", NULL, NULL, SW_SHOW);
-        else doConfig();
+        switch (m_lastBalloonType) {
+        case LastBalloonType::lblDefault: doConfig(); break;
+        case LastBalloonType::lblUpdate: ShellExecute(m_window.hwnd(), L"open", L"https://robsmithdev.co.uk/diskflashback", NULL, NULL, SW_SHOW); break;
+        case LastBalloonType::lblReminder: ShellExecute(m_window.hwnd(), L"open", L"https://robsmithdev.co.uk/diskflashback_intro", NULL, NULL, SW_SHOW); break;
+        }
         break;
     case WM_CONTEXTMENU: {
         RECT r;
@@ -584,7 +792,7 @@ void CTrayMenu::mountDisk() {
     dlg.hwndOwner = m_window.hwnd();
     std::wstring filter;
     std::wstring defaultFormat;
-    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st;*.scp\0All Files(*.*)\0*.*\0\0";
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.hda;*.hdf;*.ima;*.st;*.scp;*.dsk\0All Files(*.*)\0*.*\0\0";
     dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
     dlg.lpstrTitle = L"Select disk image to mount";
     dlg.lpstrFile = filename;
@@ -645,7 +853,7 @@ void CTrayMenu::monitorPhysicalDrive() {
                     else {
                         wcscpy_s(m_notify.szInfo, L"Unable to start physical drive.\r\nThe device COM port could not be found.");
                     }
-                    m_lastBalloonIsUpdate = false;
+                    m_lastBalloonType = LastBalloonType::lblDefault;
                     // Do popup for updates available
                     m_notify.uFlags |= NIF_INFO;
                     m_notify.dwInfoFlags = NIIF_ERROR;
@@ -670,7 +878,7 @@ void CTrayMenu::monitorPhysicalDrive() {
                 std::wstring driveLetterW; ansiToWide(driveLetter, driveLetterW);
                 std::wstring profileW; ansiToWide(m_config.floppyProfile, profileW);
 
-                std::wstring cmd = L"\"" + m_exeName + L"\" BRIDGE " + driveLetterW + L" 1 \"" + profileW + L"\"";
+                std::wstring cmd = L"\"" + m_exeName + L"\" " + COMMANDLINE_MOUNTDRIVE + L" " + driveLetterW + L" 1 \"" + profileW + L"\"";
                 STARTUPINFO si; ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
 
                 CreateProcess(NULL, (LPWSTR)cmd.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &m_floppyPi);
@@ -721,6 +929,7 @@ void CTrayMenu::cleanupDriveIcons() {
 
 
 CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSilentStart) : m_hInstance(hInstance), m_window(hInstance, APP_TITLE), m_exeName(exeName) {
+    CoInitialize(NULL);
     memset(&m_notify, 0, sizeof(m_notify));
     loadConfiguration(m_config);
     if (!isSilentStart) cleanupDriveIcons();
@@ -737,15 +946,14 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
     // Make sure the icon stays even if explorer dies
     m_window.setMessageHandler(RegisterWindowMessage(L"TaskbarCreated"), [this](WPARAM wParam, LPARAM lParam) ->LRESULT {
         setupIcon(); return 0; });
-
-
+   
     m_window.setMessageHandler(WM_USER, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         handleMenuInput((UINT)wParam, (UINT)lParam); return 0; });
 
     m_window.setMessageHandler(WM_DOQUIT, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
         if ((wParam == 20) && (lParam == 30)) PostQuitMessage(0);
         return 0;
-        });
+       });
 
 
     m_window.setMessageHandler(WM_PHYSICAL_EJECT, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
@@ -753,7 +961,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
         // Turn off the "enabled" option
         m_config.enabled = false;
         saveConfiguration(m_config);
-        CheckMenuItem(m_hUpdates, MENUID_ENABLED, MF_BYCOMMAND | MF_UNCHECKED);
+        CheckMenuItem(m_hPhysicalDrive, MENUID_ENABLED, MF_BYCOMMAND | MF_UNCHECKED);
         return 0;
         });
 
@@ -773,8 +981,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
 
                 if (closePhysicalDrive(true, driveType)) {
                     m_didNotifyFail = true;
-                    WCHAR name[1024];
-                    m_lastBalloonIsUpdate = false;
+                    WCHAR name[1024];                    
 
                     HANDLE tmp = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, (DWORD)lParam);
                     if (tmp) {
@@ -794,6 +1001,7 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
                     m_notify.uFlags |= NIF_INFO;
                     m_notify.dwInfoFlags = NIIF_INFO;
                     wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                    m_lastBalloonType = LastBalloonType::lblDefault;
                     Shell_NotifyIcon(NIM_MODIFY, &m_notify);
                     m_notify.uFlags &= ~NIF_INFO;
 
@@ -810,6 +1018,41 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
                 }
             }
         }
+        return 0;
+    });
+
+    m_window.setMessageHandler(WM_COPYDATA, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        COPYDATASTRUCT* str = (COPYDATASTRUCT*)lParam;
+        switch (str->dwData) {
+        case COPYDATA_MOUNTRAW_FAILED: {
+            // Do popup for updates available
+                std::wstring tmp;
+                tmp.resize(str->cbData >> 1);
+                memcpy_s(&tmp[0], tmp.length() * 2, str->lpData, str->cbData);
+                tmp = L"Error, unable to mount volumes on device " + tmp;
+                wcscpy_s(m_notify.szInfo, tmp.c_str());
+
+                m_notify.uFlags |= NIF_INFO;
+                m_notify.dwInfoFlags = NIIF_INFO;
+                wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+                m_lastBalloonType = LastBalloonType::lblDefault;
+                Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+                m_notify.uFlags &= ~NIF_INFO;
+            }
+            break;
+        }
+        return 0;
+    });
+
+    // Just to popup a message
+    m_window.setMessageHandler(WM_POPUP_INFO, [this](WPARAM wParam, LPARAM lParam)->LRESULT {
+        m_lastBalloonType = LastBalloonType::lblReminder;
+        wcscpy_s(m_notify.szInfo, L"DiskFlashback is already running.\r\n\r\nUse the icon in the task bar to control it. Click this for help...");
+        m_notify.uFlags |= NIF_INFO;
+        m_notify.dwInfoFlags = NIIF_INFO;
+        wcscpy_s(m_notify.szInfoTitle, APPLICATION_NAME_L);
+        Shell_NotifyIcon(NIM_MODIFY, &m_notify);
+        m_notify.uFlags &= ~NIF_INFO;
         return 0;
     });
     
@@ -832,7 +1075,12 @@ CTrayMenu::CTrayMenu(HINSTANCE hInstance, const std::wstring& exeName, bool isSi
         }
         return 0;
      });
-   
+
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_USER, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_COPYDATA, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_DOQUIT, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_PHYSICAL_EJECT, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_REMOTEUSAGE, MSGFLT_ALLOW, NULL);   
 
 #ifdef _DEBUG
     SetTimer(m_window.hwnd(), TIMERID_UPDATE_CHECK, 1000, NULL);
@@ -852,9 +1100,10 @@ CTrayMenu::~CTrayMenu() {
     DestroyMenu(m_hCreateListDD);
     DestroyMenu(m_hCreateListHD);
     DestroyMenu(m_hUpdates);
-    DestroyMenu(m_hCopy);
+    DestroyMenu(m_hPhysicalDrive);
     if (m_floppyPi.hProcess) CloseHandle(m_floppyPi.hProcess);
     cleanupDriveIcons();
+    CoUninitialize();
 }
 
 // Main loop

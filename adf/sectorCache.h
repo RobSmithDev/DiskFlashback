@@ -18,6 +18,7 @@
 #include <dokan/dokan.h>
 #include <unordered_map>
 #include <atomic>
+#include <mutex>
 
 
 // Possible types of sector / file
@@ -34,6 +35,7 @@ private:
     uint32_t m_maxCacheEntries;
     const uint32_t m_cacheMaxMem;
 
+    std::mutex m_multithreadLock;
     std::atomic<bool> m_isLocked = false;
 
     // Sector disk cache for speed
@@ -66,7 +68,7 @@ public:
 
     bool readData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
     bool writeData(const uint32_t sectorNumber, const uint32_t sectorSize, const void* data);
-    bool hybridReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data) { return internalHybridReadData(sectorNumber, sectorSize, data); };
+    bool hybridReadData(const uint32_t sectorNumber, const uint32_t sectorSize, void* data);
 
     virtual bool isDiskPresent() = 0;
     virtual bool isDiskWriteProtected() = 0;

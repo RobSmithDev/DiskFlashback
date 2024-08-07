@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "DiskFlashback"
-#define MyAppVersion "1.0.1.0"
+#define MyAppVersion "1.0.2.2"
 #define MyAppPublisher "RobSmithDev"
 #define MyAppURL "https://robsmithdev.co.uk/diskflashback"
 #define MyAppExeName "DiskFlashback.exe"
@@ -30,22 +30,25 @@ LicenseFile=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\adflib.t
 ;PrivilegesRequired=lowest
 OutputDir=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\
 OutputBaseFilename=DiskFlashbackInstall
-//SetupIconFile=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
-//UninstallDisplayIcon=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
+SetupIconFile=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
+UninstallDisplayIcon=D:\Virtual Floppy Drive\dokany-master\FloppyDrive\adf\floppy2.ico
 Compression=zip
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
+SignedUninstaller=yes
+SignTool=signing 
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\dokansetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall; AfterInstall: InstallDokan
-Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\FloppyBridge.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\FloppyBridge_x64.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\ADFlib\win32\src\Release\adflib.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion signonce
+Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\FloppyBridge.dll"; DestDir: "{app}"; Flags: ignoreversion signonce
+Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\FloppyBridge_x64.dll"; DestDir: "{app}"; Flags: ignoreversion signonce
+Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\adflib.dll"; DestDir: "{app}"; Flags: ignoreversion signonce
+Source: "D:\Virtual Floppy Drive\dokany-master\x64\Release\pfs3lib.dll"; DestDir: "{app}"; Flags: ignoreversion signonce
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\adflib.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\fatfs.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "D:\Virtual Floppy Drive\dokany-master\FloppyDrive\installer\dokan2.dll"; DestDir: "{app}"; Flags: ignoreversion
@@ -63,6 +66,7 @@ Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedType
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".st"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".msa"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".scp"; ValueData: "";
+Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\SupportedTypes"; ValueType: string; ValueName: ".dsk"; ValueData: "";
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\mount\icon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1"
 Root: HKCU; Subkey: "Software\Classes\Applications\{#MyAppExeName}\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
@@ -78,6 +82,7 @@ Root: HKCU; Subkey: "Software\Classes\.ima"; ValueType: string; ValueName: ""; V
 Root: HKCU; Subkey: "Software\Classes\.st";  ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.atarist"; Flags: uninsdeletevalue createvalueifdoesntexist
 Root: HKCU; Subkey: "Software\Classes\.msa"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.atarist"; Flags: uninsdeletevalue createvalueifdoesntexist
 Root: HKCU; Subkey: "Software\Classes\.scp"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.flux"; Flags: uninsdeletevalue createvalueifdoesntexist
+Root: HKCU; Subkey: "Software\Classes\.dsk"; ValueType: string; ValueName: ""; ValueData: "{#MyAppAssocKey}.msx"; Flags: uninsdeletevalue createvalueifdoesntexist
 
 ; Setup the Open With Prog ID
 Root: HKCU; Subkey: "Software\Classes\.adf\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.amiga.fd"; ValueData: ""; Flags: uninsdeletevalue
@@ -88,6 +93,7 @@ Root: HKCU; Subkey: "Software\Classes\.img\OpenWithProgids"; ValueType: string; 
 Root: HKCU; Subkey: "Software\Classes\.ima\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.ibmpc"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.st\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.atarist"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKCU; Subkey: "Software\Classes\.scp\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.flux"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.dsk\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}.msx"; ValueData: ""; Flags: uninsdeletevalue
 
 ; Setup their default description
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.fd"; ValueType: string; ValueName: ""; ValueData: "Amiga Floppy Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
@@ -95,11 +101,13 @@ Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.hd"; ValueType: str
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc"; ValueType: string; ValueName: ""; ValueData: "IBM PC Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist"; ValueType: string; ValueName: ""; ValueData: "ST Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux"; ValueType: string; ValueName: ""; ValueData: "Flux Level Disk Image"; Flags: uninsdeletekey; Permissions: users-modify
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.msx"; ValueType: string; ValueName: ""; ValueData: "MSX Floppy Image"; Flags: uninsdeletekey; Permissions: users-modify
 
 ; And default icon
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.fd\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1" 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.amiga.hd\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},1" 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0" 
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.msx\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0" 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},3"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.flux\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},4"
 
@@ -117,6 +125,11 @@ Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell"; ValueType: 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},0"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.ibmpc\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
+
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.msx\shell"; ValueType: string; ValueName: ""; ValueData: "mount"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.msx\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.msx\shell\mount"; ValueType: string; ValueName: "icon"; ValueData: "{app}\{#MyAppExeName},0"
+Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.msx\shell\mount\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell"; ValueType: string; ValueName: ""; ValueData: "mount"
 Root: HKCU; Subkey: "Software\Classes\{#MyAppAssocKey}.atarist\shell\mount"; ValueType: string; ValueName: ""; ValueData: "&Mount Disk"

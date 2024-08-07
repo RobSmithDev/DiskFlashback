@@ -57,8 +57,12 @@ int TaskDialogMessage(HWND parent, HINSTANCE hInstance, const std::wstring& capt
 
 // Jump back in!
 VOID CALLBACK MotorMonitor(_In_ PVOID   lpParameter, _In_ BOOLEAN TimerOrWaitFired) {
-    SectorCacheMFM* callback = (SectorCacheMFM*)lpParameter;
-    callback->motorMonitor();
+    static std::mutex busy;
+    if (busy.try_lock()) {
+        SectorCacheMFM* callback = (SectorCacheMFM*)lpParameter;
+        callback->motorMonitor();
+        busy.unlock();
+    }
 }
 
 void SectorCacheMFM::releaseDrive() {
@@ -123,6 +127,8 @@ void SectorCacheMFM::setReady() {
 
 // Reads some data to see what kind of disk it is
 void SectorCacheMFM::identifyFileSystem() {
+    if (!m_fileSystemID) return;
+
     for (uint32_t i = 0; i < 2; i++) {
         m_totalCylinders[i] = 0;
         m_numHeads[i] = 2;
@@ -262,6 +268,7 @@ void SectorCacheMFM::motorMonitor() {
     }
 
     if (sendNotify) {
+        if (!m_fileSystemID) return;
         if (m_diskChangeCallback) {
             for (DecodedTrack& trk : m_trackCache[0]) trk.sectors.clear();
             for (DecodedTrack& trk : m_trackCache[1]) trk.sectors.clear();
@@ -336,6 +343,8 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
 
     checkFlushPendingWrites();
 
+    if (!isDiskInDrive()) return false;
+
     // Retry several times
     uint32_t retries = 0;
     for (;;) {
@@ -368,20 +377,26 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
                 break;
             default: 
                 return false;
-            }           
+            }    
+
+            // Re-check disk is actually inserted!
+            if (!isDiskInDrive()) return false;
         }
 
         // If this hits, then do a re-seek.  Sometimes it helps
         if (retries == MAX_RETRIES / 2) {
+            if (!isDiskInDrive()) return false;
             motorInUse(upperSurface);
+            if (isPhysicalDisk()) {
+                if (cylinder < 40)
+                    cylinderSeek(79, upperSurface);
+                else
+                    cylinderSeek(0, upperSurface);
 
-            if (cylinder < 40)
-                cylinderSeek(79, upperSurface);
-            else
-                cylinderSeek(0, upperSurface);
-
-            // Wait for the seek, or it will get removed! 
-            Sleep(300);
+                // Wait for the seek, or it will get removed! 
+                Sleep(300);
+            }
+            if (!isDiskInDrive()) return false;
         }
 
         // If we get here then this sector isn't in the cache (or has errors), so we'll read and update ALL sectors for this cylinder
@@ -427,7 +442,7 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         motorInUse(track % m_numHeads[fileSystem]);
         // Try both methods
         if (fileSystem == 1) {  // Hybrid file system
-            bitsReceived = mfmRead(track * 2, retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
+            bitsReceived = mfmRead(track * ((m_numHeads[fileSystem]==1) ? 2 : 1), retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
         } else bitsReceived = mfmRead(track, retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
         if (!bitsReceived) bitsReceived = mfmRead(track / m_numHeads[fileSystem], track % m_numHeads[fileSystem], retryMode, m_mfmBuffer, MAX_TRACK_SIZE);
 
@@ -470,7 +485,7 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
                     m_diskType = SectorType::stHybrid;
                 }
                 else
-                    if (nonStandard || (numHeads < 2)) m_diskType = SectorType::stAtari;
+                    if (nonStandard /*|| (numHeads < 2)*/) m_diskType = SectorType::stAtari;
                 uint32_t i = (m_diskType == SectorType::stHybrid) ? 1 : 0;
                 m_sectorsPerTrack[i] = sectorsPerTrack;
                 m_bytesPerSector[i] = bytesPerSector;
@@ -487,8 +502,8 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
             }
         }
     }
-
     if (m_diskType == SectorType::stHybrid) {
+
         if (m_numHeads[1] == 2) {  // Has 2 sides? Treat everything as normal
             findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
             findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track]);
@@ -508,7 +523,7 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         if (m_diskType == SectorType::stAmiga)
             findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
     if ((m_diskType == SectorType::stAtari) || (m_diskType == SectorType::stIBM))
-        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);    
+        findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
 
     return true;
 }
@@ -590,6 +605,7 @@ bool SectorCacheMFM::flushPendingWrites() {
             m_tracksToFlush.clear();
             return false;
         }
+        cylinderSeek(cylinder, upperSurface);
 
         // Assemble and commit an entire track.  First see if any data is missing
         bool fillData = m_trackCache[0][track].sectors.size() < m_sectorsPerTrack[0];
@@ -663,18 +679,20 @@ bool SectorCacheMFM::flushPendingWrites() {
         for (;;) {
             // Handle a re-seek - might clean the head
             if (retries == MAX_RETRIES / 2) {
-                motorInUse(upperSurface);
+                if (isPhysicalDisk()) {
+                    motorInUse(upperSurface);
 
-                if (cylinder < 40)
-                    cylinderSeek(79, upperSurface);
-                else
-                    cylinderSeek(0, upperSurface);
+                    if (cylinder < 40)
+                        cylinderSeek(79, upperSurface);
+                    else
+                        cylinderSeek(0, upperSurface);
 
-                // Wait for the seek, or it will get removed! 
-                Sleep(300);
-                cylinderSeek(cylinder, upperSurface);
+                    // Wait for the seek, or it will get removed! 
+                    Sleep(300);
+                }
                 retries = 0;
             }
+            cylinderSeek(cylinder, upperSurface);
 
             // Commit to disk
             motorInUse(upperSurface);
@@ -695,7 +713,9 @@ bool SectorCacheMFM::flushPendingWrites() {
                         if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
                         resetDrive(cylinder);
                         m_motorTurnOnTime = 0;
-                        Sleep(200);
+                        
+                        if (isPhysicalDisk()) Sleep(200);
+
                         if (!isDiskInDrive()) {
                             if (diskRemovedWarning()) {
                                 doRetry = true;
@@ -759,7 +779,7 @@ bool SectorCacheMFM::flushPendingWrites() {
                                     }
                                 }
                             // Wait and try again
-                            Sleep(100);
+                            if (isPhysicalDisk()) Sleep(100);
                         }
                         else break;
                     }

@@ -3972,7 +3972,8 @@ FRESULT f_read (
 					}
 				}
 				if (clst < 2) ABORT(fs, FR_INT_ERR);
-				if (clst == 0xFFFFFFFF) ABORT(fs, FR_DISK_ERR);
+				if (clst == 0xFFFFFFFF) 
+					ABORT(fs, FR_DISK_ERR);
 				fp->clust = clst;				/* Update current cluster */
 			}
 			sect = clst2sect(fs, fp->clust);	/* Get current sector */

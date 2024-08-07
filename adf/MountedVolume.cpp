@@ -276,6 +276,71 @@ void MountedVolume::setSystemRecognisedSectorFormat(bool wasRecognised) {
     setIsNONDos(!wasRecognised);
 }
 
+
+IPFS3* createPFS3FromVolume(AdfDevice* device, int partitionIndex, SectorCacheEngine* io, bool readOnly) {
+    AdfRDSKblock rdskBlock;
+    bool blockFound = false;
+    // RDSK could be in the first 64
+    for (int32_t offset = 0; offset < 64; offset++)
+        if (adfReadRDSKblock(device, offset, &rdskBlock) == ADF_RC_OK) {
+            blockFound = true;
+            break;
+        }
+    if (!blockFound) return nullptr;
+
+    // Find partition
+    int32_t next = rdskBlock.partitionList;
+    struct AdfPARTblock part;
+    part.blockSize = 0;
+
+    int partToSearch = partitionIndex + 1;
+    while (next && partToSearch) {
+        partToSearch--;
+        if (adfReadPARTblock(device, next, &part) != ADF_RC_OK) {
+            part.blockSize = 0;
+            break;
+        }
+        next = part.next;
+    }
+
+    if (!part.blockSize) return nullptr;
+
+    // Lets try PFS3
+    IPFS3::DriveInfo drive;
+
+    drive.numHeads = rdskBlock.heads;
+    drive.numCylinders = rdskBlock.cylinders;
+    drive.cylBlocks = rdskBlock.cylBlocks;
+    drive.sectorSize = rdskBlock.blockSize;
+
+    IPFS3::PartitionInfo pinfo;
+    pinfo.sectorsPerBlock = part.sectorsPerBlock;
+    pinfo.blocksPerTrack = part.blocksPerTrack;
+    pinfo.blockSize = part.blockSize;
+    pinfo.lowCyl = part.lowCyl;
+    pinfo.highCyl = part.highCyl;
+    pinfo.mask = part.mask;
+    pinfo.numBuffer = part.numBuffer;
+
+    IPFS3* pfs3 = IPFS3::createInstance(drive, pinfo,
+        [io](uint32_t physicalSector, uint32_t readSize, void* data)->bool {
+            // READ SECTOR
+            return io->readData(physicalSector, readSize, data);
+        },
+        [io](uint32_t physicalSector, uint32_t readSize, const void* data)->bool {
+            // WRITE SECTOR
+            return io->writeData(physicalSector, readSize, data);
+        },
+        [io](const std::string& message) {                
+        }
+    , readOnly);
+    if (!pfs3->available()) {
+        delete pfs3;
+        return nullptr;
+    }
+    return pfs3;
+}
+
 bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionIndex, bool showExplorer) {
     if (m_ADFvolume) {
         adfVolUnMount(m_ADFvolume);
@@ -293,69 +358,8 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     else {
         m_partitionIndex = partitionIndex;
         m_ADFvolume = m_ADFdevice ? adfVolMount(m_ADFdevice, partitionIndex, isForcedWriteProtect() ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE) : nullptr;
-        // Not a standard AMIGA file system.
-        if (!m_ADFvolume) {
-            // Quick re-parse to get the data we need
-            AdfRDSKblock rdskBlock;
-            if (adfReadRDSKblock(m_ADFdevice, &rdskBlock) == ADF_RC_OK) {
-
-                // Find partition
-                int32_t next = rdskBlock.partitionList;
-                struct AdfPARTblock part;
-                part.blockSize = 0;
-                
-                int partToSearch = partitionIndex + 1;
-                while (next && partToSearch) {                    
-                    partToSearch--;
-                    if (adfReadPARTblock(m_ADFdevice, next, &part) != ADF_RC_OK) {
-                        part.blockSize = 0;
-                        break;
-                    }
-                    next = part.next;
-                }
-
-                if (part.blockSize) {
-
-                    // Lets try PFS3
-                    IPFS3::DriveInfo drive;
-
-                    drive.numHeads = rdskBlock.heads;
-                    drive.numCylinders = rdskBlock.cylinders;
-                    drive.cylBlocks = rdskBlock.cylBlocks;
-                    drive.sectorSize = rdskBlock.blockSize;
-
-                    IPFS3::PartitionInfo pinfo;
-                    pinfo.sectorsPerBlock = part.sectorsPerBlock;
-                    pinfo.blocksPerTrack = part.blocksPerTrack;
-                    pinfo.blockSize = part.blockSize;
-                    pinfo.lowCyl = part.lowCyl;
-                    pinfo.highCyl = part.highCyl;
-                    pinfo.mask = part.mask;
-                    pinfo.numBuffer = part.numBuffer;
-
-                    m_pfs3 = IPFS3::createInstance(drive, pinfo,
-                        [this](uint32_t physicalSector, uint32_t readSize, void* data)->bool {
-                            // READ SECTOR
-                            return m_io->readData(physicalSector, readSize, data);
-                        },
-                        [this](uint32_t physicalSector, uint32_t readSize, const void* data)->bool {
-                            // WRITE SECTOR
-                            return m_io->writeData(physicalSector, readSize, data);
-                        },
-                        [this](const std::string& message) {
-                            std::string mp;
-                            wideToAnsi(getMountPoint(), mp);
-                            std::string caption = "DiskFlashback - PFS3 Error on " + mp;
-                            MessageBoxA(GetDesktopWindow(), message.c_str(), caption.c_str(), MB_OK | MB_ICONERROR);
-                        }
-                    );
-                    if (!m_pfs3->available()) {
-                        delete m_pfs3;
-                        m_pfs3 = nullptr;
-                    }
-                }
-            }
-        }
+        // Not a standard AMIGA file system. Try PFS3
+        if (!m_ADFvolume) m_pfs3 = createPFS3FromVolume(m_ADFdevice, partitionIndex, m_io, isForcedWriteProtect());
     }   
 
     // Hook up ADF_operations

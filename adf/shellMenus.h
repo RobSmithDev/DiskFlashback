@@ -26,7 +26,7 @@ class SectorCacheEngine;
  
 class ShellRegistery {
 private:
-	#define MAX_DISK_IMAGE_FILES 3
+	#define MAX_DISK_IMAGE_FILES 4
 	static const WCHAR* DiskImageFiles[MAX_DISK_IMAGE_FILES];
 	static const int    DiskImageIcon[MAX_DISK_IMAGE_FILES];
 

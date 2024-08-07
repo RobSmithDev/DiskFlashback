@@ -209,10 +209,7 @@ void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, co
 			extractRawSector(track, dataLengthInBits, (bit + 1) % dataLengthInBits, alignedSector);
 
 			// Now see if there's a valid sector there.  We now only skip the sector if its valid, incase rogue data gets in there
-			decodeSector(alignedSector, trackNumber, expectedSectors, decodedTrack);
-			
-			// Stop if we find them all
-			if (decodedTrack.sectors.size() == expectedSectors) break;
+			decodeSector(alignedSector, trackNumber, expectedSectors, decodedTrack);			
 		}
 	}
 

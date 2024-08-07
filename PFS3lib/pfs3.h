@@ -77,7 +77,8 @@ public:
 	static IPFS3* createInstance(const struct DriveInfo& drive, const struct PartitionInfo& partition, 
 		const std::function<bool(uint32_t physicalSector, uint32_t readSize, void* data)> readSector, 
 		const std::function<bool(uint32_t physicalSector, uint32_t readSize, const void* data)> writeSector,
-		const std::function<void(const std::string& message)> pfsError);
+		const std::function<void(const std::string& message)> pfsError,
+		const bool readOnly);
 
 	virtual ~IPFS3() {};
 

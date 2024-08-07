@@ -151,11 +151,11 @@ bool isBlank(uint8_t* mem, uint32_t size) {
 // Actually do the format
 bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, uint32_t density, uint32_t formatMode, const std::string& volumeLabel) {
 	if (!m_io->isDiskPresent()) {
-		MessageBox(m_hParent, L"No disk in drive. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
+		MessageBox(m_dialogBox, L"No disk in drive. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 		return false;
 	}
 	if (m_io->isDiskWriteProtected()) {
-		MessageBox(m_hParent, L"Disk in drive is write protected. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
+		MessageBox(m_dialogBox, L"Disk in drive is write protected. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 		return false;
 	}
 	m_fs->temporaryUnmountDrive();

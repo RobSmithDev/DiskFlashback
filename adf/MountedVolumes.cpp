@@ -31,6 +31,8 @@
 #include "resource.h"
 #include "menu.h"
 #include "SCPFile.h"
+#include "dlgClean.h"
+#include "DriveList.h"
 
 #define TIMERID_MONITOR_FILESYS 1000
 #define WM_DISKCHANGE (WM_USER + 1)
@@ -298,6 +300,21 @@ void VolumeManager::unmountPhysicalFileSystems() {
     }
 }
 
+// Special version to call adfDevMount that monitors the cylinder count for weirdness
+void VolumeManager::adfDevMountCylinders() {
+    if (!m_adfDevice) return;
+
+    ADF_RETCODE code = adfDevMount(m_adfDevice);
+    if ((code != ADF_RC_OK) && ((m_adfDevice->devType == ADF_DEVTYPE_FLOPDD) || (m_adfDevice->devType == ADF_DEVTYPE_FLOPHD))) {
+        while (m_adfDevice->cylinders > 80) {
+            m_adfDevice->cylinders--;
+            code = adfDevMount(m_adfDevice);
+            if (code == ADF_RC_OK) return;
+        }
+    }
+}
+
+
 
 // Notification received that the current disk changed
 void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {    
@@ -328,11 +345,11 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
         switch (diskFormat) {
             case SectorType::stAmiga:   
                 m_adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)m_io, m_forceReadOnly ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE);
-                if (m_adfDevice) adfDevMount(m_adfDevice);
+                if (m_adfDevice) adfDevMountCylinders();
                 break;
             case SectorType::stHybrid:
                 m_adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)m_io, m_forceReadOnly ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE); 
-                if (m_adfDevice) adfDevMount(m_adfDevice);
+                if (m_adfDevice) adfDevMountCylinders();
                 m_fatDevice = (FATFS*)malloc(sizeof(FATFS));
                 if (m_fatDevice) {
                     memset(m_fatDevice, 0, sizeof(FATFS));
@@ -403,6 +420,36 @@ void VolumeManager::triggerRemount() {
         PostMessage(m_window.hwnd(), WM_DISKCHANGE, m_io->isDiskPresent() ? 1 : 0, (LPARAM)m_io->getSystemType());
 }
 
+// Mount a raw volume
+bool VolumeManager::mountRaw(const std::wstring& physicalDrive, bool readOnly) {
+    CDriveList d;
+    d.refreshList();
+    CDriveList::DeviceList list = d.getDevices();
+    CDriveAccess* drive = nullptr;
+
+    // find the device
+    for (CDriveList::CDevice& dev : list)
+        if (dev.deviceName == physicalDrive) {
+            // Drive found
+            drive = d.connectToDrive(dev, readOnly);
+            break;
+        }
+
+    if (!drive) {
+        COPYDATASTRUCT str;
+        str.lpData = (void*)physicalDrive.data();
+        str.cbData = physicalDrive.length() * 2;
+        str.dwData = COPYDATA_MOUNTRAW_FAILED;
+        SendMessage(FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE), WM_COPYDATA, (WPARAM)m_window.hwnd(), (LPARAM)&str);
+        return false;
+    }
+    else {
+        m_io = drive;
+        m_mountMode = COMMANDLINE_MOUNTRAW;
+    }
+    return true;
+}
+
 // Start a file mount
 bool VolumeManager::mountFile(const std::wstring& filename) {
     // Open the file
@@ -436,7 +483,7 @@ bool VolumeManager::mountFile(const std::wstring& filename) {
         return true;
     }
     else {
-        buffer[4] = '\0';
+        buffer[3] = '\0';
         if (strcmp(buffer, "SCP") == 0) {
             // Assume its some kind of image file
             m_io = new SCPFile(fle, [this](bool diskInserted, SectorType diskFormat) {
@@ -546,6 +593,13 @@ LRESULT VolumeManager::handleCopyToDiskRequest(const std::wstring message) {
 // Handle other remote requests
 LRESULT VolumeManager::handleRemoteRequest(MountedVolume* volume, const WPARAM commandID, HWND parentWindow) {
     switch (commandID) {
+
+    case REMOTECTRL_CLEAN:
+        m_threads.emplace_back(std::thread([this, parentWindow, volume]() {
+            DialogCLEAN dlg(m_hInstance, parentWindow, m_io, volume);
+            return dlg.doModal();
+        }));
+        return MESSAGE_RESPONSE_OK;
 
     case REMOTECTRL_FORMAT:
         m_threads.emplace_back(std::thread([this, parentWindow, volume]() {
@@ -686,6 +740,13 @@ bool VolumeManager::run(bool triggerExplorer) {
         handleRemoteRequest(volume, REMOTECTRL_COPYTOADF, GetDesktopWindow());
         return 0;       
     });
+
+    // Allow these messages from less privilaged applications
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_COPYDATA, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_USER, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_AUTORENAME, MSGFLT_ALLOW, NULL);
+    ChangeWindowMessageFilterEx(m_window.hwnd(), WM_COPYTOFILE, MSGFLT_ALLOW, NULL);
+
 
     // Not quite Highlander, as there There must always be one (at least one!)
     m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, findEmptyLetter(m_firstDriveLetter), m_forceReadOnly));

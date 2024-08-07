@@ -91,3 +91,4 @@ public:
     AdfDevice* getADFDevice();
     AdfVolume* getADFVolume();
 };
+

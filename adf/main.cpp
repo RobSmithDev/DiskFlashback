@@ -22,21 +22,16 @@
 #include "SignalWnd.h"
 #include "dlgFormat.h"
 #include "dlgCopy.h"
+#include "dlgClean.h"
 #include "menu.h"
 #include "shellMenus.h"
+#include "DriveList.h"
+#include "dlgMount.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
 processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-// Command line is:
-//   COMMANDLINE_ constant
-//   DRIVELETTER
-//   If MOUNT:
-//            0=Read Only, 1=Read/Write
-//   If CONTROL:
-//          one of the CTRL_PARAM_ values
-//   Mount File/Drive Params (if mount)
 
 // Trigger the applet loading if this is called for some other reason
 void startTrayIcon(const std::wstring& exe) {
@@ -68,6 +63,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     if (argc >= 1) {
         std::wstring txt = argv[0];
         isSilentStart = txt == L"SILENT";
+
+        if (txt == L"HDMOUNT") {
+            DialogMount mounter(hInstance, GetDesktopWindow());
+            mounter.run(exeName);
+            return 0;
+        } 
     }
      
     // See if its just a disk image on the command line
@@ -79,7 +80,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                 std::wstring ext = txt.substr(pos + 1);
                 for (WCHAR& c : ext) c = towupper(c);
                 // Disk image file
-                if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"MSA") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP")) {
+                if ((ext == L"ADF") || (ext == L"DMS") || (ext == L"ST") || (ext == L"MSA") || (ext == L"IMG") || (ext == L"IMA") || (ext == L"HDA") || (ext == L"HDF") || (ext == L"SCP") || (ext == L"DSK")) {
                     VolumeManager* vol = new VolumeManager(hInstance, exeName, '?', false);
                     if (!vol->mountFile(txt)) {
                         delete vol;
@@ -100,7 +101,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
     if (argc < 3) {
-        if (FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE)) return 0;
+        HWND existingApp = FindWindow(MESSAGEWINDOW_CLASS_NAME, APP_TITLE);
+        if (existingApp) {
+            if (argc < 1) PostMessage(existingApp, WM_POPUP_INFO, 0, 0);
+            return 0;
+        }
         CTrayMenu menu(hInstance, exeName, isSilentStart);
         menu.run();
         return 0;
@@ -117,6 +122,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         HWND wnd = VolumeManager::FindControlWindowForDrive(driveLetter);
         std::wstring param = argv[2];
         if (wnd) {
+            if (param == CTRL_PARAM_CLEAN) {
+                std::wstring letter = L" "; letter[0] = driveLetter;
+                std::wstring winname = CLEANWINDOW_TITLE;
+                HWND formatWindow = FindWindow(NULL, winname.c_str());
+                if (formatWindow) {
+                    PostMessage(formatWindow, WM_USER + 20, 0, 0);
+                }
+                else SendMessage(wnd, WM_USER, REMOTECTRL_CLEAN, (LPARAM)driveLetter);
+            }
             if (param == CTRL_PARAM_FORMAT) {
                 std::wstring letter = L" "; letter[0] = driveLetter;
                 std::wstring winname = L"Format Disk Drive " + letter + L":";
@@ -155,7 +169,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
         VolumeManager* vol = new VolumeManager(hInstance, exeName, driveLetter, readOnly);
 
+        bool showExplorer = false;
+        if (std::wstring(argv[0]) == COMMANDLINE_MOUNTRAW) {
+            if (!vol->mountRaw(argv[3], readOnly)) {
+                delete vol;
+                return RETURNCODE_MOUNTFAIL;
+            }
+            showExplorer = true;
+        } else
         if (std::wstring(argv[0]) == COMMANDLINE_MOUNTFILE) {
+            // this never actually ever gets called
             if (!vol->mountFile(argv[3])) {
                 delete vol;
                 return RETURNCODE_MOUNTFAIL;
@@ -171,7 +194,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             else return RETURNCODE_BADARGS;
 
         try {
-            vol->run();
+            vol->run(showExplorer);
         }
         catch (const std::exception& ex) {
             UNREFERENCED_PARAMETER(ex);

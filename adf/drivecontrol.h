@@ -22,7 +22,9 @@
 // Sent directly to a drive
 #define WM_COPYTOFILE			(WM_USER + 2) 
 #define WM_AUTORENAME			(WM_USER + 5)
+#define WM_POPUP_INFO           (WM_USER + 6) 
  // Sent by other programs to "dismount" any real drives while they operate
+ // 
  // Example: SendMessage(remoteWindow, WM_REMOTEUSAGE, (controllerType & 0x7FFF) | (release ? 0 : 0x8000), (LPARAM)GetCurrentProcessId());
 #define WM_REMOTEUSAGE        (WM_USER+2)
 
@@ -32,8 +34,10 @@
 #define REMOTECTRL_COPYTOADF        6
 #define REMOTECTRL_EJECT            7
 #define REMOTECTRL_EJECT_SILENT     8
+#define REMOTECTRL_CLEAN			9
 
 // These get turned into the above
+#define CTRL_PARAM_CLEAN			L"CLEAN"
 #define CTRL_PARAM_FORMAT			L"FORMAT"
 #define CTRL_PARAM_EJECT			L"EJECT"
 #define CTRL_PARAM_INSTALLBB		L"BB"
@@ -55,6 +59,7 @@
 #define COMMANDLINE_CONTROL					L"CONTROL"
 #define COMMANDLINE_MOUNTDRIVE              L"BRIDGE"
 #define COMMANDLINE_MOUNTFILE				L"FILE"
+#define COMMANDLINE_MOUNTRAW                L"RAW"
 
 
 

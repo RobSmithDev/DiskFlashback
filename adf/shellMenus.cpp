@@ -17,9 +17,10 @@
 #include "sectorCache.h"
 #include "dokaninterface.h"
 
-const WCHAR* ShellRegistery::DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"amiga.fd",L"ibmpc",L"atarist"};
+const WCHAR* ShellRegistery::DiskImageFiles[MAX_DISK_IMAGE_FILES] = { L"amiga.fd",L"ibmpc",L"atarist",L"msx"};
 const int    ShellRegistery::DiskImageIcon[MAX_DISK_IMAGE_FILES] = { 1, 0, 3 };
 
+#define REG_DRIVE_KEYNAME_CLEAN  L"DiskFlashback.Clean"
 #define REG_DRIVE_KEYNAME_FORMAT  L"DiskFlashback.Format"
 #define REG_DRIVE_KEYNAME_EJECT  L"DiskFlashback.Eject"
 #define REG_DRIVE_KEYNAME_COPY  L"DiskFlashback.Copy"
@@ -40,7 +41,7 @@ void ShellRegistery::addDriveAction(WCHAR driveLetter, const std::wstring& secti
 	const std::wstring iconNumber = L"\"" + m_mainEXE + L"\"," + std::to_wstring(iconIndex);
 	RegSetKeyValue(HKEY_CURRENT_USER, path, L"Icon", REG_SZ, iconNumber.c_str(), (DWORD)(iconNumber.length() * 2));
 
-	std::wstring cmd = L"\"" + m_mainEXE + L"\" CONTROL " + drive.substr(0, 1) + L" " + commandParams;
+	std::wstring cmd = L"\"" + m_mainEXE + L"\" " + COMMANDLINE_CONTROL + L" " + drive.substr(0, 1) + L" " + commandParams;
 	wcscat_s(path, L"\\command");
 	RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, cmd.c_str(), (DWORD)(cmd.length() * 2));
 }
@@ -58,7 +59,7 @@ void ShellRegistery::removeDriveAction(WCHAR driveLetter, const std::wstring& se
 void ShellRegistery::setupContextForFileType(bool add, const std::wstring& path, uint32_t icon, WCHAR driveLetter) {
 	std::wstring clsRoot = path + L"\\CopyToDisk";
 	if (add) {
-		const std::wstring cmd = L"\"" + m_mainEXE + L"\" CONTROL " + driveLetter + L" 2DISK \"%1\"";
+		const std::wstring cmd = L"\"" + m_mainEXE + L"\" " + COMMANDLINE_CONTROL + L" " + driveLetter + L" 2DISK \"%1\"";
 		const std::wstring iconNumber = L"\"" + m_mainEXE + L"\"," + std::to_wstring(icon);
 
 		HKEY key = 0;
@@ -91,9 +92,10 @@ void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t ico
 		RegSetValue(HKEY_CURRENT_USER, path, REG_SZ, tmp.c_str(), (DWORD)(tmp.length() * 2));
 
 		addDriveAction(driveLetter, REG_DRIVE_KEYNAME_EJECT, L"&Eject", 0, L"EJECT");
-		if (isPhysicalDisk)
+		if (isPhysicalDisk) {
+			addDriveAction(driveLetter, REG_DRIVE_KEYNAME_CLEAN, L"C&lean Drive...", 0, L"CLEAN");
 			addDriveAction(driveLetter, REG_DRIVE_KEYNAME_FORMAT, L"Form&at...", 0, L"FORMAT");
-
+		}
 	}
 	else {
 		RegDeleteKey(HKEY_CURRENT_USER, path);
@@ -101,6 +103,7 @@ void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t ico
 		path[wcslen(path) - 12] = L'\0';
 		RegDeleteKey(HKEY_CURRENT_USER, path);
 
+		removeDriveAction(driveLetter, REG_DRIVE_KEYNAME_CLEAN);
 		removeDriveAction(driveLetter, REG_DRIVE_KEYNAME_FORMAT);
 		removeDriveAction(driveLetter, REG_DRIVE_KEYNAME_EJECT);
 	}
@@ -108,7 +111,7 @@ void ShellRegistery::setupDriveIcon(bool enable, WCHAR driveLetter, uint32_t ico
 
 void ShellRegistery::mountDismount(bool mounted, WCHAR driveLetter, SectorCacheEngine* sectorSource) {
 	const bool physicalDisk = sectorSource ? sectorSource->isPhysicalDisk() : false;
-	const bool copyToADF = sectorSource ? sectorSource->allowCopyToFile() : false;
+	const bool copyToFile = sectorSource ? sectorSource->allowCopyToFile() : false;
 	setupFiletypeContextMenu(physicalDisk, driveLetter);
 
 	removeDriveAction(driveLetter, REG_DRIVE_KEYNAME_BB);
@@ -116,16 +119,11 @@ void ShellRegistery::mountDismount(bool mounted, WCHAR driveLetter, SectorCacheE
 
 	if (mounted) {		
 		
-		if (copyToADF) {
-			switch (sectorSource->getSystemType()) {
-			case SectorType::stAmiga: addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to .ADF...", 0, L"BACKUP"); break;
-			case SectorType::stIBM: addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to .IMG...", 0, L"BACKUP"); break;
-			case SectorType::stAtari: addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to .ST...", 0, L"BACKUP"); break;
-			}
-		}
+		if (copyToFile) 
+			if ((sectorSource->getSystemType() != SectorType::stUnknown) && (sectorSource->getSystemType() != SectorType::stHybrid)) 
+				addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to File...", 0, L"BACKUP");
 
-		if ((sectorSource->getSystemType() == SectorType::stAmiga) && (!sectorSource->isDiskWriteProtected())) {
+		if ((sectorSource->getSystemType() == SectorType::stAmiga) && (!sectorSource->isDiskWriteProtected())) 
 			addDriveAction(driveLetter, REG_DRIVE_KEYNAME_BB, L"&Install Bootblock...", 0, L"BB");
-		}		
 	}
 }

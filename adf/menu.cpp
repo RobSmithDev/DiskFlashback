@@ -330,10 +330,10 @@ DWORD CTrayMenu::getAppVersion() {
     return 0;
 }
 
-// Check for updates (auto is only every 7 days)
+// Check for updates (auto is checked once per day)
 void CTrayMenu::checkForUpdates(bool force) {
     if (!force)
-        if (getStamp() - m_config.lastCheck < 7) return;
+        if (getStamp() - m_config.lastCheck < 1) return;
 
     m_config.lastCheck = getStamp();
     saveConfiguration(m_config);

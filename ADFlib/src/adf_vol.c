@@ -221,6 +221,9 @@ struct AdfVolume * adfVolMount ( struct AdfDevice * const dev,
         vol->readOnly = true;
     else
         vol->readOnly = ( mode != ADF_ACCESS_MODE_READWRITE );
+
+
+    
 	   	
     struct AdfRootBlock root;
     if ( adfReadRootBlock ( vol, (uint32_t) vol->rootBlock, &root ) != ADF_RC_OK ) {
@@ -355,7 +358,7 @@ struct AdfVolume * adfVolCreate ( struct AdfDevice * const dev,
     vol->firstBlock = (int32_t) ( dev->heads * dev->sectors * start );
     vol->lastBlock = vol->firstBlock + (int32_t) ( dev->heads * dev->sectors * len ) - 1;
     vol->blockSize = 512;
-    vol->rootBlock = adfVolCalcRootBlk ( vol );
+    vol->rootBlock = adfVolCalcRootBlk ( vol, 0 );
 
 /*printf("first=%ld last=%ld root=%ld\n",vol->firstBlock,
  vol->lastBlock, vol->rootBlock);

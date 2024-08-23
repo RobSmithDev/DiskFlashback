@@ -85,9 +85,9 @@ static inline uint32_t adfVolGetBlockNum ( const struct AdfVolume * const vol )
     return (uint32_t) ( vol->lastBlock - vol->firstBlock + 1 );
 }
 
-static inline ADF_SECTNUM adfVolCalcRootBlk ( const struct AdfVolume * const vol )
+static inline ADF_SECTNUM adfVolCalcRootBlk ( const struct AdfVolume * const vol, const int numReservedBlocks )
 {
-    return ( vol->lastBlock - vol->firstBlock + 1 ) / 2;
+    return ( vol->lastBlock - vol->firstBlock + 1 + numReservedBlocks) / 2;
 }
 
 

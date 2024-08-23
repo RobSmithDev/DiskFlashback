@@ -254,7 +254,7 @@ ADF_RETCODE adfMountHd ( struct AdfDevice * const dev, const int32_t rdskBlock )
             return ADF_RC_MALLOC;
         }
 
-        vol->rootBlock = adfVolIsDosFS ( vol ) ? adfVolCalcRootBlk ( vol ) : -1;
+        vol->rootBlock = adfVolIsDosFS ( vol ) ? adfVolCalcRootBlk ( vol, part.dosReserved ) : -1;
 
         next = part.next;
     }

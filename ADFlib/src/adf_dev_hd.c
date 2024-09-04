@@ -254,8 +254,24 @@ ADF_RETCODE adfMountHd ( struct AdfDevice * const dev, const int32_t rdskBlock )
             return ADF_RC_MALLOC;
         }
 
-        vol->rootBlock = adfVolIsDosFS ( vol ) ? adfVolCalcRootBlk ( vol, part.dosReserved ) : -1;
-
+         if (adfVolIsDosFS(vol)) {
+             vol->rootBlock = adfVolCalcRootBlk(vol, part.dosReserved);
+             // Check the root block, and if its not right, then try again without the reserved counter
+             // Not sure whats going on here! - this will of corse fail for non OFS/FFS partitions too but thats ok
+             struct AdfRootBlock root;
+             vol->mounted = true;   // a hack
+             ADF_RETCODE rc = adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root);
+             if (rc != ADF_RC_OK) {
+                 ADF_SECTNUM sec = adfVolCalcRootBlk(vol, 0);
+                 if (sec != vol->rootBlock) {
+                     vol->rootBlock = sec;
+                     rc = adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root);
+                 }
+             }
+             vol->mounted = false;
+         }
+         else vol->rootBlock = -1;
+        
         next = part.next;
     }
 

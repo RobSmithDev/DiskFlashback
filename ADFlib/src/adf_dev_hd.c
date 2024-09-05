@@ -88,7 +88,7 @@ ADF_RETCODE adfMountHdFile ( struct AdfDevice * const dev )
     vol->volName = NULL;
     vol->mounted = false;
     vol->blockSize = 512;
-    
+    vol->numReservedBlocks = 2;
     vol->firstBlock = 0;
 
     unsigned size = dev->size + 512 - ( dev->size % 512 );
@@ -212,6 +212,7 @@ ADF_RETCODE adfMountHd ( struct AdfDevice * const dev, const int32_t rdskBlock )
         vol->firstBlock = (int32_t) rdsk.cylBlocks * part.lowCyl;
         vol->lastBlock = ( part.highCyl + 1 ) * (int32_t) rdsk.cylBlocks - 1;
         vol->blockSize = part.blockSize*4;
+        vol->numReservedBlocks = part.dosReserved;
 
         /* set filesystem info (read from bootblock) */
         struct AdfBootBlock boot;
@@ -254,24 +255,7 @@ ADF_RETCODE adfMountHd ( struct AdfDevice * const dev, const int32_t rdskBlock )
             return ADF_RC_MALLOC;
         }
 
-         if (adfVolIsDosFS(vol)) {
-             vol->rootBlock = adfVolCalcRootBlk(vol, part.dosReserved);
-             // Check the root block, and if its not right, then try again without the reserved counter
-             // Not sure whats going on here! - this will of corse fail for non OFS/FFS partitions too but thats ok
-             struct AdfRootBlock root;
-             vol->mounted = true;   // a hack
-             ADF_RETCODE rc = adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root);
-             if (rc != ADF_RC_OK) {
-                 ADF_SECTNUM sec = adfVolCalcRootBlk(vol, 0);
-                 if (sec != vol->rootBlock) {
-                     vol->rootBlock = sec;
-                     rc = adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root);
-                 }
-             }
-             vol->mounted = false;
-         }
-         else vol->rootBlock = -1;
-        
+        vol->rootBlock = adfVolIsDosFS(vol) ? adfVolCalcRootBlk(vol) : -1;
         next = part.next;
     }
 

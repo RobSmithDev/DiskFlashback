@@ -49,6 +49,7 @@ struct AdfVolume {
     ADF_SECTNUM firstBlock;     /* first block of data area (from beginning of device) */
     ADF_SECTNUM lastBlock;      /* last block of data area  (from beginning of device) */
     ADF_SECTNUM rootBlock;      /* root block (from firstBlock) */
+    int32_t numReservedBlocks;  /* number of reserved blocks */
 
     struct fs {
         char    id[4];          /* "DOS", "PFS", ... */
@@ -85,11 +86,30 @@ static inline uint32_t adfVolGetBlockNum ( const struct AdfVolume * const vol )
     return (uint32_t) ( vol->lastBlock - vol->firstBlock + 1 );
 }
 
-static inline ADF_SECTNUM adfVolCalcRootBlk ( const struct AdfVolume * const vol, const int numReservedBlocks )
+static inline ADF_SECTNUM adfVolCalcRootBlk ( const struct AdfVolume * const vol )
 {
-    return ( vol->lastBlock - vol->firstBlock + 1 + numReservedBlocks) / 2;
+    return ( vol->lastBlock - vol->firstBlock + vol->numReservedBlocks) / 2;
+    // Taken from AROS
+    //return (vol->lastBlock - vol->firstBlock + 1)
 }
+/*
+vol->firstBlock = (int32_t)rdsk.cylBlocks * part.lowCyl;
+vol->lastBlock = (part.highCyl + 1) * (int32_t)rdsk.cylBlocks - 1;
+vol->blockSize = part.blockSize * 4;
 
+
+/*
+
+volume->countblocks =
+                                        (
+                                                (
+                                                        devicedef->de_HighCyl-devicedef->de_LowCyl+1
+                                                )*devicedef->de_Surfaces*devicedef->de_BlocksPerTrack
+                                                /
+                                                devicedef->de_SectorPerBlock
+                                        );
+                                volume->rootblock =(volume->countblocks-1+devicedef->de_Reserved)/2;
+*/
 
 static inline bool adfVolIsDosFS ( const struct AdfVolume * const vol ) {
     return ( strncmp ( vol->fs.id, "DOS", 3 ) == 0 );

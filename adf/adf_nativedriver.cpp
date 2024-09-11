@@ -42,20 +42,30 @@ void adfPrepNativeDriver() {
 
 int adfDevType(struct AdfDevice* dev)
 {
-    if ((dev->size == 512 * 11 * 2 * 80) ||		/* BV */
-        (dev->size == 512 * 11 * 2 * 81) ||		/* BV */
-        (dev->size == 512 * 11 * 2 * 82) || 	/* BV */
-        (dev->size == 512 * 11 * 2 * 83))		/* BV */
-        return(ADF_DEVTYPE_FLOPDD);
-    else if ((dev->size == 512 * 22 * 2 * 80) ||
-        (dev->size == 512 * 22 * 2 * 81) ||
-        (dev->size == 512 * 22 * 2 * 82) ||
-        (dev->size == 512 * 22 * 2 * 83))
-        return(ADF_DEVTYPE_FLOPHD);
-    else if (dev->size > 512 * 22 * 2 * 83)
-        return(ADF_DEVTYPE_HARDDISK);
-    else {       
-        return(-1);
+    {
+        switch (dev->size) {
+        case 512 * 11 * 2 * 80:
+        case 512 * 11 * 2 * 81:
+        case 512 * 11 * 2 * 82:
+        case 512 * 11 * 2 * 83:  return ADF_DEVTYPE_FLOPDD;
+        case 512 * 12 * 2 * 80:
+        case 512 * 12 * 2 * 81:
+        case 512 * 12 * 2 * 82:
+        case 512 * 12 * 2 * 83:  return ADF_DEVTYPE_FLOPDS_DD;
+
+        case 512 * 22 * 2 * 80:
+        case 512 * 22 * 2 * 81:
+        case 512 * 22 * 2 * 82:
+        case 512 * 22 * 2 * 83:  return ADF_DEVTYPE_FLOPHD;
+        case 512 * 24 * 2 * 80:
+        case 512 * 24 * 2 * 81:
+        case 512 * 24 * 2 * 82:
+        case 512 * 24 * 2 * 83:  return ADF_DEVTYPE_FLOPDS_HD;
+
+        default:
+            if (dev->size > 512 * 24 * 2 * 83) return(ADF_DEVTYPE_HARDDISK);
+            return(-1);
+        }
     }
 }
 

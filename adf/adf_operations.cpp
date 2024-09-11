@@ -743,6 +743,8 @@ NTSTATUS DokanFileSystemAmigaFS::fs_getvolumeinformation(std::wstring& volumeNam
         switch (m_volume->dev->devType) {
         case ADF_DEVTYPE_FLOPDD: filesystemName += L"DD Floppy "; break;
         case ADF_DEVTYPE_FLOPHD: filesystemName += L"HD Floppy "; break;
+        case ADF_DEVTYPE_FLOPDS_DD: filesystemName += L"DiskSpare DD Floppy "; break;
+        case ADF_DEVTYPE_FLOPDS_HD: filesystemName += L"DiskSpare HD Floppy "; break;
         case ADF_DEVTYPE_HARDDISK: filesystemName += L"HD Partition "; break;
         case ADF_DEVTYPE_HARDFILE: filesystemName += L"HD File "; break;
         }

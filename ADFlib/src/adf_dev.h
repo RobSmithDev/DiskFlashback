@@ -21,10 +21,12 @@ struct Partition {
 /* ----- DEVICES ----- */
 
 typedef enum {
-    ADF_DEVTYPE_FLOPDD   = 1,
-    ADF_DEVTYPE_FLOPHD   = 2,
+    ADF_DEVTYPE_FLOPDD = 1,
+    ADF_DEVTYPE_FLOPHD = 2,
     ADF_DEVTYPE_HARDDISK = 3,
-    ADF_DEVTYPE_HARDFILE = 4
+    ADF_DEVTYPE_HARDFILE = 4,
+    ADF_DEVTYPE_FLOPDS_DD = 5,  // DiskSpare
+    ADF_DEVTYPE_FLOPDS_HD = 6   // DiskSpare
 } AdfDeviceType;
 
 struct AdfDevice {

@@ -182,19 +182,27 @@ void adfDevClose ( struct AdfDevice * const dev )
  */
 int adfDevType ( struct AdfDevice * dev )
 {
-    if( (dev->size==512*11*2*80) ||		/* BV */
-        (dev->size==512*11*2*81) ||		/* BV */
-        (dev->size==512*11*2*82) || 	/* BV */
-        (dev->size==512*11*2*83) )		/* BV */
-        return(ADF_DEVTYPE_FLOPDD);
-    else if ((dev->size==512*22*2*80) || 
-        (dev->size == 512 * 22 * 2 * 81) ||
-        (dev->size == 512 * 22 * 2 * 82) || 
-        (dev->size == 512 * 22 * 2 * 83))
-        return(ADF_DEVTYPE_FLOPHD);
-    else if (dev->size>512*22*2*83)
-        return(ADF_DEVTYPE_HARDDISK);
-    else {
+    switch (dev->size) {
+    case 512 * 11 * 2 * 80:
+    case 512 * 11 * 2 * 81:
+    case 512 * 11 * 2 * 82:
+    case 512 * 11 * 2 * 83:  return ADF_DEVTYPE_FLOPDD;
+    case 512 * 12 * 2 * 80:
+    case 512 * 12 * 2 * 81:
+    case 512 * 12 * 2 * 82:
+    case 512 * 12 * 2 * 83:  return ADF_DEVTYPE_FLOPDS_DD;
+
+    case 512 * 22 * 2 * 80:
+    case 512 * 22 * 2 * 81:
+    case 512 * 22 * 2 * 82:
+    case 512 * 22 * 2 * 83:  return ADF_DEVTYPE_FLOPHD;
+    case 512 * 24 * 2 * 80:
+    case 512 * 24 * 2 * 81:
+    case 512 * 24 * 2 * 82:
+    case 512 * 24 * 2 * 83:  return ADF_DEVTYPE_FLOPDS_HD;
+
+    default:
+        if (dev->size>512*24*2*83) return(ADF_DEVTYPE_HARDDISK);
         (*adfEnv.eFct)("adfDevType : unknown device type");
         return(-1);
     }
@@ -276,7 +284,9 @@ ADF_RETCODE adfDevMount ( struct AdfDevice * const dev )
     switch( dev->devType ) {
 
     case ADF_DEVTYPE_FLOPDD:
-    case ADF_DEVTYPE_FLOPHD: {
+    case ADF_DEVTYPE_FLOPHD: 
+    case ADF_DEVTYPE_FLOPDS_DD:
+    case ADF_DEVTYPE_FLOPDS_HD: {
         rc = adfMountFlop ( dev );
         if ( rc != ADF_RC_OK )
             return rc;
@@ -392,6 +402,26 @@ static ADF_RETCODE adfDevSetCalculatedGeometry_ ( struct AdfDevice * const dev )
         dev->cylinders = dev->size / ( dev->heads * dev->sectors * 512 );
         if (dev->cylinders < 80 || dev->cylinders > 83) {
             adfEnv.eFct ( "adfDevSetCalculatedGeometry_: invalid size %u", dev->size );
+            return ADF_RC_ERROR;
+        }
+        break;
+
+    case ADF_DEVTYPE_FLOPDS_DD:
+        dev->heads = 2;
+        dev->sectors = 12;
+        dev->cylinders = dev->size / (dev->heads * dev->sectors * 512);
+        if (dev->cylinders < 80 || dev->cylinders > 83) {
+            adfEnv.eFct("adfDevSetCalculatedGeometry_: invalid size %u", dev->size);
+            return ADF_RC_ERROR;
+        }
+        break;
+
+    case ADF_DEVTYPE_FLOPDS_HD:
+        dev->heads = 2;
+        dev->sectors = 24;
+        dev->cylinders = dev->size / (dev->heads * dev->sectors * 512);
+        if (dev->cylinders < 80 || dev->cylinders > 83) {
+            adfEnv.eFct("adfDevSetCalculatedGeometry_: invalid size %u", dev->size);
             return ADF_RC_ERROR;
         }
         break;

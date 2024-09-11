@@ -47,6 +47,9 @@ private:
     bool m_writeOnly                = false;
     std::function<void(bool diskInserted, SectorType diskFormat)> m_diskChangeCallback;
 
+    // Sub format flags
+    bool m_diskSpare = false;   // Amiga DiskSpare
+
     uint32_t m_sectorsPerTrack[2] = { 0,0 };
     uint32_t m_bytesPerSector[2] = { 512, 512 };
     uint32_t m_totalCylinders[2] = { 0, 0 };

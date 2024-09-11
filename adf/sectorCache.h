@@ -22,7 +22,7 @@
 
 
 // Possible types of sector / file
-enum class SectorType  {stAmiga, stIBM, stAtari, stHybrid, stUnknown };
+enum class SectorType  {stAmiga, stAmigaDiskSpare, stIBM, stAtari, stHybrid, stUnknown };
 
 class SectorCacheEngine {
 private:

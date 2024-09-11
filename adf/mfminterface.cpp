@@ -363,21 +363,30 @@ bool SectorCacheMFM::readDataAllFS(const uint32_t fileSystem, const uint32_t sec
         if (retries > MAX_RETRIES) {
             if (m_ignoreErrors) return false;
             retries = 0;
+            bool skipDialog = false;
 
             if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
-            if (!shouldPrompt()) return false;
+            if (!shouldPrompt()) {
+                if (!m_ignoreErrors) {
+                    m_ignoreErrors = true;
+                    retries = 0;
+                    skipDialog = true;
+                }
+                else return false;
+            }
 
-            switch (TaskDialogMessage(GetDesktopWindow(), GetModuleHandle(NULL), L"Disk Errors Detected", L"Disk read errors were detected.", L"What would you like to do?",
-                { L"Retry", L"Ignore", L"Always Ignore", L"Abort" }, TD_WARNING_ICON)) {
-            case 0: break;
-            case 1: m_ignoreErrors = true;
-                break;
-            case 2: m_alwaysIgnore = true;
-                m_ignoreErrors = true;
-                break;
-            default: 
-                return false;
-            }    
+            if (!skipDialog)
+                switch (TaskDialogMessage(GetDesktopWindow(), GetModuleHandle(NULL), L"Disk Errors Detected", L"Disk read errors were detected.", L"What would you like to do?",
+                    { L"Retry", L"Ignore", L"Always Ignore", L"Abort" }, TD_WARNING_ICON)) {
+                case 0: break;
+                case 1: m_ignoreErrors = true;
+                    break;
+                case 2: m_alwaysIgnore = true;
+                    m_ignoreErrors = true;
+                    break;
+                default: 
+                    return false;
+                }    
 
             // Re-check disk is actually inserted!
             if (!isDiskInDrive()) return false;
@@ -461,7 +470,7 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         m_numHeads[1] = 2;
         getTrackDetails_AMIGA(isHD(), m_sectorsPerTrack[0], m_bytesPerSector[0]);
         DecodedTrack trAmiga;
-        findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trAmiga);
+        findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trAmiga, m_diskSpare);
         DecodedTrack trIBM;
         bool nonStandard = false;
         findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, 0, trIBM, nonStandard);
@@ -470,8 +479,8 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         uint32_t bytesPerSector;
 
         if (trAmiga.sectors.size()) {
-            m_diskType = SectorType::stAmiga;
-            m_sectorsPerTrack[0] = max(m_sectorsPerTrack[0], (uint32_t)trAmiga.sectors.size());
+            m_diskType = m_diskSpare ? SectorType::stAmigaDiskSpare : SectorType::stAmiga;
+            m_sectorsPerTrack[0] = max(m_diskSpare ? (isHD() ? 24 : 12)  : m_sectorsPerTrack[0], (uint32_t)trAmiga.sectors.size());
             m_serialNumber[0] = 0x414D4644; // AMFD
         }
         else m_diskType = SectorType::stUnknown;
@@ -503,25 +512,24 @@ bool SectorCacheMFM::doTrackReading(const uint32_t fileSystem, const uint32_t tr
         }
     }
     if (m_diskType == SectorType::stHybrid) {
-
         if (m_numHeads[1] == 2) {  // Has 2 sides? Treat everything as normal
-            findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
+            findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track], m_diskSpare);
             findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track]);
         }
         else // Atari is single sided. Amiga is ALWAYS double sided
             if (fileSystem == 1) {
-                findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track * 2, m_sectorsPerTrack[0], m_trackCache[0][track * 2]);
+                findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track * 2, m_sectorsPerTrack[0], m_trackCache[0][track * 2], m_diskSpare);
                 findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track]);
             }
             else {
-                findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
+                findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track], m_diskSpare);
                 if ((track & 1) == 0)
                     findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[1], m_trackCache[1][track >> 1]);
             }
     }
     else
-        if (m_diskType == SectorType::stAmiga)
-            findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
+        if ((m_diskType == SectorType::stAmiga) || (m_diskType == SectorType::stAmigaDiskSpare))
+            findSectors_AMIGA((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track], m_diskSpare);
     if ((m_diskType == SectorType::stAtari) || (m_diskType == SectorType::stIBM))
         findSectors_IBM((const unsigned char*)m_mfmBuffer, bitsReceived, isHD(), track, m_sectorsPerTrack[0], m_trackCache[0][track]);
 
@@ -655,14 +663,9 @@ bool SectorCacheMFM::flushPendingWrites() {
 
         switch (m_diskType) {
         case SectorType::stAmiga: numBytes = encodeSectorsIntoMFM_AMIGA(isHD(), m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
+        case SectorType::stAmigaDiskSpare: numBytes = 0;  break; //numBytes = encodeSectorsIntoMFM_AMIGA(isHD(), m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
         case SectorType::stIBM: numBytes = encodeSectorsIntoMFM_IBM(isHD(), false, &m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
         case SectorType::stAtari: numBytes = encodeSectorsIntoMFM_IBM(isHD(), true, &m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
-        case SectorType::stHybrid:
-            // Need to work out which type of track it is although technically hybrid isnt supported for writing
-            if ((m_trackCache[0][track].sectors.size() == 11) || (m_trackCache[0][track].sectors.size() == 22))
-                numBytes = encodeSectorsIntoMFM_AMIGA(isHD(), m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer);
-            else numBytes = encodeSectorsIntoMFM_IBM(isHD(), true, &m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer);
-            break;
         default:
             numBytes = 0;
             break;

@@ -88,28 +88,9 @@ static inline uint32_t adfVolGetBlockNum ( const struct AdfVolume * const vol )
 
 static inline ADF_SECTNUM adfVolCalcRootBlk ( const struct AdfVolume * const vol )
 {
-    return ( vol->lastBlock - vol->firstBlock + vol->numReservedBlocks) / 2;
-    // Taken from AROS
-    //return (vol->lastBlock - vol->firstBlock + 1)
+    //return (vol->lastBlock - vol->firstBlock + 1) / 2;
+    return (vol->lastBlock - vol->firstBlock + vol->numReservedBlocks) / 2;
 }
-/*
-vol->firstBlock = (int32_t)rdsk.cylBlocks * part.lowCyl;
-vol->lastBlock = (part.highCyl + 1) * (int32_t)rdsk.cylBlocks - 1;
-vol->blockSize = part.blockSize * 4;
-
-
-/*
-
-volume->countblocks =
-                                        (
-                                                (
-                                                        devicedef->de_HighCyl-devicedef->de_LowCyl+1
-                                                )*devicedef->de_Surfaces*devicedef->de_BlocksPerTrack
-                                                /
-                                                devicedef->de_SectorPerBlock
-                                        );
-                                volume->rootblock =(volume->countblocks-1+devicedef->de_Reserved)/2;
-*/
 
 static inline bool adfVolIsDosFS ( const struct AdfVolume * const vol ) {
     return ( strncmp ( vol->fs.id, "DOS", 3 ) == 0 );

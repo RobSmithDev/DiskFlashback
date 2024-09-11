@@ -247,7 +247,7 @@ uint32_t VolumeManager::mountAmigaVolumes(uint32_t startPoint) {
     bool mountAsNDOS = m_adfDevice == nullptr;
     if (m_adfDevice && m_adfDevice->nVol == 0) mountAsNDOS = true;
 
-    if (mountAsNDOS && (m_currentSectorFormat == SectorType::stAmiga)) {
+    if (mountAsNDOS && ((m_currentSectorFormat == SectorType::stAmiga) || (m_currentSectorFormat == SectorType::stAmigaDiskSpare))) {
         if (startPoint >= m_volumes.size()) {
             // new volume required
             m_volumes.push_back(new MountedVolume(this, m_mainExeFilename, m_io, letter, m_forceReadOnly));
@@ -305,7 +305,7 @@ void VolumeManager::adfDevMountCylinders() {
     if (!m_adfDevice) return;
 
     ADF_RETCODE code = adfDevMount(m_adfDevice);
-    if ((code != ADF_RC_OK) && ((m_adfDevice->devType == ADF_DEVTYPE_FLOPDD) || (m_adfDevice->devType == ADF_DEVTYPE_FLOPHD))) {
+    if ((code != ADF_RC_OK) && ((m_adfDevice->devType == ADF_DEVTYPE_FLOPDD) || (m_adfDevice->devType == ADF_DEVTYPE_FLOPHD) || (m_adfDevice->devType == ADF_DEVTYPE_FLOPDS_DD) || (m_adfDevice->devType == ADF_DEVTYPE_FLOPDS_HD))) {
         while (m_adfDevice->cylinders > 80) {
             m_adfDevice->cylinders--;
             code = adfDevMount(m_adfDevice);
@@ -343,7 +343,8 @@ void VolumeManager::diskChanged(bool diskInserted, SectorType diskFormat) {
 
         // Create device based on what system was detected
         switch (diskFormat) {
-            case SectorType::stAmiga:   
+            case SectorType::stAmiga:
+            case SectorType::stAmigaDiskSpare:
                 m_adfDevice = adfDevOpenWithDriver(DISKFLASHBACK_AMIGA_DRIVER, (char*)m_io, m_forceReadOnly ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE);
                 if (m_adfDevice) adfDevMountCylinders();
                 break;
@@ -454,6 +455,7 @@ bool VolumeManager::mountRaw(const std::wstring& physicalDrive, bool readOnly) {
 bool VolumeManager::mountFile(const std::wstring& filename) {
     // Open the file
     HANDLE fle = CreateFile(filename.c_str(), GENERIC_READ | (m_forceReadOnly ? 0 : GENERIC_WRITE), 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, 0);
+    int j = GetLastError();
     if ((fle == INVALID_HANDLE_VALUE) && (!m_forceReadOnly)) {
         // Try read only
         fle = CreateFile(filename.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS, 0);

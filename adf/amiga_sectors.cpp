@@ -125,6 +125,54 @@ uint32_t decodeMFMdata(const uint32_t* input, uint32_t* output, const unsigned i
 	return chksum & MFM_MASK;
 }
 
+// Decodes a sector in DiskSpare format
+bool decodeDiskSpareSector(const RawEncodedSector& rawSector, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack) {
+	uint16_t j = 0;
+	uint8_t buffer[560];
+
+	for (uint16_t i = 2; i < 1080; i += 8) {
+		decodeMFMdata((uint32_t*)(&rawSector[i]), (uint32_t*)&buffer[j], 4);
+		j += 4;
+	}
+
+	// rawSector[2] = mfmbuf[3]
+	uint16_t* mfmbuf = (uint16_t*)&rawSector[2];
+
+
+	DecodedSector sector;
+	sector.numErrors = 0;
+
+	if (buffer[0] > 166) sector.numErrors++;
+	if (buffer[0] != trackNumber) sector.numErrors++;
+	if (buffer[1] > expectedNumSectors)
+		return false; 
+
+	sector.data.resize(SECTOR_BYTES);
+	memcpy_s(&sector.data[0], sector.data.size(), &buffer[4], SECTOR_BYTES);
+
+	const uint16_t chkRequired = (buffer[3] << 8) | buffer[2];
+
+	uint16_t i = 4;
+	uint16_t chk = mfmbuf[i++] & 0x7fff;
+	while (i < 512 + 4)
+		chk ^= mfmbuf[i++];
+
+	if (chk != chkRequired) sector.numErrors++;
+
+	// Store the one with the least errors if there's duplicates
+	auto it = decodedTrack.sectors.find(buffer[1]);
+
+	if (it == decodedTrack.sectors.end())
+		decodedTrack.sectors.insert(std::make_pair(buffer[1], sector));
+	else {
+		// See which one has less errors and overwrite if needed
+		if (sector.numErrors < it->second.numErrors)
+			it->second = sector;
+	}
+
+	return true;
+}
+
 // Decode the sector.  Returns the number of checksum/errors found
 void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack) {
 	DecodedSector sector;
@@ -180,17 +228,20 @@ void decodeSector(const RawEncodedSector& rawSector, const uint32_t trackNumber,
 	}
 }
 
+
 // Search for sectors in the data supplied
-void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack) {
+void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, bool& isDiskSpare) {
 	// Work out what we need to search for which is syncsync
 	const uint32_t search = (AMIGA_WORD_SYNC | (((uint32_t)AMIGA_WORD_SYNC) << 16));
 
 	// Prepare our test buffer
 	uint32_t decoded = 0;
+	isDiskSpare = false;
 
 	// Search with an overlap of approx 3 raw sectors worth of data
 	const uint32_t totalBitsToSearch = dataLengthInBits + (RAW_SECTOR_SIZE * 8 * 3);
-	const uint32_t expectedSectors = expectedNumSectors ? expectedNumSectors : (isHD ? NUM_SECTORS_PER_TRACK_HD : NUM_SECTORS_PER_TRACK_DD);
+	uint32_t expectedSectors = expectedNumSectors ? expectedNumSectors : (isHD ? NUM_SECTORS_PER_TRACK_HD : NUM_SECTORS_PER_TRACK_DD);
+	const uint32_t expectedSectorsDS = isHD ? 24 : 12;
 
 	int nextTrackBitCount = 0;
 
@@ -208,8 +259,15 @@ void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, co
 			// Extract the sector and skip past the data
 			extractRawSector(track, dataLengthInBits, (bit + 1) % dataLengthInBits, alignedSector);
 
-			// Now see if there's a valid sector there.  We now only skip the sector if its valid, incase rogue data gets in there
-			decodeSector(alignedSector, trackNumber, expectedSectors, decodedTrack);			
+			// Is it DiskSpare?
+			if (((alignedSector[0] = 0x2A) && (alignedSector[1] = 0xAA)) || (isDiskSpare)) {
+				isDiskSpare |= decodeDiskSpareSector(alignedSector, trackNumber, expectedSectorsDS, decodedTrack);
+				if (isDiskSpare) expectedSectors = expectedSectorsDS;
+			}
+			else {
+				// Now see if there's a valid sector there.  We now only skip the sector if its valid, incase rogue data gets in there
+				decodeSector(alignedSector, trackNumber, expectedSectors, decodedTrack);
+			}
 		}
 	}
 

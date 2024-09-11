@@ -49,30 +49,37 @@ ADF_RETCODE refreshAmigaVolume(struct AdfDevice* const dev) {
     struct AdfRootBlock root;
     char diskName[35];
 
-    dev->cylinders = 80;
+    
     dev->heads = 2;
-    if (dev->devType == ADF_DEVTYPE_FLOPDD)
-        dev->sectors = 11;
-    else
-        dev->sectors = 22;
+    switch (dev->devType) {
+    case ADF_DEVTYPE_FLOPDD: dev->sectors = 11; break;
+    case ADF_DEVTYPE_FLOPDS_DD: dev->sectors = 12; break;
+    case ADF_DEVTYPE_FLOPHD: dev->sectors = 22; break;
+    case ADF_DEVTYPE_FLOPDS_HD: dev->sectors = 24; break;
+    }
 
     vol = (struct AdfVolume*)malloc(sizeof(struct AdfVolume));
     if (!vol) return ADF_RC_ERROR;
 
+    // TODO: Calculate root block position!!!!!!!!!!  adfDevMountCylinders
     vol->mounted = TRUE;
     vol->firstBlock = 0;
     vol->numReservedBlocks = 2;
-    vol->lastBlock = (int32_t)(dev->cylinders * dev->heads * dev->sectors - 1);
-    vol->rootBlock = (vol->lastBlock + vol->numReservedBlocks - vol->firstBlock) / 2;
     vol->blockSize = 512;
     vol->dev = dev;
 
-    if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == ADF_RC_OK) {
-        memset(diskName, 0, 35);
-        memcpy_s(diskName, 35, root.diskName, root.nameLen);
-        diskName[34] = '\0';  // make sure its null terminted
+    for (dev->cylinders = 80; dev->cylinders < 84; dev->cylinders++) {
+        vol->lastBlock = (int32_t)(dev->cylinders * dev->heads * dev->sectors - 1);
+        vol->rootBlock = (vol->lastBlock + vol->numReservedBlocks - vol->firstBlock) / 2;
+
+        if (adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root) == ADF_RC_OK) {
+            memset(diskName, 0, 35);
+            memcpy_s(diskName, 35, root.diskName, root.nameLen);
+            diskName[34] = '\0';  // make sure its null terminted
+            break;
+        }
+        else diskName[0] = '\0';
     }
-    else diskName[0] = '\0';
     vol->volName = _strdup(diskName);
 
     if (dev->volList) {

@@ -28,7 +28,7 @@ void fetchBootBlockCode_AMIGA(bool ffs, uint8_t* target);
 void getTrackDetails_AMIGA(const bool isID, uint32_t& sectorsPerTrack, uint32_t& bytesPerSector);
 
 // Searches for sectors - you can re-call this and it will update decodedTrack rather than replace it
-void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack);
+void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, const bool isHD, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack, bool& isDiskSpare);
 
 // Encodes all sectors into the buffer provided and returns the number of bytes that need to be written to disk 
 // mfmBufferSizeBytes needs to be at least 13542 or DD and 27076 for HD

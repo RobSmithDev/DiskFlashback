@@ -119,8 +119,8 @@ void ShellRegistery::mountDismount(bool mounted, WCHAR driveLetter, SectorCacheE
 
 	if (mounted) {		
 		
-		if (copyToFile) 
-			if ((sectorSource->getSystemType() != SectorType::stUnknown) && (sectorSource->getSystemType() != SectorType::stHybrid)) 
+	//	if (copyToFile) 
+	//		if ((sectorSource->getSystemType() != SectorType::stUnknown) && (sectorSource->getSystemType() != SectorType::stHybrid)) 
 				addDriveAction(driveLetter, REG_DRIVE_KEYNAME_COPY, L"&Copy to File...", 0, L"BACKUP");
 
 		if ((sectorSource->getSystemType() == SectorType::stAmiga) && (!sectorSource->isDiskWriteProtected())) 

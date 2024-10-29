@@ -21,6 +21,7 @@
 #define SECTOR_BYTES DEFAULT_SECTOR_BYTES
 #define AMIGA_WORD_SYNC  0x4489							 // Disk SYNC code for the Amiga start of sector
 #define RAW_SECTOR_SIZE (8+56+SECTOR_BYTES+SECTOR_BYTES)      // Size of a sector, *Including* the sector sync word longs
+#define RAW_SECTOR_SIZE_DS (8+8+SECTOR_BYTES+SECTOR_BYTES)      // Size of a sector, *Including* the sector sync word longs for DiskSpare
 #define ADF_TRACK_SIZE_DD (SECTOR_BYTES*NUM_SECTORS_PER_TRACK_DD)   // Bytes required for a single track dd
 #define ADF_TRACK_SIZE_HD (SECTOR_BYTES*NUM_SECTORS_PER_TRACK_HD)   // Bytes required for a single track hd
 #define PRE_FILLER 1654
@@ -125,6 +126,11 @@ uint32_t decodeMFMdata(const uint32_t* input, uint32_t* output, const unsigned i
 	return chksum & MFM_MASK;
 }
 
+
+inline uint16_t swapw(uint16_t x) {
+	return (x << 8) | (x >> 8);
+}
+
 // Decodes a sector in DiskSpare format
 bool decodeDiskSpareSector(const RawEncodedSector& rawSector, const uint32_t trackNumber, const uint32_t expectedNumSectors, DecodedTrack& decodedTrack) {
 	uint16_t j = 0;
@@ -135,27 +141,28 @@ bool decodeDiskSpareSector(const RawEncodedSector& rawSector, const uint32_t tra
 		j += 4;
 	}
 
-	// rawSector[2] = mfmbuf[3]
-	uint16_t* mfmbuf = (uint16_t*)&rawSector[2];
-
+	const uint16_t* mfmbuf = (uint16_t*)&rawSector[2];
 
 	DecodedSector sector;
 	sector.numErrors = 0;
 
-	if (buffer[0] > 166) sector.numErrors++;
+	if (buffer[0] > 166) return false;
 	if (buffer[0] != trackNumber) sector.numErrors++;
 	if (buffer[1] > expectedNumSectors)
 		return false; 
 
+	//char b[300];
+	//sprintf_s(b, "Track %i, Sec %i\n", buffer[0], buffer[1]);
+	//OutputDebugStringA(b);
+
 	sector.data.resize(SECTOR_BYTES);
 	memcpy_s(&sector.data[0], sector.data.size(), &buffer[4], SECTOR_BYTES);
 
-	const uint16_t chkRequired = (buffer[3] << 8) | buffer[2];
-
+	const uint16_t chkRequired = (buffer[2] << 8) | buffer[3];
 	uint16_t i = 4;
-	uint16_t chk = mfmbuf[i++] & 0x7fff;
-	while (i < 512 + 4)
-		chk ^= mfmbuf[i++];
+
+	uint16_t chk = swapw(mfmbuf[i++]) & 0x7fff;
+	while (i < 512 + 4) chk ^= swapw(mfmbuf[i++]);
 
 	if (chk != chkRequired) sector.numErrors++;
 
@@ -260,7 +267,7 @@ void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, co
 			extractRawSector(track, dataLengthInBits, (bit + 1) % dataLengthInBits, alignedSector);
 
 			// Is it DiskSpare?
-			if (((alignedSector[0] = 0x2A) && (alignedSector[1] = 0xAA)) || (isDiskSpare)) {
+			if (((alignedSector[0] == 0x2A) && (alignedSector[1] == 0xAA)) || (isDiskSpare)) {
 				isDiskSpare |= decodeDiskSpareSector(alignedSector, trackNumber, expectedSectorsDS, decodedTrack);
 				if (isDiskSpare) expectedSectors = expectedSectorsDS;
 			}
@@ -378,6 +385,103 @@ void encodeSector(const uint32_t trackNumber, const uint32_t sectorNumber, const
 	}
 
 	lastByte = encodedSector[RAW_SECTOR_SIZE - 1];
+}
+
+
+// Encode a sector into the correct format for disk
+void encodeSectorDiskSpare(const uint32_t trackNumber, const uint32_t sectorNumber, const uint32_t totalSectors, const RawDecodedSector& input, unsigned char* encodedSector, unsigned char& lastByte) {
+
+	// Sector Start
+	encodedSector[0] = (lastByte & 1) ? 0x2A : 0xAA;      // 10
+	encodedSector[1] = 0xAA;	
+	encodedSector[2] = 0x44;
+	encodedSector[3] = 0x89;
+	encodedSector[4] = 0x44;
+	encodedSector[5] = 0x89;
+	encodedSector[6] = 0x2A;
+	encodedSector[7] = 0xAA;
+
+	uint8_t header[4];
+	header[0] = trackNumber;
+	header[1] = sectorNumber;
+	header[2] = 0;
+	header[3] = 0;
+
+	// Encode all of the data. Start writing at 16. The 4-byte header will encode as 8 MFM bytes worth of data
+	uint32_t* inputData = (uint32_t*)input.data();
+	uint32_t* output = (uint32_t*)&encodedSector[16];
+	for (uint16_t p = 0; p < SECTOR_BYTES; p += 4) {
+		encodeMFMdata(inputData, output, 4);
+		output += 2;
+		inputData++;
+	}
+
+	// Add clock bits (7, 5, 3 and 1) - Data is 6, 4, 2, 0
+	bool lastBit = 1;   // Force the first bit to NOT be a clock bit
+	bool thisBit = lastBit;
+	for (int count = 16; count < RAW_SECTOR_SIZE_DS; count++) {  // start at 10, 0-9 are already MFM encoded
+		for (int bit = 7; bit >= 1; bit -= 2) {
+			lastBit = thisBit;
+			thisBit = encodedSector[count] & (1 << (bit - 1));
+			if (!(lastBit || thisBit)) encodedSector[count] |= (1 << bit);
+		}
+	}
+
+	// Calculate checksum
+	const uint16_t* mfmbuf = (uint16_t*)&encodedSector[16];
+	uint16_t i = 0;
+	uint16_t chk = swapw(mfmbuf[i++]) & 0x7fff;  
+	while (i < 512) chk ^= swapw(mfmbuf[i++]);
+	header[2] = chk >> 8;
+	header[3] = chk & 0xFF;
+
+	// Encode the checksum into the buffer
+	encodeMFMdata((uint32_t*)header, (uint32_t*)&encodedSector[8], 4);
+
+	lastBit = encodedSector[8] & (1 << 0);  // should be a 0
+	thisBit = lastBit;
+	// Repeat clockbit calc
+	for (int count = 8; count < 16; count++) {
+		for (int bit = 7; bit >= 1; bit -= 2) {
+			lastBit = thisBit;
+			thisBit = encodedSector[count] & (1 << (bit - 1));
+			if (!(lastBit || thisBit)) 
+				encodedSector[count] |= (1 << bit);
+		}
+	}
+
+	// output
+	lastByte = encodedSector[RAW_SECTOR_SIZE_DS - 1];
+}
+
+// Encodes all sectors into the buffer provided and returns the number of bytes that need to be written to disk 
+// mfmBufferSizeBytes needs to be at least 14166 or DD and 27076 for HD                                
+uint32_t encodeSectorsIntoMFM_AmigaDiskSpare(const bool isHD, const DecodedTrack& decodedTrack, const uint32_t trackNumber, const uint32_t mfmBufferSizeBytes, void* memBuffer) {
+	// Filler padding added to the front of the data to wipe old data and to provide a very stable clock for the data
+	const uint32_t fillerSize = (PRE_FILLER + (isHD ? PRE_FILLER : 0))>>1;  // not needed as much
+
+	// Calculate total bytes we want to write - the extra 8 bytes is for post padding to clean up clock bits
+	const uint32_t bytesRequired = (uint32_t)((RAW_SECTOR_SIZE_DS * decodedTrack.sectors.size()) + fillerSize + 2);
+
+	// Not enough space?
+	if (mfmBufferSizeBytes < bytesRequired) return 0;
+
+	unsigned char* output = (unsigned char*)memBuffer;
+	unsigned char lastByte = 0xAA;
+	memset(output, lastByte, fillerSize);
+	output += fillerSize;
+
+	// The order of the sectors does not matter
+	for (const auto& sec : decodedTrack.sectors) {
+		encodeSectorDiskSpare(trackNumber, (uint32_t)sec.first, (uint32_t)decodedTrack.sectors.size(), sec.second.data, output, lastByte);
+		output += RAW_SECTOR_SIZE_DS;
+	}
+
+	// Clock byte needs to be adjusted here if the last bit is set
+	if (lastByte & 1) *output = 0x2A; else *output = 0xAA;
+	output++;
+
+	return output - (unsigned char*)memBuffer;
 }
 
 // Encodes all sectors into the buffer provided and returns the number of bytes that need to be written to disk 

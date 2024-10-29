@@ -93,6 +93,12 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	ctrl = GetDlgItem(hwnd, IDC_BB);
 	SendMessage(ctrl, BM_SETCHECK, BST_UNCHECKED, 0);
 
+	ctrl = GetDlgItem(hwnd, IDC_DS);
+	SendMessage(ctrl, BM_SETCHECK, BST_UNCHECKED, 0);
+
+	ctrl = GetDlgItem(hwnd, IDC_DS82);
+	SendMessage(ctrl, BM_SETCHECK, BST_UNCHECKED, 0);
+
 	ctrl = GetDlgItem(hwnd, IDC_PROGRESS);
 	SendMessage(ctrl, PBM_SETRANGE, 0, MAKELPARAM(0, 160));
 	SendMessage(ctrl, PBS_SMOOTH, 0, 0);
@@ -118,6 +124,10 @@ void DialogFORMAT::enableControls(bool enable) {
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_INT), enable && (sel < 2));
 	EnableWindow(GetDlgItem(m_dialogBox, IDC_BB), enable && (sel < 2));
 	EnableWindow(GetDlgItem(m_dialogBox, ID_START), enable);
+
+	EnableWindow(GetDlgItem(m_dialogBox, IDC_DS), enable && (sel < 2));
+	const bool ds = SendMessage(GetDlgItem(m_dialogBox, IDC_DS), BM_GETCHECK, 0, 0) == BST_CHECKED;
+	EnableWindow(GetDlgItem(m_dialogBox, IDC_DS82), enable && (sel < 2) && ds);
 
 	SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
 
@@ -149,7 +159,7 @@ bool isBlank(uint8_t* mem, uint32_t size) {
 }
 
 // Actually do the format
-bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, uint32_t density, uint32_t formatMode, const std::string& volumeLabel) {
+bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMode, bool installBB, uint32_t density, bool useDiskSpare, bool useDiskSpare82, uint32_t formatMode, const std::string& volumeLabel) {
 	if (!m_io->isDiskPresent()) {
 		MessageBox(m_dialogBox, L"No disk in drive. Format aborted.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 		return false;
@@ -185,8 +195,12 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 		switch (formatMode) {
 		case 0:
 		case 1:
-			numSectors = isHD ? 22 : 11;
-			bridge->overwriteSectorSettings(SectorType::stAmiga, totalTracks/2,2,  numSectors, 512);
+			if (useDiskSpare) {
+				numSectors = isHD ? 24 : 12;
+				if (useDiskSpare82) totalTracks = 82 * 2;
+			} 
+			else numSectors = isHD ? 22 : 11;
+			bridge->overwriteSectorSettings(useDiskSpare  ? SectorType::stAmigaDiskSpare : SectorType::stAmiga, totalTracks/2,2,  numSectors, 512);
 			break;
 		case 2:
 			numSectors = isHD ? 18 : 9;
@@ -213,6 +227,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 			return false;
 		}
 	}
+	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks + 4));
 
 	uint32_t progress = 0;
 	if (!quickFormat) {
@@ -339,6 +354,8 @@ void DialogFORMAT::doFormat() {
 		bool dirCache = SendMessage(GetDlgItem(m_dialogBox, IDC_CACHE), BM_GETCHECK, 0, 0) == BST_CHECKED;
 		bool intMode = SendMessage(GetDlgItem(m_dialogBox, IDC_INT), BM_GETCHECK, 0, 0) == BST_CHECKED;
 		bool installBB = SendMessage(GetDlgItem(m_dialogBox, IDC_BB), BM_GETCHECK, 0, 0) == BST_CHECKED;
+		bool useDiskSpare = SendMessage(GetDlgItem(m_dialogBox, IDC_DS), BM_GETCHECK, 0, 0) == BST_CHECKED;
+		bool useDiskSpare82 = SendMessage(GetDlgItem(m_dialogBox, IDC_DS82), BM_GETCHECK, 0, 0) == BST_CHECKED;
 
 		uint32_t density = 2;
 		if (SendMessage(GetDlgItem(m_dialogBox, IDC_DD), BM_GETCHECK, 0, 0) == BST_CHECKED) density = 0; else
@@ -350,9 +367,9 @@ void DialogFORMAT::doFormat() {
 		GetWindowText(GetDlgItem(m_dialogBox, IDC_LABEL), name, 64);
 		wideToAnsi(name, volumeLabel);
 
-		m_formatThread = new std::thread([this, quickFormat, dirCache, intMode, installBB, density, formatMode, volumeLabel]() {
+		m_formatThread = new std::thread([this, quickFormat, dirCache, intMode, installBB, density, formatMode, useDiskSpare, useDiskSpare82, volumeLabel]() {
 			m_io->setWritingOnlyMode(true);
-			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, density, formatMode, volumeLabel);
+			bool ret = runFormatCommand(quickFormat, dirCache, intMode, installBB, density, useDiskSpare, useDiskSpare82, formatMode, volumeLabel);
 			{
 				SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
 				if (bridge) bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
@@ -412,9 +429,9 @@ INT_PTR DialogFORMAT::handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 		if (m_formatThread) {			
 			if (m_formatThread->joinable()) m_formatThread->join();
 			delete m_formatThread;
+			m_formatThread = nullptr;
 			if (m_lastCursor) SetCursor(m_lastCursor);
 			m_lastCursor = 0;
-			m_formatThread = nullptr;
 			enableControls(true);
 		}
 		if (m_abortFormat) EndDialog(hwnd, FALSE);
@@ -426,6 +443,7 @@ INT_PTR DialogFORMAT::handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 
 
 		case IDC_FILESYSTEM:
+		case IDC_DS:
 			enableControls(true);
 			break;
 

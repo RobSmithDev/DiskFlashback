@@ -188,7 +188,7 @@ int adfDevType ( struct AdfDevice * dev )
     case 512 * 11 * 2 * 82:
     case 512 * 11 * 2 * 83:  return ADF_DEVTYPE_FLOPDD;
     case 512 * 12 * 2 * 80:
-    case 512 * 12 * 2 * 81:
+    case 512 * 12 * 2 * 81:  
     case 512 * 12 * 2 * 82:
     case 512 * 12 * 2 * 83:  return ADF_DEVTYPE_FLOPDS_DD;
 

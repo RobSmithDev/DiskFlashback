@@ -600,7 +600,7 @@ void CTrayMenu::installAmigaFS(bool isHD, SectorCacheEngine* fle) {
     dev->cylinders = fle->totalNumTracks() / 2;
     dev->heads = 2;
     dev->sectors = fle->numSectorsPerTrack();
-    adfCreateFlop(dev, "empty", 0);
+    adfCreateFlop(dev, "empty",0 /* ADF_DOSFS_FFS */);
     adfDevUnMount(dev);
     fle->flushWriteCache();
     adfEnvCleanUp();

@@ -186,7 +186,7 @@ bool SectorCacheMFM::diskRemovedWarning() {
 
 // Return TRUE if you can export this to disk image
 bool SectorCacheMFM::allowCopyToFile() {
-    return (m_diskType == SectorType::stAmiga) || (m_diskType == SectorType::stIBM);
+    return (m_diskType == SectorType::stAmiga) || (m_diskType == SectorType::stAmigaDiskSpare) || (m_diskType == SectorType::stIBM);
 }
 
 // Override sector infomration
@@ -663,7 +663,7 @@ bool SectorCacheMFM::flushPendingWrites() {
 
         switch (m_diskType) {
         case SectorType::stAmiga: numBytes = encodeSectorsIntoMFM_AMIGA(isHD(), m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
-        case SectorType::stAmigaDiskSpare: numBytes = 0;  break; //numBytes = encodeSectorsIntoMFM_AMIGA(isHD(), m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
+        case SectorType::stAmigaDiskSpare: numBytes = encodeSectorsIntoMFM_AmigaDiskSpare(isHD(), m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
         case SectorType::stIBM: numBytes = encodeSectorsIntoMFM_IBM(isHD(), false, &m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
         case SectorType::stAtari: numBytes = encodeSectorsIntoMFM_IBM(isHD(), true, &m_trackCache[0][track], track, MAX_TRACK_SIZE, m_mfmBuffer); break;
         default:
@@ -707,7 +707,12 @@ bool SectorCacheMFM::flushPendingWrites() {
                 }
             }
 
-            if (mfmWrite(cylinder, upperSurface, (m_diskType == SectorType::stIBM) || (m_diskType == SectorType::stAtari), m_mfmBuffer, numBytes )) {
+#ifdef _DEBUG
+#define ALWAYS_ALIGN 1
+#else
+#define ALWAYS_ALIGN 0
+#endif
+            if (mfmWrite(cylinder, upperSurface, ALWAYS_ALIGN | (m_diskType == SectorType::stIBM) || (m_diskType == SectorType::stAtari), m_mfmBuffer, numBytes )) {
                 // Now wait until it completes - approx 400-500ms as this will also read it back to verify it
                 ULONGLONG start = GetTickCount64();
                 bool doRetry = false;

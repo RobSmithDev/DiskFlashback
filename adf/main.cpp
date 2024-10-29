@@ -53,6 +53,7 @@ void startTrayIcon(const std::wstring& exe) {
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow) {
     int argc = 0;
     WCHAR exeName[MAX_PATH];
+
     GetModuleFileName(NULL, exeName, MAX_PATH);
 
     LPWSTR* argv = nullptr;

@@ -3,7 +3,6 @@
 // Used by Resource.rc
 //
 #define ID_REFRESH                      3
-#define ID_REFRESH2                     4
 #define ID_MOUNT                        4
 #define IDD_FORMAT                      102
 #define IDD_COPY                        103
@@ -27,7 +26,10 @@
 #define ID_START                        1009
 #define IDC_CABLE                       1009
 #define IDC_COMPORT                     1010
+#define IDC_DS                          1010
 #define IDC_CAPTION                     1011
+#define IDC_DS2                         1011
+#define IDC_DS82                        1011
 #define IDC_LETTER                      1012
 #define IDC_AUTODETECT                  1013
 #define IDC_DD                          1014

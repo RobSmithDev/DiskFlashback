@@ -33,6 +33,7 @@
 #include "adf_str.h"
 
 #include <string.h>
+#include <assert.h>
 
 /* ----- VOLUME ----- */
 
@@ -78,7 +79,8 @@ static inline uint32_t adfVolGetSizeInBlocks ( const struct AdfVolume * const vo
 static inline uint32_t adfVolGetSizeInBlocksWithoutBootblock (
     const struct AdfVolume * const vol )
 {
-    return (uint32_t) ( adfVolGetSizeInBlocks ( vol ) - 2 );
+    assert(vol->numReservedBlocks >= 2);
+    return (uint32_t) ( adfVolGetSizeInBlocks ( vol ) - vol->numReservedBlocks );
 }
 
 static inline uint32_t adfVolGetBlockNum ( const struct AdfVolume * const vol )

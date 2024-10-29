@@ -33,3 +33,7 @@ void findSectors_AMIGA(const uint8_t* track, const uint32_t dataLengthInBits, co
 // Encodes all sectors into the buffer provided and returns the number of bytes that need to be written to disk 
 // mfmBufferSizeBytes needs to be at least 13542 or DD and 27076 for HD
 uint32_t encodeSectorsIntoMFM_AMIGA(const bool isHD, const DecodedTrack& decodedTrack, const uint32_t trackNumber, const uint32_t mfmBufferSizeBytes, void* memBuffer);
+
+// Encodes all sectors into the buffer provided and returns the number of bytes that need to be written to disk 
+// mfmBufferSizeBytes needs to be at least 13542 or DD and 27076 for HD                                
+uint32_t encodeSectorsIntoMFM_AmigaDiskSpare(const bool isHD, const DecodedTrack& decodedTrack, const uint32_t trackNumber, const uint32_t mfmBufferSizeBytes, void* memBuffer);

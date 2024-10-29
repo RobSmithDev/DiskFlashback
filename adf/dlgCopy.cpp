@@ -53,6 +53,7 @@ INT_PTR DialogCOPY::doModal(bool fileSystemRecognised) {
 		std::wstring defaultFormat;
 		switch (m_io->getSystemType()) {
 		case SectorType::stAmiga:
+		case SectorType::stAmigaDiskSpare:
 			dlg.lpstrFilter = L"Amiga Disk Files (*.adf)\0*.adf\0All Files(*.*)\0*.*\0\0";
 			m_fileExtension = L"adf";
 			break;

@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -255,7 +255,7 @@ void DokanFileSystemAmigaPFS3::fs_cleanup(const std::wstring& filename, PDOKAN_F
         std::string amigaPathA; wideToAnsi(amigaPath, amigaPathA);
         releaseFileInUse(amigaPathA);
     }
-    if (dokanfileinfo->DeleteOnClose) {
+    if (dokanfileinfo->DeletePending) {
         // Delete happens during cleanup and not in close event.
         ActiveFileIO io = notifyIOInUse(dokanfileinfo);
         fs_deletefile(filename, dokanfileinfo);

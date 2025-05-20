@@ -89,10 +89,10 @@ ADF_RETCODE adfMountHdFile ( struct AdfDevice * const dev )
     vol->mounted = false;
     vol->blockSize = 512;
     vol->numReservedBlocks = 2;
-    vol->firstBlock = 0;
+    vol->firstBlock = 0;    
 
     unsigned size = dev->size + 512 - ( dev->size % 512 );
-/*printf("size=%ld\n",size);*/
+    vol->lastBlock = (dev->size / vol->blockSize) - 1;
 
     /* set filesystem info (read from bootblock) */
     struct AdfBootBlock boot;
@@ -111,8 +111,14 @@ ADF_RETCODE adfMountHdFile ( struct AdfDevice * const dev )
     vol->datablockSize = adfVolIsOFS ( vol ) ? 488 : 512;
 
     if ( adfVolIsDosFS ( vol ) ) {
-        vol->rootBlock = (int32_t) ( ( size / 512 ) / 2 );
-/*printf("root=%ld\n",vol->rootBlock);*/
+#ifdef LITT_ENDIAN
+        const uint32_t block = swapLong((const uint8_t*)&boot.rootBlock);
+#else
+        const uint32_t block = boot.rootBlock;
+#endif
+
+        vol->rootBlock = adfVolCalcRootBlk(vol, block);
+
         uint8_t buf[512];
         bool found = false;
         do {
@@ -255,7 +261,13 @@ ADF_RETCODE adfMountHd ( struct AdfDevice * const dev, const int32_t rdskBlock )
             return ADF_RC_MALLOC;
         }
 
-        vol->rootBlock = adfVolIsDosFS(vol) ? adfVolCalcRootBlk(vol) : -1;
+#ifdef LITT_ENDIAN
+        const uint32_t block = boot.rootBlock;
+#else
+        const uint32_t block = swapLong(&boot.rootBlock);
+#endif
+
+        vol->rootBlock = adfVolIsDosFS(vol) ? adfVolCalcRootBlk(vol, block) : -1;
         next = part.next;
     }
 

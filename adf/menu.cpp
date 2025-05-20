@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -58,6 +58,8 @@
 #define MENUID_EJECTSTART       100
 #define MENUID_COPYTODISK       200
 #define MENUID_COPYTOIMAGE      201
+#define MENUID_DUPLICATOR       202
+#define MENUID_FORMAT           203
 
 #define TIMERID_UPDATE_CHECK      1000
 #define TIMERID_TRIGGER_REALDRIVE 1001
@@ -258,8 +260,11 @@ void CTrayMenu::setupMenu() {
     AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_ENABLED, L"Enabled");
     AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_COPYTODISK, L"Copy File to Disk...");
-    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_COPYTOIMAGE, L"Copy Disk to File...");
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_COPYTOIMAGE, L"Copy Disk to File...");        
     AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_DUPLICATOR, L"Copy File to Multiple Disks...");
+    AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
+    AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_FORMAT, L"Format Disk...");
     AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_CLEAN, L"Clean Drive Heads...");
     AppendMenu(m_hPhysicalDrive, MF_SEPARATOR, 0, NULL);
     AppendMenu(m_hPhysicalDrive, MF_STRING, MENUID_CONFIGURE, L"Configure...");
@@ -425,8 +430,21 @@ void CTrayMenu::populateDrives() {
     }
     if (m_drives.size() < 1) AppendMenu(m_hDriveMenu, MF_STRING | MF_DISABLED,0, L"no drives mounted");
     EnableMenuItem(m_hPhysicalDrive, MENUID_COPYTODISK, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
+    EnableMenuItem(m_hPhysicalDrive, MENUID_DUPLICATOR, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
     EnableMenuItem(m_hPhysicalDrive, MENUID_COPYTOIMAGE, MF_BYCOMMAND | ((physicalDrive && isMounted) ? MF_ENABLED : MF_DISABLED));
     EnableMenuItem(m_hPhysicalDrive, MENUID_CLEAN, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
+    EnableMenuItem(m_hPhysicalDrive, MENUID_FORMAT, MF_BYCOMMAND | (physicalDrive ? MF_ENABLED : MF_DISABLED));
+    
+}
+
+// Trigger the format dialog
+void CTrayMenu::handleFormatDisk() {
+    for (const auto& d : m_drives) {
+        if (d.second.isPhysicalDrive) {
+            PostMessage(d.second.hWnd, WM_USER, REMOTECTRL_FORMAT, (LPARAM)d.first[0]);
+            return;
+        }
+    }
 }
 
 // Handles triggering the drive cleaner
@@ -435,6 +453,36 @@ void CTrayMenu::handleCleanDisk() {
         if (d.second.isPhysicalDrive) {
             PostMessage(d.second.hWnd, WM_USER, REMOTECTRL_CLEAN, (LPARAM)d.first[0]);
             return;
+        }
+    }
+}
+
+// Start the disk duplicator system that will keep writing the same image
+void CTrayMenu::handleDiskDuplicator() {
+    // Request filename
+    OPENFILENAME dlg;
+    WCHAR filename[MAX_PATH] = { 0 };
+    memset(&dlg, 0, sizeof(dlg));
+    dlg.lStructSize = sizeof(dlg);
+    dlg.hwndOwner = m_window.hwnd();
+    std::wstring filter;
+    std::wstring defaultFormat;
+    dlg.lpstrFilter = L"Disk Images Files\0*.adf;*.img;*.dms;*.ima;*.st;*.dsk\0All Files(*.*)\0*.*\0\0";
+    dlg.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
+    dlg.lpstrTitle = L"Select disk image to copy to multiple floppy disks";
+    dlg.lpstrFile = filename;
+    dlg.nMaxFile = MAX_PATH;
+    if (GetOpenFileName(&dlg)) {
+        for (const auto& d : m_drives) {
+            if (d.second.isPhysicalDrive) {
+                COPYDATASTRUCT str;
+                std::wstring command = d.first.substr(0, 1) + filename;
+                str.lpData = (PVOID)command.c_str();
+                str.cbData = (DWORD)(command.length() * 2);
+                str.dwData = REMOTECTRL_DUPLICATETODISK;
+                LRESULT res = SendMessage(d.second.hWnd, WM_COPYDATA, (WPARAM)m_window.hwnd(), (LPARAM)&str);
+                return;
+            }
         }
     }
 }
@@ -653,6 +701,10 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
         CheckMenuItem(m_hUpdates, MENUID_AUTOSTART, MF_BYCOMMAND | isAutoStartWithWindows() ? MF_CHECKED : MF_UNCHECKED);
         break;
 
+    case MENUID_DUPLICATOR:
+        handleDiskDuplicator();
+        break;
+
     case MENUID_COPYTODISK:
         handleCopyToDisk();
         break;
@@ -661,6 +713,9 @@ void CTrayMenu::handleMenuResult(uint32_t index) {
         break;
     case MENUID_CLEAN:
         handleCleanDisk();
+        break;
+    case MENUID_FORMAT:
+        handleFormatDisk();
         break;
     case MENUID_MOUNTHD:
         runMountDialog();

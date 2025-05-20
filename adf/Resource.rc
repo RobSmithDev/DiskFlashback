@@ -92,6 +92,14 @@ BEGIN
         TOPMARGIN, 7
         BOTTOMMARGIN, 189
     END
+
+    IDD_DUPLICATE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 320
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 105
+    END
 END
 #endif    // APSTUDIO_INVOKED
 
@@ -186,6 +194,21 @@ BEGIN
     LTEXT           "Tip: If Unsure, Mount Read Only first",IDC_STATIC,8,178,134,11
 END
 
+IDD_DUPLICATE DIALOGEX 0, 0, 327, 112
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    PUSHBUTTON      "&Abort",ID_CLOSE,270,91,50,14
+    CONTROL         "",IDC_PROGRESS,"msctls_progress32",PBS_SMOOTH | WS_BORDER,7,76,313,11
+    LTEXT           "File system",IDC_CAPTION,7,7,313,19,SS_NOPREFIX
+    LTEXT           "Progress:",IDC_STATIC,7,64,32,8
+    CTEXT           "Progress:",IDC_STATUS,7,46,313,14,0,WS_EX_STATICEDGE
+    LTEXT           "",IDC_COUNTER,7,94,234,11
+    CONTROL         "Supress Errors (Fail after several retries)",IDC_SUPRESS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,28,313,10
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -228,6 +251,18 @@ BEGIN
     0
 END
 
+IDD_DUPLICATE AFX_DIALOG_LAYOUT
+BEGIN
+    0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 0,
+    0, 0, 0, 100,
+    0, 0, 0, 0,
+    0, 0, 0, 0
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -253,8 +288,8 @@ IDI_ICON5               ICON                    "floppy4.ico"
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,2,1
- PRODUCTVERSION 1,0,2,1
+ FILEVERSION 1,0,3,0
+ PRODUCTVERSION 1,0,3,1
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -271,12 +306,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "RobSmithDev"
             VALUE "FileDescription", "DiskFlashback"
-            VALUE "FileVersion", "1.0.2.1"
+            VALUE "FileVersion", "1.0.3.0"
             VALUE "InternalName", "DiskFlashback.exe"
-            VALUE "LegalCopyright", "Copyright (C) 2024 RobSmithDev"
+            VALUE "LegalCopyright", "Copyright (C) 2024-2025 RobSmithDev"
             VALUE "OriginalFilename", "DiskFlashback.exe"
             VALUE "ProductName", "DiskFlashback"
-            VALUE "ProductVersion", "1.0.2.1"
+            VALUE "ProductVersion", "1.0.3.1"
         END
     END
     BLOCK "VarFileInfo"

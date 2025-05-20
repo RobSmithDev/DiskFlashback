@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -17,6 +17,7 @@
 #include "amiga_sectors.h"
 #include "ibm_sectors.h"
 #include <stdio.h>
+#include <string>
 #include <Commctrl.h>
 #pragma comment(lib, "Comctl32.lib")
 
@@ -679,8 +680,10 @@ bool SectorCacheMFM::flushPendingWrites() {
 
         // Write retries
         uint32_t retries = 0;
+        uint32_t totalRetryCount = 0;
         for (;;) {
             // Handle a re-seek - might clean the head
+            bool didRetrySeek = false;
             if (retries == MAX_RETRIES / 2) {
                 if (isPhysicalDisk()) {
                     motorInUse(upperSurface);
@@ -692,10 +695,12 @@ bool SectorCacheMFM::flushPendingWrites() {
 
                     // Wait for the seek, or it will get removed! 
                     Sleep(300);
+                    didRetrySeek = true;
                 }
                 retries = 0;
             }
             cylinderSeek(cylinder, upperSurface);
+            if (isPhysicalDisk() && didRetrySeek) Sleep(300); else Sleep(1);
 
             // Commit to disk
             motorInUse(upperSurface);
@@ -759,6 +764,9 @@ bool SectorCacheMFM::flushPendingWrites() {
                 else {
                     // Writing succeeded. Now to do a verify!
                     const std::map<int, DecodedSector> backup = m_trackCache[0][track].sectors;
+                    
+                    // no point otherwise
+                    m_trackCache[0][track].sectors.clear();
                     for (;;) {
                         if (!doTrackReading(0, track, retries > 1)) {
                             if (m_dokanfileinfo) DokanResetTimeout(30000, m_dokanfileinfo);
@@ -834,6 +842,30 @@ bool SectorCacheMFM::flushPendingWrites() {
             }
 
             retries++;
+            totalRetryCount++;
+
+            if (totalRetryCount >= MAX_RETRIES * 2) {
+                if (!shouldPrompt()) return false; else {
+                    if (m_alwaysIgnore) {
+                        removeFailedWritesFromCache();
+                        return false;
+                    }
+                    std::wstring msg = L"Verify error writing to cylinder " + std::to_wstring(cylinder) + L", " + (upperSurface ? L"Upper" : L"Lower") + L" side";
+                    bool skip = false;
+                    switch (TaskDialogMessage(GetDesktopWindow(), GetModuleHandle(NULL), L"Disk Verifying Error", msg.c_str(), L"What would you like to do?",
+                        { L"Retry", L"Ignore", L"Always Ignore", L"Abort" }, TD_WARNING_ICON)) {
+                    case 0: totalRetryCount = 0; break;
+                    case 1: skip = true;
+                    case 2:
+                        m_alwaysIgnore = true;
+                        removeFailedWritesFromCache();
+                        return false;
+                    default:  removeFailedWritesFromCache();
+                        return false;
+                    }
+                    if (skip) break;
+                }
+            }
         }
 
         // Mark that its done!

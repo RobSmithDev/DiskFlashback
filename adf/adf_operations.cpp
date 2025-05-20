@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -337,7 +337,7 @@ void DokanFileSystemAmigaFS::fs_cleanup(const std::wstring& filename, PDOKAN_FIL
 
         dokanfileinfo->Context = 0;
     }
-    if (dokanfileinfo->DeleteOnClose) {
+    if (dokanfileinfo->DeletePending) {
         // Delete happens during cleanup and not in close event.
         ActiveFileIO io = notifyIOInUse(dokanfileinfo);
         fs_deletefile(filename, dokanfileinfo);
@@ -606,6 +606,7 @@ NTSTATUS DokanFileSystemAmigaFS::fs_setfiletime(const std::wstring& filename, CO
     DateTime tm;
 
     SYSTEMTIME sys;
+    if ((lastwritetime->dwLowDateTime == 0) && (lastwritetime->dwHighDateTime == 0)) return STATUS_SUCCESS;
     FileTimeToSystemTime(lastwritetime, &sys);
     tm.day = sys.wDay;
     tm.hour = sys.wHour;

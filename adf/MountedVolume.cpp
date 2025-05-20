@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -274,7 +274,7 @@ bool MountedVolume::mountFileSystem(FATFS* ftFSDevice, uint32_t partitionIndex, 
     }
     m_tempUnmount = false;
 #ifndef _DEBUG
-    if (showExplorer && m_FatFS) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
+    //if (showExplorer && m_FatFS) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
 #endif
     return m_FatFS != nullptr;
 }
@@ -365,7 +365,9 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     }
     else {
         m_partitionIndex = partitionIndex;
-        m_ADFvolume = m_ADFdevice ? adfVolMount(m_ADFdevice, partitionIndex, isForcedWriteProtect() ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE) : nullptr;
+        if (m_ADFdevice->volList)
+            m_ADFvolume = m_ADFdevice ? adfVolMount(m_ADFdevice, partitionIndex, isForcedWriteProtect() ? AdfAccessMode::ADF_ACCESS_MODE_READONLY : AdfAccessMode::ADF_ACCESS_MODE_READWRITE) : nullptr;
+        else m_ADFvolume = nullptr;
         // Not a standard AMIGA file system. Try PFS3
         if (!m_ADFvolume) m_pfs3 = createPFS3FromVolume(m_ADFdevice, partitionIndex, m_io, isForcedWriteProtect());
     }   
@@ -384,7 +386,7 @@ bool MountedVolume::mountFileSystem(AdfDevice* adfDevice, uint32_t partitionInde
     SHChangeNotify(SHCNE_DRIVEADD, SHCNF_PATH, getMountPoint().c_str(), NULL);
     m_tempUnmount = false;
 
-    if (showExplorer && (m_ADFvolume || m_pfs3)) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
+  //  if (showExplorer && (m_ADFvolume || m_pfs3)) ShellExecute(GetDesktopWindow(), L"explore", getMountPoint().c_str(), NULL, NULL, SW_SHOW);
 
     return (m_ADFvolume != nullptr) || (m_pfs3 != nullptr);
 }

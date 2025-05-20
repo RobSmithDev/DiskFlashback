@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -134,6 +134,10 @@ void DialogCOPY::handleInitDialog(HWND hwnd) {
 		RECT r;
 		GetWindowRect(m_hParent, &r);
 		SetWindowPos(hwnd, m_hParent, r.left + 70, r.top + 70, 0, 0, SWP_NOSIZE);
+	} else {
+		RECT r;
+		GetWindowRect(m_hParent, &r);
+		SetWindowPos(hwnd, m_hParent, (GetSystemMetrics(SM_CXSCREEN) - (r.right - r.left)) / 2, (GetSystemMetrics(SM_CYSCREEN) - (r.bottom - r.top)) / 2, 0, 0, SWP_NOSIZE);
 	}
 
 
@@ -145,6 +149,8 @@ void DialogCOPY::handleInitDialog(HWND hwnd) {
 
 	BringWindowToTop(hwnd);
 	SetForegroundWindow(hwnd);
+
+	setProgressWindowHandle(hwnd);
 } 
 
 // Returns TRUE if its OK to close
@@ -169,6 +175,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
+		resetProgress(totalTracks);
 		DWORD written;
 
 		uint32_t sectorNumber = 0;
@@ -224,6 +231,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 				sectorNumber++;
 			}
 			SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, track + 1, 0);
+			setDialogProgress(track + 1);
 		}
 
 		free(sectorData);
@@ -263,6 +271,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
+		resetProgress(totalTracks);
 
 		uint32_t sectorNumber = 0;
 		void* sectorData = malloc(source->sectorSize());
@@ -295,6 +304,7 @@ bool DialogCOPY::runCopyCommand(HANDLE fle, SectorCacheEngine* source) {
 				return false;
 			}
 			SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, track + 1, 0);
+			setDialogProgress(track + 1);
 		}
 
 		free(sectorData);
@@ -345,6 +355,7 @@ void DialogCOPY::doCopy() {
 			m_fs->setLocked(false);
 			m_fs->restoreUnmountedDrive(m_backup);
 			if (source) delete source;
+			resetProgress(0);
 			if (ret) {
 				MessageBox(m_dialogBox, L"Copy completed.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
 			}

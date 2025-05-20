@@ -26,7 +26,7 @@
  */
 
 #include "adf_dev_flop.h"
-
+#include "adf_byteorder.h"
 #include "adf_env.h"
 #include "adf_raw.h"
 #include "adf_util.h"
@@ -78,14 +78,31 @@ ADF_RETCODE adfMountFlop ( struct AdfDevice * const dev )
     if ( adfVolIsDosFS ( vol ) ) {
         vol->datablockSize = adfVolIsOFS ( vol ) ? 488 : 512;
         vol->numReservedBlocks = 2;
-        vol->rootBlock = adfVolCalcRootBlk ( vol );
+#ifdef LITT_ENDIAN
+        const uint32_t block = swapLong((const uint8_t*) & boot.rootBlock);
+#else
+        const uint32_t block = boot.rootBlock;
+#endif
+        vol->rootBlock = adfVolCalcRootBlk ( vol, block);
         struct AdfRootBlock root;
         vol->mounted = true;    // must be set to read the root block
         rc = adfReadRootBlock ( vol, (uint32_t) vol->rootBlock, &root );
         vol->mounted = false;
         if ( rc != ADF_RC_OK ) {
-            free ( vol );
-            return rc;
+            if (block) {
+                vol->rootBlock = adfVolCalcRootBlk(vol, 0);
+                vol->mounted = true;    // must be set to read the root block
+                rc = adfReadRootBlock(vol, (uint32_t)vol->rootBlock, &root);
+                vol->mounted = false;
+                if (rc != ADF_RC_OK) {
+                    free(vol);
+                    return rc;
+                }
+            }
+            else {
+                free(vol);
+                return rc;
+            }
         }
 
         vol->volName = strndup ( root.diskName,

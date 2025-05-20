@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -288,7 +288,7 @@ void DokanFileSystemFATFS::fs_cleanup(const std::wstring& filename, PDOKAN_FILE_
         dokanfileinfo->Context = 0;
     }
 
-    if (dokanfileinfo->DeleteOnClose) {
+    if (dokanfileinfo->DeletePending) {
         if (isFileInUse(filename, true)) return;
         // Delete happens during cleanup and not in close event.
         ActiveFileIO io = notifyIOInUse(dokanfileinfo);
@@ -544,6 +544,8 @@ NTSTATUS DokanFileSystemFATFS::fs_setfiletime(const std::wstring& filename, CONS
     FRESULT res = f_stat(filename.c_str(), &info);
     if (res != FR_OK) return makeFileOpenStatus(res);
 
+    if ((lastwritetime->dwLowDateTime == 0) && (lastwritetime->dwHighDateTime == 0)) return STATUS_SUCCESS;
+
     FILINFO inf;
     SYSTEMTIME sys;
     FileTimeToSystemTime(lastwritetime, &sys);
@@ -594,6 +596,8 @@ NTSTATUS DokanFileSystemFATFS::fs_movefile(const std::wstring& filename, const s
     return makeFileOpenStatus(f_rename(filename.c_str(), new_filename.c_str()));
 }
 
+#include <queue>
+
 NTSTATUS DokanFileSystemFATFS::fs_getdiskfreespace(uint64_t& freeBytesAvailable, uint64_t& totalNumBytes, uint64_t& totalNumFreeBytes, PDOKAN_FILE_INFO dokanfileinfo) {   
     DWORD fre_clust;
     FATFS* fs;
@@ -608,6 +612,21 @@ NTSTATUS DokanFileSystemFATFS::fs_getdiskfreespace(uint64_t& freeBytesAvailable,
         return STATUS_SUCCESS;
     }    
     return STATUS_DATA_ERROR;
+}
+
+void recurse(std::string path, std::string padding) {
+    FIL l;
+
+                
+    if (f_open(&l, L"ST\\NOISE15\\NOISE_15.PRG", FA_OPEN_EXISTING | FA_READ) == FR_OK) {
+                    char mem[6000];
+                    UINT r;
+                    f_read(&l, mem, 6000, &r);
+                    f_close(&l);
+                }
+
+    OutputDebugStringA("\n");
+   
 }
 
 NTSTATUS DokanFileSystemFATFS::fs_getvolumeinformation(std::wstring& volumeName, uint32_t& volumeSerialNumber, uint32_t& maxComponentLength, uint32_t& filesystemFlags, std::wstring& filesystemName, PDOKAN_FILE_INFO dokanfileinfo) {
@@ -636,6 +655,12 @@ NTSTATUS DokanFileSystemFATFS::fs_getvolumeinformation(std::wstring& volumeName,
         volumeName = L"Unknown";
         filesystemName = L"???";
     }
+
+
+    recurse("","");
+    //rminateProcess(GetCurrentProcess(), 0);
+    
+
 
     return STATUS_SUCCESS;
 }

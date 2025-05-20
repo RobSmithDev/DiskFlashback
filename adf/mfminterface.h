@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -45,7 +45,7 @@ private:
     PDOKAN_FILE_INFO m_dokanfileinfo = nullptr; // active file i/o
     std::mutex m_motorTimerProtect;
     bool m_writeOnly                = false;
-    std::function<void(bool diskInserted, SectorType diskFormat)> m_diskChangeCallback;
+    std::function<void(bool diskInserted, SectorType diskFormat)> m_diskChangeCallback;    
 
     // Sub format flags
     bool m_diskSpare = false;   // Amiga DiskSpare
@@ -112,7 +112,7 @@ protected:
     virtual uint32_t mfmRead(uint32_t track, bool retryMode, void* data, uint32_t maxLength) { return 0; };
     virtual bool mfmWrite(uint32_t cylinder, bool upperSide, bool fromIndex, void* data, uint32_t maxLength) = 0;
     virtual bool shouldPrompt() { return true; };
-    void setReady();
+    void setReady();    
 
 public:
     SectorCacheMFM(std::function<void(bool diskInserted, SectorType diskFormat)> diskChangeCallback);

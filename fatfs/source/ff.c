@@ -3621,6 +3621,10 @@ static FRESULT mount_volume (	/* FR_OK(0): successful, !=0: an error occurred */
 #if FF_FS_LOCK				/* Clear file lock semaphores */
 	clear_share(fs);
 #endif
+
+
+
+
 	return FR_OK;
 }
 
@@ -3750,6 +3754,9 @@ FRESULT f_open (
 	FSIZE_t ofs;
 #endif
 	DEF_NAMBUF
+		
+
+	
 
 
 	if (!fp) return FR_INVALID_OBJECT;
@@ -3759,6 +3766,10 @@ FRESULT f_open (
 	res = mount_volume(&path, &fs, mode);
 	if (res == FR_OK) {
 		dj.obj.fs = fs;
+
+
+
+
 		INIT_NAMBUF(fs);
 		res = follow_path(&dj, path);	/* Follow the file path */
 #if !FF_FS_READONLY	/* Read/Write configuration */
@@ -3816,6 +3827,11 @@ FRESULT f_open (
 					st_dword(dj.dir + DIR_CrtTime, tm);
 					st_dword(dj.dir + DIR_ModTime, tm);
 					cl = ld_clust(fs, dj.dir);			/* Get current cluster chain */
+
+					char tmp[100];
+					sprintf_s(tmp, "[%i]", cl);
+					OutputDebugStringA(tmp);
+
 					dj.dir[DIR_Attr] = AM_ARC;			/* Reset attribute */
 					st_clust(fs, dj.dir, 0);			/* Reset file allocation info */
 					st_dword(dj.dir + DIR_FileSize, 0);
@@ -3828,6 +3844,8 @@ FRESULT f_open (
 							fs->last_clst = cl - 1;		/* Reuse the cluster hole */
 						}
 					}
+
+
 				}
 			}
 		}
@@ -3874,6 +3892,10 @@ FRESULT f_open (
 #endif
 			{
 				fp->obj.sclust = ld_clust(fs, dj.dir);					/* Get object allocation info */
+
+				char buf[100];
+				_itoa_s(fp->obj.sclust, buf, 100, 10);				
+				OutputDebugStringA(buf);
 				fp->obj.objsize = ld_dword(dj.dir + DIR_FileSize);
 			}
 #if FF_USE_FASTSEEK
@@ -3894,6 +3916,11 @@ FRESULT f_open (
 				bcs = (DWORD)fs->csize * SS(fs);	/* Cluster size in byte */
 				clst = fp->obj.sclust;				/* Follow the cluster chain */
 				for (ofs = fp->obj.objsize; res == FR_OK && ofs > bcs; ofs -= bcs) {
+
+
+
+
+
 					clst = get_fat(&fp->obj, clst);
 					if (clst <= 1) res = FR_INT_ERR;
 					if (clst == 0xFFFFFFFF) res = FR_DISK_ERR;
@@ -3920,7 +3947,12 @@ FRESULT f_open (
 		FREE_NAMBUF();
 	}
 
+
 	if (res != FR_OK) fp->obj.fs = 0;	/* Invalidate file object on error */
+
+
+
+
 
 	LEAVE_FF(fs, res);
 }

@@ -7,6 +7,9 @@ https://robsmithdev.co.uk/diskflashback
 	Changed automatic update check from once per week to once per day
 	Fixed some OFS/FFS partitions not being detected due to a bug with ADFLib ignoring reserved blocks during root block position calculation
         Experimental Read access to DiskSpare Floppy Disks
+        Fixed problem where Windows might try to set the modified date to 0 (was handled incorrectly)
+        Fixed and improved floppy disk writing verify - it was a little broken
+        Added new Disk Duplicator option for writing the same image to multiple disks.
 
 1.0.2
 	Sped up the Greaseweazle track reading speed by almost double

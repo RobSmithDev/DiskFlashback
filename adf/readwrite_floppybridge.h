@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -28,6 +28,8 @@ class SectorRW_FloppyBridge : public SectorCacheMFM {
 private:
     FloppyBridgeAPI* m_bridge       = nullptr;
     FloppyBridge::BridgeDensityMode m_densityMode = FloppyBridge::BridgeDensityMode::bdmAuto;
+    std::function<bool()> m_promptCallbackQuestion; // For intercepting and disabling error dialogs
+
 protected:
     virtual bool restoreDrive() override;
     virtual void releaseDrive() override;
@@ -41,10 +43,14 @@ protected:
     virtual bool cylinderSeek(uint32_t cylinder, bool upperSide) override;
     virtual uint32_t mfmRead(uint32_t cylinder, bool upperSide, bool retryMode, void* data, uint32_t maxLength) override;
     virtual bool mfmWrite(uint32_t cylinder, bool upperSide, bool fromIndex, void* data, uint32_t maxLength) override;
+    virtual bool shouldPrompt() override { if (m_promptCallbackQuestion) return m_promptCallbackQuestion(); else return true; };
 
 public:
     SectorRW_FloppyBridge(const std::string& profile, std::function<void(bool diskInserted, SectorType diskFormat)> diskChangeCallback);
     ~SectorRW_FloppyBridge();
+
+    // Apply the override if needed
+    void setShoundPromptCallback(std::function<bool()> promptCallbackQuestion) { m_promptCallbackQuestion = promptCallbackQuestion; };
 
     // Return TRUE if this is actually a physical "REAL" drive
     virtual bool isPhysicalDisk() override { return true; };

@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -33,6 +33,7 @@
 #include "SCPFile.h"
 #include "dlgClean.h"
 #include "DriveList.h"
+#include "dlgDuplicator.h"
 
 #define TIMERID_MONITOR_FILESYS 1000
 #define WM_DISKCHANGE (WM_USER + 1)
@@ -139,6 +140,8 @@ DSTATUS disk_initialize(BYTE pdrv) {
 DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (fatfsSectorCache && (pdrv == 0)) {
         if (!fatfsSectorCache->isDiskPresent()) return RES_NOTRDY;
+
+
 
         while (count) {
             if (!fatfsSectorCache->hybridReadData(sector, fatfsSectorCache->sectorSize(), buff))
@@ -573,6 +576,25 @@ MountedVolume* VolumeManager::findVolumeFromDriveLetter(const WCHAR driveLetter)
     return nullptr;
 }
 
+// Handle a request to copy a file to the active drive multiple times
+LRESULT VolumeManager::handleDiskDuplicatorRequest(const std::wstring message) {
+    const HWND potentialParent = VolumeManager::FindPotentialExplorerParent();
+
+    // Extract the letter and string           
+    const WCHAR driveLetter = message[0];
+    std::wstring filename = message.substr(1);
+
+    MountedVolume* volumeFound = findVolumeFromDriveLetter(driveLetter);
+    if (!volumeFound) return MESSAGE_RESPONSE_DRIVENOTFOUND;
+
+    m_threads.emplace_back(std::thread([this, filename, potentialParent, volumeFound]() {
+        DialogDuplicate dlg(m_hInstance, potentialParent, m_io, volumeFound, filename);
+        return dlg.doModal();
+    }));
+
+    return MESSAGE_RESPONSE_OK;
+}
+
 // Handle a request to copy a file to the active drive
 LRESULT VolumeManager::handleCopyToDiskRequest(const std::wstring message) {
     const HWND potentialParent = VolumeManager::FindPotentialExplorerParent();
@@ -697,17 +719,26 @@ bool VolumeManager::run(bool triggerExplorer) {
     m_window.setMessageHandler(WM_COPYDATA, [this](WPARAM window, LPARAM param) -> LRESULT {
         COPYDATASTRUCT* cp = (COPYDATASTRUCT*)param;
         if (!cp) return MESSAGE_RESPONSE_FAILED;
+        std::wstring request;
 
-        if (cp->dwData == REMOTECTRL_COPYTODISK) {
+        switch (cp->dwData) {
+        case REMOTECTRL_COPYTODISK:
             if (cp->cbData < 6) return MESSAGE_RESPONSE_BADFORMAT;
             if (cp->cbData > (MAX_PATH + 2) * 2) return MESSAGE_RESPONSE_BADFORMAT;
 
             // Copy to a string
-            std::wstring request;
+            request.resize(cp->cbData / 2);
+            memcpy_s(&request[0], request.length() * 2, cp->lpData, cp->cbData);
+            return handleCopyToDiskRequest(request);
+
+        case REMOTECTRL_DUPLICATETODISK:
+            if (cp->cbData < 6) return MESSAGE_RESPONSE_BADFORMAT;
+            if (cp->cbData > (MAX_PATH + 2) * 2) return MESSAGE_RESPONSE_BADFORMAT;
+
             request.resize(cp->cbData / 2);
             memcpy_s(&request[0], request.length() * 2, cp->lpData, cp->cbData);
 
-            return handleCopyToDiskRequest(request);
+            return handleDiskDuplicatorRequest(request);
         }
 
         return MESSAGE_RESPONSE_FAILED;

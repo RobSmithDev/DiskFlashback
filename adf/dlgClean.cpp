@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -92,6 +92,8 @@ void DialogCLEAN::handleInitDialog(HWND hwnd) {
 	BringWindowToTop(hwnd);
 	SetForegroundWindow(hwnd);
 	enableControls(true);
+
+	setProgressWindowHandle(hwnd);
 } 
 	
 // Enable/disable controls on the dialog
@@ -117,11 +119,14 @@ bool DialogCLEAN::runCleanCommand() {
 		return false;
 	}	
 
+	resetProgress(10);
 	bool ret = m_bridge->runCleaning([this](uint16_t position, uint16_t total) ->bool {
+		setDialogProgress(position, total);
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, total));
 		SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, position, 0);
 		return !m_abortClean;
 	});
+	resetProgress(10);
 
 	if (!ret) {
 		MessageBox(m_dialogBox, L"Drive cleaning aborted. Please remove disk and press OK.", m_windowCaption.c_str(), MB_OK | MB_ICONINFORMATION);
@@ -163,7 +168,7 @@ INT_PTR DialogCLEAN::handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
 		AllowSetForegroundWindow(ASFW_ANY);
 		break;
 
-	case WM_SHOWWINDOW:
+	case WM_SHOWWINDOW:		
 		if (wParam) PostMessage(hwnd, WM_USER + 20, 0, 0);
 		break;
 

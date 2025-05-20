@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -60,6 +60,12 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 		GetWindowRect(m_hParent, &r);
 		SetWindowPos(hwnd, m_hParent, r.left + 70, r.top + 70, 0, 0, SWP_NOSIZE);
 	}
+	else {
+		RECT r;
+		GetWindowRect(m_hParent, &r);
+		SetWindowPos(hwnd, m_hParent, (GetSystemMetrics(SM_CXSCREEN)-(r.right-r.left))/2, (GetSystemMetrics(SM_CYSCREEN) - (r.bottom - r.top)) / 2, 0, 0, SWP_NOSIZE);
+
+	}
 
 	// Populate controls
 	HWND ctrl = GetDlgItem(hwnd, IDC_FILESYSTEM);
@@ -110,6 +116,7 @@ void DialogFORMAT::handleInitDialog(HWND hwnd) {
 	BringWindowToTop(hwnd);
 	SetForegroundWindow(hwnd);
 	enableControls(true);
+	setProgressWindowHandle(hwnd);
 } 
 	
 // Enable/disable controls on the dialog
@@ -178,6 +185,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 	//if (totalTracks == 0) totalTracks = 80 * 2;
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETRANGE, 0, MAKELPARAM(0, totalTracks + 4));
 	SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, 0, 0);
+	resetProgress(totalTracks + 4);
 
 	SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
 	bool isHD;
@@ -245,6 +253,7 @@ bool DialogFORMAT::runFormatCommand(bool quickFormat, bool dirCache, bool intMod
 			if (!m_io->flushWriteCache()) 
 				return false;
 			SendMessage(GetDlgItem(m_dialogBox, IDC_PROGRESS), PBM_SETPOS, track+1, 0);
+			setDialogProgress(track + 1);
 		}
 		progress = totalTracks;
 		m_io->resetCache();
@@ -374,6 +383,7 @@ void DialogFORMAT::doFormat() {
 				SectorRW_FloppyBridge* bridge = dynamic_cast<SectorRW_FloppyBridge*>(m_io);
 				if (bridge) bridge->setForceDensityMode(FloppyBridge::BridgeDensityMode::bdmAuto);
 			}
+			resetProgress(10);
 			m_io->setWritingOnlyMode(false);
 			m_fs->setLocked(false);
 			m_fs->restoreUnmountedDrive(false);

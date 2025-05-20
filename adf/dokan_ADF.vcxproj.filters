@@ -120,6 +120,9 @@
     <ClCompile Include="DriveList.cpp">
       <Filter>Interfaces\Sector Interface</Filter>
     </ClCompile>
+    <ClCompile Include="dlgDuplicator.cpp">
+      <Filter>Dialogs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -254,6 +257,9 @@
     </ClInclude>
     <ClInclude Include="DriveList.h">
       <Filter>Interfaces\Sector Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="dlgDuplicator.h">
+      <Filter>Dialogs</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

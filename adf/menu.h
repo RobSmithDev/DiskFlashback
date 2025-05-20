@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -107,11 +107,17 @@ private:
     // Trigger copy disk to image
     void handleCopyToImage();
 
+    // Start the disk duplicator system that will keep writing the same image
+    void handleDiskDuplicator();
+
     // Trigger copy image to disk
     void handleCopyToDisk();
 
     // Handles triggering the drive cleaner
     void handleCleanDisk();
+
+    // Trigger the format dialog
+    void handleFormatDisk();
 
     // Finds any .lnk files in the startup folder for this user that would start "diskflashback.exe"
     void findStartupShellLinksForProgram(std::vector<std::wstring>& fullPaths);

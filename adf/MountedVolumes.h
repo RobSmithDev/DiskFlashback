@@ -1,4 +1,4 @@
-/* DiskFlashback, Copyright (C) 2021-2024 Robert Smith (@RobSmithDev)
+/* DiskFlashback, Copyright (C) 2021-2025 Robert Smith (@RobSmithDev)
  * https://robsmithdev.co.uk/diskflashback
  *
  * This file is multi-licensed under the terms of the Mozilla Public
@@ -60,6 +60,9 @@ private:
 
 	// General cleanup and monitoring to see if file systems have dropped out
 	void checkRunningFileSystems();
+
+	// Handle a request to copy a file to the active drive multiple times
+	LRESULT handleDiskDuplicatorRequest(const std::wstring message);
 
 	// Handle a request to copy a file to the active drive
 	LRESULT handleCopyToDiskRequest(const std::wstring message);

@@ -23,7 +23,7 @@
 class SectorCacheEngine;
 class MountedVolume;
 
-class DialogCOPY : public ProgressDialog {
+class DialogDuplicate : public ProgressDialog {
 private:
 	HINSTANCE m_hInstance;
 	HWND m_hParent;
@@ -33,9 +33,17 @@ private:
 	std::wstring m_windowCaption;
 	std::wstring m_filename;
 	HCURSOR m_lastCursor = 0;
-	bool m_backup;
 	std::wstring m_fileExtension;
 	std::wstring m_titleExtension;
+	bool m_isVisible = false;
+	HWND m_statusText =0;
+	HANDLE m_sourceFile = INVALID_HANDLE_VALUE;
+	SectorCacheEngine* m_source = nullptr;
+
+	COLORREF	m_textColor;
+	COLORREF    m_backgroundColor;
+	HBRUSH		m_backgroundBrush;
+	bool        m_blinking = true;
 
 	// Thread to handle the actual operation
 	std::thread* m_copyThread = nullptr;
@@ -51,12 +59,11 @@ private:
 	void doCopy();
 
 	// Actually do the copy
-	bool runCopyCommand(HANDLE fle, SectorCacheEngine* source);
+	bool runCopyCommand();
 
 public:
-	DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs);
-	DialogCOPY(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs, const std::wstring& sourceADF);
-	INT_PTR doModal(bool fileSystemRecognised);
+	DialogDuplicate(HINSTANCE hInstance, HWND hParent, SectorCacheEngine* io, MountedVolume* fs, const std::wstring& sourceADF);
+	INT_PTR doModal();
 
 	// Dialog window message handler
 	INT_PTR handleDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
